@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Roll Overlay</title>
+  <style>
+    html, body {
+      margin: 0; height: 100%; background: transparent; overflow: hidden;
+      font-family: system-ui, "Segoe UI", sans-serif;
+    }
+    #stage {
+      position: fixed; inset: 0;
+      display: flex; align-items: flex-end; justify-content: center;
+      padding-bottom: 8vh;
+    }
+    .card {
+      min-width: 260px; max-width: 70vw;
+      padding: 18px 28px; border-radius: 16px;
+      background: rgba(20, 20, 28, 0.82);
+      border: 2px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.55);
+      color: #f4f4f6; text-align: center;
+      transform: translateY(40px) scale(0.96); opacity: 0;
+      transition: transform 0.35s cubic-bezier(.2,.9,.25,1.2), opacity 0.35s ease;
+    }
+    .card.show { transform: translateY(0) scale(1); opacity: 1; }
+    .who { font-size: 20px; font-weight: 600; opacity: 0.85; letter-spacing: 0.3px; }
+    .total {
+      font-size: 84px; font-weight: 800; line-height: 1.05; margin: 4px 0;
+      font-variant-numeric: tabular-nums;
+    }
+    .formula { font-size: 18px; opacity: 0.7; font-variant-numeric: tabular-nums; }
+    .tag {
+      display: inline-block; margin-top: 8px; padding: 3px 12px; border-radius: 999px;
+      font-size: 15px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+    }
+    /* crit */
+    .card.crit {
+      border-color: rgba(255, 210, 74, 0.9);
+      box-shadow: 0 0 40px rgba(255, 190, 0, 0.55), 0 10px 40px rgba(0,0,0,0.5);
+    }
+    .card.crit .total { color: #ffd24a; text-shadow: 0 0 18px rgba(255,190,0,0.8); }
+    .card.crit .tag { background: #ffd24a; color: #3a2c00; }
+    /* fumble */
+    .card.fumble { border-color: rgba(255, 80, 80, 0.9); }
+    .card.fumble .total { color: #ff6b6b; text-shadow: 0 0 18px rgba(255,40,40,0.7); }
+    .card.fumble .tag { background: #ff5050; color: #2a0000; }
+    .card.fumble.show { animation: shake 0.5s ease; }
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      20% { transform: translateX(-10px); } 40% { transform: translateX(9px); }
+      60% { transform: translateX(-6px); } 80% { transform: translateX(4px); }
+    }
+    #status {
+      position: fixed; top: 6px; left: 8px; font-size: 11px; color: #888;
+      font-family: monospace; opacity: 0.5;
+    }
+  </style>
+</head>
+<body>
+  <div id="stage"></div>
+  <div id="status">connecting…</div>
+  <script>
+    // Room id is the path segment: /room/<id>/overlay
+    const m = location.pathname.match(/\/room\/([^/]+)\//);
+    const room = m ? m[1] : new URLSearchParams(location.search).get('room');
+    const statusEl = document.getElementById('status');
+    const stage = document.getElementById('stage');
+
+    const DISPLAY_MS = 5000; // how long a card stays up
+    const queue = [];
+    let showing = false;
+
+    function enqueue(roll) {
+      queue.push(roll);
+      if (!showing) next();
+    }
+
+    function next() {
+      const roll = queue.shift();
+      if (!roll) { showing = false; return; }
+      showing = true;
+      render(roll);
+    }
+
+    function render(roll) {
+      const card = document.createElement('div');
+      card.className = 'card' + (roll.isCrit ? ' crit' : roll.isFumble ? ' fumble' : '');
+      const tag = roll.isCrit ? '<div class="tag">Critical!</div>'
+                : roll.isFumble ? '<div class="tag">Fumble</div>' : '';
+      card.innerHTML =
+        '<div class="who"></div>' +
+        '<div class="total"></div>' +
+        '<div class="formula"></div>' + tag;
+      card.querySelector('.who').textContent = roll.who || 'Someone';
+      card.querySelector('.total').textContent = (roll.total ?? '?');
+      card.querySelector('.formula').textContent = roll.formula || '';
+      stage.appendChild(card);
+      requestAnimationFrame(() => card.classList.add('show'));
+
+      setTimeout(() => {
+        card.classList.remove('show');
+        setTimeout(() => { card.remove(); next(); }, 400);
+      }, DISPLAY_MS);
+    }
+
+    // --- SSE ---
+    function connect() {
+      if (!room) { statusEl.textContent = 'no room id in URL'; return; }
+      const es = new EventSource('/room/' + room + '/events');
+      es.onopen = () => { statusEl.textContent = 'live'; };
+      es.onmessage = (e) => {
+        try { enqueue(JSON.parse(e.data)); } catch {}
+      };
+      es.onerror = () => { statusEl.textContent = 'reconnecting…'; };
+      // EventSource auto-reconnects; nothing else to do.
+    }
+    connect();
+
+    // --- preview: press T for a fake roll in a normal browser tab ---
+    let fake = 0;
+    window.addEventListener('keydown', (e) => {
+      if (e.key.toLowerCase() !== 't') return;
+      fake++;
+      const kind = fake % 3;
+      const v = kind === 1 ? 20 : kind === 2 ? 1 : (3 + (fake % 16));
+      enqueue({
+        id: 'fake-' + fake, who: 'Preview', formula: '1d20 + 5',
+        total: v + 5, dice: [{ sides: '20', value: v, crit: kind===1, fumble: kind===2 }],
+        isCrit: kind === 1, isFumble: kind === 2, ts: Date.now(),
+      });
+    });
+  </script>
+</body>
+</html>

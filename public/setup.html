@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Overlay setup</title>
+  <style>
+    body { margin: 0; background: #14141c; color: #e8e8ee; font-family: system-ui, sans-serif;
+           line-height: 1.55; }
+    main { max-width: 720px; margin: 0 auto; padding: 32px 20px 80px; }
+    h1 { font-size: 28px; } h2 { margin-top: 32px; font-size: 19px; color: #ffd24a; }
+    code, .url { font-family: ui-monospace, Menlo, monospace; }
+    .url { display: flex; gap: 8px; align-items: center; margin: 10px 0; }
+    .url input { flex: 1; padding: 10px 12px; border-radius: 8px; border: 1px solid #333;
+                 background: #0c0c12; color: #ffd24a; font-size: 14px; }
+    button { padding: 10px 14px; border-radius: 8px; border: 0; background: #ffd24a;
+             color: #2a2000; font-weight: 700; cursor: pointer; }
+    ol { padding-left: 22px; } li { margin: 8px 0; }
+    .note { color: #9a9aa6; font-size: 14px; }
+    a { color: #7db8ff; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>🎲 Your overlay is ready</h1>
+  <p class="note">This page is your room's control panel. The links below are secret —
+     anyone with them can view or feed your overlay. Don't share them publicly.</p>
+
+  <h2>1. Add the overlay to OBS</h2>
+  <p>In OBS: <strong>Sources → + → Browser</strong>, then paste this URL:</p>
+  <div class="url">
+    <input id="overlayUrl" readonly />
+    <button onclick="copy('overlayUrl')">Copy</button>
+  </div>
+  <p class="note">Set Width/Height to your canvas (e.g. 1920 × 1080). Background is transparent.
+     <a id="overlayOpen" href="#" target="_blank">Open overlay in a tab</a> to preview
+     (press <code>T</code> there for a fake roll).</p>
+
+  <h2>2. Install the capture script in Roll20</h2>
+  <ol>
+    <li>Install <a href="https://www.tampermonkey.net/" target="_blank">Tampermonkey</a>
+        in your browser if you haven't.</li>
+    <li>Open the capture script:
+        <a id="scriptOpen" href="/roll20-capture.user.js">install link</a>
+        and confirm in Tampermonkey.</li>
+    <li>Open your Roll20 game. The script connects to this room automatically.</li>
+    <li>Roll some dice — they appear on the overlay.</li>
+  </ol>
+  <p class="note">If you provisioned via the script instead, it already stored this room and
+     opened this page for you.</p>
+</main>
+<script>
+  const m = location.pathname.match(/\/room\/([^/]+)\//);
+  const room = m ? m[1] : '';
+  const origin = location.origin;
+  const overlayUrl = `${origin}/room/${room}/overlay`;
+  document.getElementById('overlayUrl').value = overlayUrl;
+  document.getElementById('overlayOpen').href = overlayUrl;
+  function copy(id) {
+    const el = document.getElementById(id);
+    el.select(); navigator.clipboard.writeText(el.value);
+  }
+</script>
+</body>
+</html>
