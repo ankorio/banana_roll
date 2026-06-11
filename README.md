@@ -23,7 +23,12 @@ Then:
    into the script. On first run in Roll20 it provisions a room and opens the setup page.
 3. **Add to OBS:** Sources → **+** → **Browser**, paste the `overlayUrl`, set the size to your
    canvas. The background is transparent.
-4. **Roll dice** in Roll20 — they appear on the overlay.
+4. **Roll dice** in Roll20 — they appear on the overlay. The userscript reads rolls straight from
+   Roll20's Firebase data feed, so every player's rolls are captured, not just yours.
+
+**Per-player overlays:** the userscript's on-page panel lists the players it sees and gives each a
+filtered overlay URL (`…/overlay?player=<playerid>`) alongside the all-players one — handy for a
+per-player scene or a solo cam overlay.
 
 Preview without OBS: open the overlay URL in a browser tab and press **T** for a fake roll
 (cycles normal → crit → fumble).
@@ -40,6 +45,7 @@ npm run smoke   # spawns the server, asserts create/SSE/dedup/retained-replay/40
 |---|---|---|
 | `PORT` | `8765` | Listen port |
 | `BASE_URL` | derived from request | Absolute URL base for generated links (set in production) |
+| `STATE_FILE` | _(unset)_ | Path to persist rooms to disk so they survive restarts (e.g. `.state.json`). Off = in-memory only. Single-instance only. |
 | `ROOM_TTL` | `21600000` (6h) | Idle room lifetime (ms) before sweep |
 | `MAX_ROOMS` | `5000` | Global room cap |
 | `CREATE_RATE_MAX` / `CREATE_RATE_WINDOW` | `10` / `60000` | Per-IP `/rooms` limit |
@@ -74,7 +80,7 @@ src/server.js                  http server + routing
 src/rooms.js                   in-memory room store, rate limits, TTL sweep
 public/overlay.html            transparent OBS overlay (EventSource + animations)
 public/setup.html              per-room setup page
-public/roll20-capture.user.js  Tampermonkey capture script (origin templated on serve)
+public/roll20-capture.user.js  Tampermonkey capture script — hooks Roll20's Firebase transport (origin templated on serve)
 scripts/smoke.mjs              end-to-end smoke test
 poc/                           throwaway ticking-number POC for OBS import testing
 ```

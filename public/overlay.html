@@ -62,8 +62,11 @@
   <div id="status">connecting…</div>
   <script>
     // Room id is the path segment: /room/<id>/overlay
+    const params = new URLSearchParams(location.search);
     const m = location.pathname.match(/\/room\/([^/]+)\//);
-    const room = m ? m[1] : new URLSearchParams(location.search).get('room');
+    const room = m ? m[1] : params.get('room');
+    // Per-player overlay: ?player=<playerid> shows only that player's rolls.
+    const wantPlayer = params.get('player');
     const statusEl = document.getElementById('status');
     const stage = document.getElementById('stage');
 
@@ -110,7 +113,11 @@
       const es = new EventSource('/room/' + room + '/events');
       es.onopen = () => { statusEl.textContent = 'live'; };
       es.onmessage = (e) => {
-        try { enqueue(JSON.parse(e.data)); } catch {}
+        try {
+          const roll = JSON.parse(e.data);
+          if (wantPlayer && roll.playerid !== wantPlayer) return; // not this player's overlay
+          enqueue(roll);
+        } catch {}
       };
       es.onerror = () => { statusEl.textContent = 'reconnecting…'; };
       // EventSource auto-reconnects; nothing else to do.

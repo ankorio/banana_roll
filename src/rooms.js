@@ -1,7 +1,9 @@
 'use strict';
 // In-memory room store: id/token minting, dedup, TTL sweep, rate limiting.
-// Single instance only — losing this process loses all state (by design).
+// Single instance only. Optional disk persistence (STATE_FILE) keeps rooms across
+// restarts — useful for local testing so OBS/userscript URLs don't go stale.
 const crypto = require('crypto');
+const fs = require('fs');
 
 // --- knobs (env-overridable) ------------------------------------------------
 const ROOM_TTL = intEnv('ROOM_TTL', 1000 * 60 * 60 * 6);        // 6h idle -> room dropped
@@ -50,6 +52,7 @@ function createRoom() {
     createdAt: now,
     lastActivity: now,
   });
+  save();
   return { id, publishToken };
 }
 
@@ -129,12 +132,73 @@ function stopSweeper() {
   if (sweepTimer) { clearInterval(sweepTimer); sweepTimer = null; }
 }
 
+// --- optional disk persistence (STATE_FILE) ---------------------------------
+// Off by default (in-memory only). When STATE_FILE is set, rooms survive restarts
+// so OBS/userscript URLs stay valid. Single-instance only — this is NOT a broker.
+const STATE_FILE = process.env.STATE_FILE || '';
+let saveTimer = null;
+let dirty = false;
+
+function serialize() {
+  const out = [];
+  for (const r of rooms.values()) {
+    out.push({
+      id: r.id, publishToken: r.publishToken, lastRoll: r.lastRoll,
+      seenOrder: r.seenOrder, createdAt: r.createdAt, lastActivity: r.lastActivity,
+    });
+  }
+  return JSON.stringify({ v: 1, rooms: out });
+}
+
+// debounced async write — coalesces bursts of rolls into one disk write
+function save() {
+  if (!STATE_FILE) return;
+  dirty = true;
+  if (saveTimer) return;
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    if (!dirty) return;
+    dirty = false;
+    fs.writeFile(STATE_FILE, serialize(), (e) => {
+      if (e) console.error('[state] save failed:', e.message);
+    });
+  }, 500);
+  if (saveTimer.unref) saveTimer.unref();
+}
+
+// synchronous flush for shutdown
+function flush() {
+  if (!STATE_FILE) return;
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+  try { fs.writeFileSync(STATE_FILE, serialize()); } catch (e) { console.error('[state] flush failed:', e.message); }
+}
+
+function load() {
+  if (!STATE_FILE || !fs.existsSync(STATE_FILE)) return;
+  try {
+    const data = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+    for (const r of (data.rooms || [])) {
+      rooms.set(r.id, {
+        id: r.id, publishToken: r.publishToken, lastRoll: r.lastRoll || null,
+        clients: new Set(), seen: new Set(r.seenOrder || []), seenOrder: r.seenOrder || [],
+        rollHits: [], createdAt: r.createdAt || Date.now(), lastActivity: r.lastActivity || Date.now(),
+      });
+    }
+    console.log(`[state] loaded ${rooms.size} room(s) from ${STATE_FILE}`);
+  } catch (e) {
+    console.error('[state] load failed:', e.message);
+  }
+}
+
+load(); // restore on startup (no-op unless STATE_FILE is set)
+
 module.exports = {
   createRoom, getRoom, touch,
   markSeen,
   allowCreate, allowRoll,
   addClient, removeClient,
   startSweeper, stopSweeper,
+  save, flush,
   _rooms: rooms, // exposed for tests
   limits: { SEEN_MAX, CLIENTS_MAX, MAX_ROOMS, ROOM_TTL },
 };

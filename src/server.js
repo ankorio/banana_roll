@@ -66,18 +66,32 @@ function serveFile(res, file, headers = {}) {
 // don't hand-edit SERVER / @connect. (The token is NOT baked in — the script
 // self-provisions, keeping the token off room-id-only responses.)
 let userscriptTemplate = null;
-function serveUserscript(req, res) {
+function buildUserscript(req) {
   if (userscriptTemplate == null) {
-    try { userscriptTemplate = fs.readFileSync(path.join(PUBLIC_DIR, 'roll20-capture.user.js'), 'utf8'); }
-    catch { return sendJson(res, 404, { error: 'not found' }); }
+    userscriptTemplate = fs.readFileSync(path.join(PUBLIC_DIR, 'roll20-capture.user.js'), 'utf8');
   }
   const origin = baseUrl(req);
-  const host = origin.replace(/^https?:\/\//, '');
-  const body = userscriptTemplate
+  const host = origin.replace(/^https?:\/\//, '').split(':')[0];
+  return userscriptTemplate
     .replace(/const SERVER = '[^']*';/, `const SERVER = '${origin}';`)
-    .replace(/^\/\/ @connect\s+localhost$/m, `// @connect      ${host.split(':')[0]}`);
+    .replace(/^\/\/ @connect\s+localhost$/m, `// @connect      ${host}`)
+    .replace(/__ORIGIN__/g, origin); // @updateURL/@downloadURL point back here
+}
+function serveUserscript(req, res) {
+  let body;
+  try { body = buildUserscript(req); } catch { return sendJson(res, 404, { error: 'not found' }); }
   res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8' });
   res.end(body);
+}
+// Tampermonkey fetches <name>.meta.js (just the header) to check @version for updates.
+function serveUserscriptMeta(req, res) {
+  let body;
+  try { body = buildUserscript(req); } catch { return sendJson(res, 404, { error: 'not found' }); }
+  const marker = '// ==/UserScript==';
+  const end = body.indexOf(marker);
+  const meta = end >= 0 ? body.slice(0, end + marker.length) + '\n' : body;
+  res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8' });
+  res.end(meta);
 }
 
 // --- roll validation --------------------------------------------------------
@@ -90,7 +104,7 @@ function validateRoll(obj) {
     crit: !!(d && d.crit),
     fumble: !!(d && d.fumble),
   })) : [];
-  return {
+  const out = {
     id: obj.id,
     who: typeof obj.who === 'string' ? obj.who.slice(0, 100) : 'Someone',
     formula: typeof obj.formula === 'string' ? obj.formula.slice(0, 200) : '',
@@ -100,6 +114,9 @@ function validateRoll(obj) {
     isFumble: !!obj.isFumble,
     ts: Number.isFinite(obj.ts) ? obj.ts : Date.now(),
   };
+  // Optional: which Roll20 player made this roll, so per-player overlays can filter.
+  if (typeof obj.playerid === 'string' && obj.playerid) out.playerid = obj.playerid.slice(0, 100);
+  return out;
 }
 
 // --- SSE --------------------------------------------------------------------
@@ -127,6 +144,8 @@ function handleCreateRoom(req, res) {
     throw e;
   }
   const base = baseUrl(req);
+  console.log(`  ↳ room created: ${created.id}`);
+  console.log(`    overlay: ${base}/room/${created.id}/overlay`);
   sendJson(res, 201, {
     room: created.id,
     publishToken: created.publishToken,
@@ -158,6 +177,11 @@ function handleRoll(req, res, id, query) {
     if (isNew) {
       room.lastRoll = roll;
       broadcast(room, roll);
+      rooms.save(); // persist retained last-roll (no-op unless STATE_FILE set)
+      console.log(`  ↳ roll in ${id}: ${roll.who} ${roll.formula} = ${roll.total}` +
+        `${roll.isCrit ? ' [CRIT]' : roll.isFumble ? ' [FUMBLE]' : ''} → ${room.clients.size} client(s)`);
+    } else {
+      console.log(`  ↳ duplicate roll ${roll.id} in ${id} (ignored)`);
     }
     sendJson(res, 200, { ok: true, duplicate: !isNew });
   });
@@ -180,6 +204,7 @@ function handleEvents(req, res, id) {
     return res.end();
   }
   rooms.touch(room);
+  console.log(`  ↳ overlay connected to ${id} (${room.clients.size} client(s))`);
 
   // Replay retained last roll so a late subscriber isn't blank.
   if (room.lastRoll) writeSse(res, JSON.stringify(room.lastRoll), room.lastRoll.id);
@@ -202,6 +227,15 @@ const server = http.createServer((req, res) => {
   const pathname = url.pathname;
   const method = req.method;
 
+  // Request logging: one line per request when the response finishes.
+  // /healthz is skipped to keep liveness probes from spamming the log.
+  if (pathname !== '/healthz') {
+    const started = Date.now();
+    res.on('finish', () => {
+      console.log(`${new Date().toISOString()} ${clientIp(req)} ${method} ${pathname} → ${res.statusCode} (${Date.now() - started}ms)`);
+    });
+  }
+
   if (pathname === '/healthz') {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     return res.end('ok');
@@ -215,6 +249,9 @@ const server = http.createServer((req, res) => {
   }
   if (pathname === '/roll20-capture.user.js' && method === 'GET') {
     return serveUserscript(req, res);
+  }
+  if (pathname === '/roll20-capture.meta.js' && method === 'GET') {
+    return serveUserscriptMeta(req, res);
   }
 
   // /room/:id/<action>
@@ -241,5 +278,14 @@ rooms.startSweeper();
 server.listen(PORT, () => {
   console.log(`relay listening on http://localhost:${PORT}`);
 });
+
+// Flush persisted state on shutdown so a clean restart keeps rooms.
+function shutdown() {
+  rooms.flush();
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(0), 500).unref();
+}
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
 
 module.exports = server;

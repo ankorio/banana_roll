@@ -13,8 +13,13 @@ Roll20 tab (userscript) --HTTP POST--> Node server (rooms, in-memory) --SSE--> O
   `MAX_ROOMS`, rate-limit knobs (see `src/rooms.js`).
 
 ## Architecture
+- **Capture = Firebase transport hook.** The userscript runs at `document-start` and hooks the
+  page's `WebSocket` (via `unsafeWindow`) to read Roll20's Firebase Realtime DB frames, plus
+  wraps `ref.on` for clean players-roster snapshots. Rolls arrive as structured JSON for *every*
+  player, keyed by a stable Firebase push-id (reused as the dedup `id`). Chat history replayed on
+  initial sync is dropped by decoding each push-id's embedded timestamp (live rolls only).
 - **Ingress = HTTP POST** from the userscript via `GM_xmlhttpRequest` (CSP-safe; the only
-  capture method Roll20's `connect-src` doesn't block).
+  way to reach the relay that Roll20's `connect-src` doesn't block).
 - **Egress = SSE** (`EventSource`) to the overlay — one-way, native, auto-reconnecting.
 - **State = in-memory**, single instance. Each room holds its publish token, retained last
   roll, connected SSE clients, and a bounded set of seen message ids.
@@ -26,22 +31,25 @@ Roll20 tab (userscript) --HTTP POST--> Node server (rooms, in-memory) --SSE--> O
 | POST | `/rooms` | IP rate-limit | Create room → `{ room, publishToken, overlayUrl, setupUrl }` |
 | POST | `/room/:id/roll` | `?token=` | Ingest one roll; dedup by message id; broadcast |
 | GET  | `/room/:id/events` | room id | SSE stream; replays retained last-roll on connect |
-| GET  | `/room/:id/overlay` | room id | Overlay HTML |
+| GET  | `/room/:id/overlay` | room id | Overlay HTML (`?player=<playerid>` filters to one player) |
 | GET  | `/room/:id/setup` | room id | Human setup page |
 | GET  | `/healthz` | none | Liveness |
 
-**Roll event shape:**
+**Roll event shape:** (`id` is the Firebase chat push-id; `playerid` is optional)
 ```json
-{ "id": "<data-messageid>", "who": "Player", "formula": "1d20 + 5", "total": 23,
+{ "id": "<firebase-chat-key>", "who": "Player", "formula": "1d20 + 5", "total": 23,
   "dice": [{ "sides": "20", "value": 18, "crit": false, "fumble": false }],
-  "isCrit": false, "isFumble": false, "ts": 1733800000000 }
+  "isCrit": false, "isFumble": false, "playerid": "-OSo…", "ts": 1733800000000 }
 ```
+The overlay reads `playerid` so a per-player overlay URL (`…/overlay?player=<playerid>`) shows
+only that player's rolls; omit the param for the all-players overlay. The userscript builds these
+URLs from the live players roster it observes on the Firebase `/players` node.
 
 ## Invariants
 - The **publish token is never** sent over SSE, shown on the overlay, or returned by any
   room-id-only endpoint. It appears only in the `POST /rooms` response and inside the userscript.
 - **Room ids and tokens are high-entropy and unguessable** (128-bit via `crypto`); no enumeration endpoint.
-- Rolls are **idempotent by `data-messageid`** within a room.
+- Rolls are **idempotent by `id`** (the Firebase chat push-id) within a room.
 - The server is **single-instance and stateless across restarts** (in-memory only). Losing state
   just means rooms must be recreated. Don't add persistence without revisiting the broker decision.
 - Treat both URLs as **bearer capabilities**: link = access.
