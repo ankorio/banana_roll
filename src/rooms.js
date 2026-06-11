@@ -260,7 +260,10 @@ function fileBackend(STATE_FILE) {
 // Redis: durable per-room keys + pub/sub fan-out across instances.
 function redisBackend(url) {
   const Redis = require('ioredis');
-  const opts = { maxRetriesPerRequest: 2, enableOfflineQueue: false };
+  // Default offline queue (enableOfflineQueue: true) so the boot-time subscribe +
+  // warm-load issued before the socket is ready are queued until 'connected'
+  // rather than rejected. maxRetriesPerRequest bounds hangs if Redis goes away.
+  const opts = { maxRetriesPerRequest: 3 };
   const redis = new Redis(url, opts);     // commands
   const sub = new Redis(url, opts);       // dedicated subscriber connection
   const KEY = (id) => `br:room:${id}`;
