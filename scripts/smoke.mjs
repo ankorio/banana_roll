@@ -77,11 +77,41 @@ async function main() {
     { method: 'POST', body: JSON.stringify({ ...roll, id: 'msg-2' }) });
   check('bad token -> 403', r3.status === 403);
 
+  // 5b. RAW chat record is parsed server-side and broadcast (advantage → higher d20).
+  const advRecord = {
+    id: 'chat-adv-1',
+    ts: Date.now(),
+    msg: {
+      type: 'general', rolltemplate: 'simple', who: 'Blaze', playerid: 'p-1',
+      content: ' {{rname=^{history-u}}} {{r1=$[[0]]}} {{advantage=1}} {{r2=$[[1]]}} charname=Blaze',
+      inlinerolls: {
+        '0': { expression: '1d20+5[intelligence]', results: { rolls: { '0': { dice: 1, results: { '0': { v: 13 } }, sides: 20, type: 'R' }, '1': { expr: '+5', type: 'M' } }, total: 18, type: 'V' } },
+        '1': { expression: '1d20+5[intelligence]', results: { rolls: { '0': { dice: 1, results: { '0': { v: 8 } }, sides: 20, type: 'R' }, '1': { expr: '+5', type: 'M' } }, total: 13, type: 'V' } },
+      },
+    },
+  };
+  const rc = await fetch(`${BASE}/room/${room}/chat?token=${publishToken}`,
+    { method: 'POST', body: JSON.stringify(advRecord) });
+  const jc = await rc.json();
+  check('raw chat parsed -> 200 with roll', rc.status === 200 && jc.roll && jc.roll.total === 18);
+  check('chat roll names the skill (history)', !!jc.roll && /history/i.test(jc.roll.formula));
+  await sleep(150);
+  check('chat roll broadcast over SSE', liveEvents.some((e) => e && e.id === 'chat-adv-1' && e.total === 18));
+
+  // 5c. a non-roll chat record is accepted but not broadcast
+  const before2 = liveEvents.length;
+  const rn = await fetch(`${BASE}/room/${room}/chat?token=${publishToken}`,
+    { method: 'POST', body: JSON.stringify({ id: 'chat-noroll', msg: { type: 'general', who: 'Blaze', content: 'hello table' } }) });
+  const jn = await rn.json();
+  check('non-roll chat -> 200 roll:null', rn.status === 200 && jn.roll === null);
+  await sleep(100);
+  check('non-roll not broadcast', liveEvents.length === before2);
+
   // 6. late subscriber gets retained last roll immediately
   const lateEvents = [];
   const closeLate = await sseClient(`${BASE}/room/${room}/events`, (e) => lateEvents.push(e));
   await sleep(200);
-  check('late subscriber gets retained last roll', lateEvents.some((e) => e && e.id === 'msg-1'));
+  check('late subscriber gets retained last roll', lateEvents.some((e) => e && e.id === 'chat-adv-1'));
 
   // 7. unknown room -> 404
   const r4 = await fetch(`${BASE}/room/nope/roll?token=x`, { method: 'POST', body: '{}' });

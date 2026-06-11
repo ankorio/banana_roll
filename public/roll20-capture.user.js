@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Roll20 → OBS Overlay Capture
 // @namespace    roll20-obs-overlay
-// @version      0.3.0
+// @version      0.5.0
 // @description  Capture Roll20 dice rolls from the Firebase transport and POST them to your overlay relay.
 // @match        https://app.roll20.net/editor*
 // @match        https://app.roll20.net/campaigns/*
@@ -14,11 +14,19 @@
 // @connect      localhost
 // @connect      self
 // @run-at       document-start
+// @noframes
 // ==/UserScript==
 
 /* eslint-disable no-undef */
 (function () {
   'use strict';
+
+  // Run only in the top-level Roll20 tab. Roll20 renders each open character sheet
+  // in its own same-origin <iframe> (name="iframe_<charid>"); without this guard
+  // Tampermonkey injects this whole script into every sheet too, so each one builds
+  // its own OBS Overlay panel and installs a duplicate set of hooks. @noframes above
+  // is the declarative form of this; the runtime check is the belt-and-suspenders.
+  try { if (window.top !== window.self) return; } catch { return; }
 
   // We hook Roll20's Firebase Realtime Database transport (a WebSocket to
   // *.firebaseio.com) instead of scraping the chat DOM. The transport carries
@@ -32,7 +40,7 @@
   // Loud, first-thing-that-runs banner so you can confirm injection in DevTools.
   // If you DON'T see this in the Roll20 tab's console, the script isn't matching
   // this URL (check Tampermonkey is enabled + the script is on) — nothing below ran.
-  console.log('%c[overlay] userscript v0.3.0 loaded on ' + location.href,
+  console.log('%c[overlay] userscript v0.5.0 loaded on ' + location.href,
     'background:#ffd24a;color:#000;padding:2px 6px;border-radius:3px;font-weight:700');
 
   // Only the editor page has live play; bail quietly on the campaign launch page.
@@ -68,7 +76,7 @@
         'box-shadow:0 6px 24px rgba(0,0,0,0.5)', 'border:1px solid #333',
       ].join(';');
       root.innerHTML =
-        '<div style="display:flex;align-items:center;gap:6px;font-weight:700;margin-bottom:6px">' +
+        '<div id="ov-head" style="display:flex;align-items:center;gap:6px;font-weight:700;margin-bottom:6px;cursor:move;user-select:none">' +
           '<span id="ov-dot" style="width:9px;height:9px;border-radius:50%;background:#f5a623"></span>' +
           '🎲 OBS Overlay' +
           '<span id="ov-status" style="margin-left:auto;font-weight:400;opacity:.7"></span>' +
@@ -99,11 +107,44 @@
       playersList = root.querySelector('#ov-plist');
       root.querySelector('#ov-x').onclick = () => root.remove();
       root.querySelector('#ov-copy').onclick = () => copy(urlInput.value, urlInput);
+      makeDraggable(root, root.querySelector('#ov-head'));
       // Re-apply anything that arrived before <body> existed.
       if (pending.room) api.setRoom(pending.room);
       if (pending.status) api.status(pending.status.text, pending.status.ok);
       if (pending.roster) api.setPlayers(pending.roster.list, pending.roster.room);
       return true;
+    }
+
+    // Drag the panel by its header. We render with position:fixed at a max z-index
+    // so it floats above every Roll20 element; dragging just rewrites left/top
+    // (switching off the initial bottom/right anchor on first grab).
+    function makeDraggable(el, handle) {
+      let sx = 0, sy = 0, ox = 0, oy = 0, dragging = false;
+      const onMove = (e) => {
+        if (!dragging) return;
+        const nx = Math.max(0, Math.min(window.innerWidth - 40, ox + e.clientX - sx));
+        const ny = Math.max(0, Math.min(window.innerHeight - 20, oy + e.clientY - sy));
+        el.style.left = nx + 'px';
+        el.style.top = ny + 'px';
+      };
+      const onUp = () => {
+        dragging = false;
+        document.removeEventListener('mousemove', onMove, true);
+        document.removeEventListener('mouseup', onUp, true);
+      };
+      handle.addEventListener('mousedown', (e) => {
+        if (e.button !== 0 || (e.target && e.target.id === 'ov-x')) return;
+        const r = el.getBoundingClientRect();
+        el.style.left = r.left + 'px';
+        el.style.top = r.top + 'px';
+        el.style.right = 'auto';
+        el.style.bottom = 'auto';
+        ox = r.left; oy = r.top; sx = e.clientX; sy = e.clientY;
+        dragging = true;
+        e.preventDefault();
+        document.addEventListener('mousemove', onMove, true);
+        document.addEventListener('mouseup', onUp, true);
+      });
     }
 
     function copy(text, selectEl) {
@@ -170,7 +211,7 @@
 
   // ── room provisioning (self-provision on first run) ────────────────────────
   let CREDS = null;
-  const rollBuffer = []; // rolls captured before creds exist; flushed once provisioned
+  const chatBuffer = []; // chat records captured before creds exist; flushed once provisioned
 
   function getCreds() {
     const room = GM_getValue('room', '');
@@ -178,16 +219,22 @@
     return room && token ? { room, token } : null;
   }
 
+  let provisioning = false;       // guard so concurrent 404s don't spawn many rooms
+  let openedSetupTab = false;     // only auto-open the setup tab on the very first provision
+
   function onCreds(creds) {
     CREDS = creds;
     ui.setRoom(creds.room);
     ui.status('watching rolls', true);
     renderPlayers(); // links need the room id
-    while (rollBuffer.length) postRoll(creds, rollBuffer.shift());
+    while (chatBuffer.length) postChat(creds, chatBuffer.shift());
+    startHeartbeat();
     console.log('[overlay] capturing for room', creds.room, '→ overlay:', `${SERVER}/room/${creds.room}/overlay`);
   }
 
   function provision() {
+    if (provisioning) return;
+    provisioning = true;
     ui.status('creating room…', null);
     GM_xmlhttpRequest({
       method: 'POST',
@@ -195,14 +242,16 @@
       headers: { 'Content-Type': 'application/json' },
       data: '{}',
       onload: (resp) => {
+        provisioning = false;
         try {
           const r = JSON.parse(resp.responseText);
           if (!r.room || !r.publishToken) throw new Error('bad provision response');
           GM_setValue('room', r.room);
           GM_setValue('token', r.publishToken);
           console.log('[overlay] provisioned room', r.room);
-          // Also try to open the setup page (may be popup-blocked — the panel is the fallback).
-          try { GM_openInTab(r.setupUrl, { active: true }); } catch {}
+          // Open the setup page once (may be popup-blocked — the panel is the fallback).
+          // Skip on re-provision so a server restart doesn't keep spawning tabs.
+          if (!openedSetupTab) { openedSetupTab = true; try { GM_openInTab(r.setupUrl, { active: true }); } catch {} }
           onCreds({ room: r.room, token: r.publishToken });
         } catch (e) {
           console.error('[overlay] provision failed', e, resp.responseText);
@@ -210,29 +259,73 @@
         }
       },
       onerror: (e) => {
+        provisioning = false;
         console.error('[overlay] provision request error', e);
         ui.status(`can't reach ${SERVER}`, false);
       },
     });
   }
 
-  // ── posting (idempotency handled server-side by id) ─────────────────────────
-  function postRoll(creds, roll) {
+  // ── heartbeat ────────────────────────────────────────────────────────────────
+  // The relay holds rooms in memory, so a server restart (or TTL sweep) silently
+  // drops ours and every roll then 404s. Poll a token-free liveness endpoint so we
+  // notice and auto-re-provision a fresh room — no more manual CTRL+F5. The new
+  // room means a new overlay URL (shown in the panel); set STATE_FILE on the relay
+  // if you want URLs to survive restarts instead.
+  let heartbeatTimer = null;
+  const HEARTBEAT_MS = 10000;
+
+  function reprovision(reason) {
+    console.warn('[overlay] room lost (' + reason + ') — re-provisioning');
+    GM_setValue('room', ''); GM_setValue('token', '');
+    CREDS = null;
+    ui.status('reconnecting…', null);
+    provision();
+  }
+
+  function startHeartbeat() {
+    if (heartbeatTimer) return;
+    heartbeatTimer = setInterval(() => {
+      if (!CREDS || provisioning) return;
+      const room = CREDS.room;
+      GM_xmlhttpRequest({
+        method: 'GET',
+        url: `${SERVER}/room/${room}/ping`,
+        onload: (resp) => {
+          if (CREDS && CREDS.room !== room) return; // creds changed mid-flight
+          if (resp.status === 404) reprovision('heartbeat 404');
+          else if (resp.status >= 200 && resp.status < 300) ui.status('watching rolls', true);
+          else ui.status('relay error ' + resp.status, false);
+        },
+        onerror: () => { ui.status(`can't reach ${SERVER}`, false); },
+      });
+    }, HEARTBEAT_MS);
+  }
+
+  // ── posting (raw chat record → server parses; dedup server-side by id) ──────────
+  function postChat(creds, record) {
+    const sentAt = Date.now();
     GM_xmlhttpRequest({
       method: 'POST',
-      url: `${SERVER}/room/${creds.room}/roll?token=${encodeURIComponent(creds.token)}`,
+      url: `${SERVER}/room/${creds.room}/chat?token=${encodeURIComponent(creds.token)}`,
       headers: { 'Content-Type': 'application/json' },
-      data: JSON.stringify(roll),
+      data: JSON.stringify(record),
       onload: (resp) => {
+        dbg(`POST ${record.id} → ${resp.status} in ${Date.now() - sentAt}ms`);
         if (resp.status === 403 || resp.status === 404) {
-          // bad token (403) or room gone after a server restart (404) — drop creds
-          // so a page reload re-provisions a fresh room.
-          console.warn('[overlay] relay returned', resp.status, '- clearing stored room');
-          GM_setValue('room', ''); GM_setValue('token', '');
-          CREDS = null;
-          ui.status('room gone — reload page to reconnect', false);
+          // bad token (403) or room gone after a server restart (404). Re-queue this
+          // record and auto-re-provision a fresh room so it lands without a reload.
+          chatBuffer.push(record);
+          if (chatBuffer.length > 50) chatBuffer.shift();
+          reprovision('chat ' + resp.status);
         } else if (resp.status >= 200 && resp.status < 300) {
-          ui.lastRoll(roll);
+          // Server echoes the parsed roll (or null if the record wasn't a roll) — use
+          // it for the panel's "last roll" line so the client still shows nothing local.
+          const roll = (() => { try { return JSON.parse(resp.responseText).roll; } catch { return null; } })();
+          if (roll) {
+            console.log(`[overlay]   ↳ parsed ${roll.who} ${roll.formula}=${roll.total} · firebase→relayed ${Date.now() - record.ts}ms`);
+            ui.lastRoll(roll);
+          }
         }
       },
       onerror: (e) => { console.error('[overlay] post error', e); ui.status('post failed', false); },
@@ -273,10 +366,13 @@
   const START_TS = Date.now();
   const HISTORY_GRACE_MS = 8000; // rolls older than this at load time are treated as history
 
-  // ── roll extraction (Firebase chat record → overlay roll shape) ──────────────
+  // ── chat record detection ────────────────────────────────────────────────────
+  // The client no longer parses rolls — it relays raw chat records and the server
+  // (parser.js) decides what's a roll. We only need to (a) recognize a chat record in
+  // the Firebase tree and (b) never relay SECRET types, so private rolls never leave
+  // the Roll20 page.
   const CHAT_TYPES = new Set(['general', 'emote', 'whisper', 'desc', 'rollresult', 'gmrollresult', 'api']);
-  // Only public rolls reach the overlay. gmrollresult/whisper are secret; emote/desc/api aren't rolls.
-  const POSTABLE = new Set(['rollresult', 'general']);
+  const SECRET_TYPES = new Set(['whisper', 'gmrollresult']);
 
   function looksLikeMessage(o) {
     if (!o || typeof o !== 'object') return false;
@@ -301,82 +397,11 @@
     return out;
   }
 
-  // Flatten Roll20's nested roll structure into flat dice for the overlay.
-  // Segments: type "R" = a die roll (sides + results[].v); type "G" = group of sub-rolls.
-  function flattenDice(rolls, out = [], depth = 0) {
-    if (!Array.isArray(rolls) || depth > 6) return out;
-    for (const seg of rolls) {
-      if (!seg || typeof seg !== 'object') continue;
-      if (seg.type === 'R' && Array.isArray(seg.results)) {
-        const sides = String(seg.sides != null ? seg.sides : '');
-        for (const res of seg.results) {
-          if (res && res.d) continue; // dropped die (keep-highest/lowest) — not counted
-          const v = num(res && res.v);
-          out.push({ sides, value: Number.isFinite(v) ? v : null, crit: false, fumble: false });
-        }
-      } else if (seg.type === 'G' && Array.isArray(seg.rolls)) {
-        for (const sub of seg.rolls) flattenDice(sub, out, depth + 1);
-      } else if (Array.isArray(seg.rolls)) {
-        flattenDice(seg.rolls, out, depth + 1);
-      }
-    }
-    return out;
-  }
-
   function msgTime(key, msg) {
     const fromId = pushIdTime(key);
     if (Number.isFinite(fromId)) return fromId;
     const pr = num(msg && (msg['.priority'] != null ? msg['.priority'] : msg.priority));
     return Number.isFinite(pr) ? pr : NaN;
-  }
-
-  // Returns an overlay roll, or null for non-roll / secret / stale-history messages.
-  function extractRoll(key, msg) {
-    if (!msg || typeof msg !== 'object') return null;
-    if (typeof msg.type === 'string' && !POSTABLE.has(msg.type)) return null;
-
-    let total = null, rolls = null, formula = '';
-    if (msg.type === 'rollresult' && typeof msg.content === 'string') {
-      // Plain /roll — content is the roll JSON ({ type:"V", rolls:[…], total }).
-      const parsed = tryParse(msg.content);
-      if (!parsed) return null;
-      total = num(parsed.total);
-      rolls = parsed.rolls;
-      formula = clean(msg.origRoll);
-    } else if (Array.isArray(msg.inlinerolls) && msg.inlinerolls.length) {
-      // Sheet roll template (attack/save/etc) — dice live in inlinerolls[].results.
-      const primary = msg.inlinerolls.find((r) => r && r.results && Array.isArray(r.results.rolls)) || msg.inlinerolls[0];
-      const r = primary && primary.results;
-      if (!r) return null;
-      total = num(r.total);
-      rolls = r.rolls;
-      formula = clean(primary.expression) || clean(msg.origRoll);
-    } else {
-      return null; // plain chat / emote with no dice
-    }
-
-    const dice = flattenDice(rolls, []);
-    let isCrit = false, isFumble = false;
-    for (const d of dice) {
-      if (d.sides === '20') { if (d.value === 20) isCrit = true; if (d.value === 1) isFumble = true; }
-    }
-    if (isCrit && isFumble) { isCrit = false; isFumble = false; } // mixed nat20+nat1 → neither
-
-    // Drop chat history replayed on initial Firebase sync; keep only live rolls.
-    const t = msgTime(key, msg);
-    if (Number.isFinite(t) && t < START_TS - HISTORY_GRACE_MS) return null;
-
-    return {
-      id: key || ('fb-' + (Number.isFinite(t) ? t : Date.now())),
-      who: clean(msg.who) || 'Someone',
-      formula,
-      total: Number.isFinite(total) ? total : null,
-      dice,
-      isCrit,
-      isFumble,
-      playerid: typeof msg.playerid === 'string' ? msg.playerid : undefined,
-      ts: Number.isFinite(t) ? t : Date.now(),
-    };
   }
 
   // ── players roster (online presence → per-player overlay links) ──────────────
@@ -432,18 +457,26 @@
   }
 
   // ── the single capture pipeline ──────────────────────────────────────────────
-  const localSeen = new Set(); // avoid re-posting the same roll within this tab
+  // The client is a thin relay: it forwards each LIVE chat record verbatim to the
+  // server, which parses it (parser.js) into an overlay roll. So new game systems /
+  // rule tweaks ship server-side with no userscript update.
+  const seenKeys = new Set(); // chat keys relayed this tab (relay-once)
 
   function onFirebaseData(path, value) {
     try {
       for (const { key, msg } of collectMessages(path, value)) {
-        const roll = extractRoll(key, msg);
-        if (!roll || localSeen.has(roll.id)) continue;
-        localSeen.add(roll.id);
-        if (localSeen.size > 2000) localSeen.clear(); // crude bound for marathon sessions
-        dbg('roll', roll.who, roll.formula, '=', roll.total);
-        if (CREDS) postRoll(CREDS, roll);
-        else { rollBuffer.push(roll); if (rollBuffer.length > 50) rollBuffer.shift(); }
+        // Drop chat history replayed on initial Firebase sync; keep only live events.
+        const t = msgTime(key, msg);
+        if (Number.isFinite(t) && t < START_TS - HISTORY_GRACE_MS) continue;
+        if (key && seenKeys.has(key)) continue;
+        // Never relay secret rolls — they must not leave the Roll20 page.
+        if (msg && SECRET_TYPES.has(msg.type)) continue;
+        if (key) { seenKeys.add(key); if (seenKeys.size > 3000) seenKeys.clear(); }
+
+        const record = { id: key, msg, ts: Number.isFinite(t) ? t : Date.now() };
+        console.log('[overlay] relaying chat', key, 'type=' + (msg && msg.type));
+        if (CREDS) postChat(CREDS, record);
+        else { chatBuffer.push(record); if (chatBuffer.length > 50) chatBuffer.shift(); }
       }
     } catch (e) { dbg('message handling failed', e); }
     try { collectPlayers(path, value); } catch (e) { dbg('player handling failed', e); }

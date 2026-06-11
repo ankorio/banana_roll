@@ -6,7 +6,8 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "smoke": "node scripts/smoke.mjs"
+    "test": "node scripts/parser.test.cjs",
+    "smoke": "node scripts/parser.test.cjs && node scripts/smoke.mjs"
   },
   "engines": {
     "node": ">=18"

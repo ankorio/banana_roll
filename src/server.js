@@ -4,6 +4,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const rooms = require('./rooms');
+const parser = require('./parser');
 
 const PORT = parseInt(process.env.PORT, 10) || 8765;
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
@@ -152,6 +153,7 @@ function handleCreateRoom(req, res) {
     overlayUrl: `${base}/room/${created.id}/overlay`,
     setupUrl: `${base}/room/${created.id}/setup`,
     eventsUrl: `${base}/room/${created.id}/events`,
+    chatUrl: `${base}/room/${created.id}/chat`,
     rollUrl: `${base}/room/${created.id}/roll`,
   });
 }
@@ -184,6 +186,54 @@ function handleRoll(req, res, id, query) {
       console.log(`  ↳ duplicate roll ${roll.id} in ${id} (ignored)`);
     }
     sendJson(res, 200, { ok: true, duplicate: !isNew });
+  });
+}
+
+// Ingest a RAW Roll20 chat record and parse it server-side. The userscript relays
+// records verbatim (no dice logic on the client); all game-rule parsing lives in
+// parser.js, so rule changes / new systems ship without touching the userscript.
+// Body: { id: "<chat push-id>", msg: <raw record>, ts?: <firebase commit ms> }.
+function handleChat(req, res, id, query) {
+  const room = rooms.getRoom(id);
+  if (!room) return sendJson(res, 404, { error: 'unknown room' });
+  if (query.get('token') !== room.publishToken) {
+    return sendJson(res, 403, { error: 'bad token' });
+  }
+  if (!rooms.allowRoll(room)) return sendJson(res, 429, { error: 'rate limited' });
+
+  readBody(req, MAX_BODY, (err, buf) => {
+    if (err) return sendJson(res, 400, { error: 'bad body' });
+    let parsed;
+    try { parsed = JSON.parse(buf.toString('utf8')); }
+    catch { return sendJson(res, 400, { error: 'invalid json' }); }
+    if (!parsed || typeof parsed !== 'object' || typeof parsed.id !== 'string' || !parsed.id) {
+      return sendJson(res, 400, { error: 'expected { id, msg }' });
+    }
+
+    rooms.touch(room);
+    // Dedup on the chat push-id before the (cheap) parse work and before broadcast.
+    const isNew = rooms.markSeen(room, parsed.id);
+    if (!isNew) {
+      console.log(`  ↳ duplicate chat ${parsed.id} in ${id} (ignored)`);
+      return sendJson(res, 200, { ok: true, duplicate: true });
+    }
+
+    const raw = parser.parseChatRecord(parsed.id, parsed.msg, {
+      system: room.system || parser.DEFAULT_SYSTEM,
+      ts: Number(parsed.ts),
+    });
+    const roll = validateRoll(raw); // null if not a roll, or normalize/cap a parsed roll
+    if (!roll) {
+      console.log(`  ↳ chat ${parsed.id} in ${id}: not a roll (ignored)`);
+      return sendJson(res, 200, { ok: true, roll: null });
+    }
+
+    room.lastRoll = roll;
+    broadcast(room, roll);
+    rooms.save();
+    console.log(`  ↳ roll in ${id}: ${roll.who} ${roll.formula} = ${roll.total}` +
+      `${roll.isCrit ? ' [CRIT]' : roll.isFumble ? ' [FUMBLE]' : ''} → ${room.clients.size} client(s)`);
+    sendJson(res, 200, { ok: true, roll });
   });
 }
 
@@ -255,12 +305,21 @@ const server = http.createServer((req, res) => {
   }
 
   // /room/:id/<action>
-  const m = pathname.match(/^\/room\/([^/]+)\/(roll|events|overlay|setup)$/);
+  const m = pathname.match(/^\/room\/([^/]+)\/(roll|chat|events|overlay|setup|ping)$/);
   if (m) {
     const id = decodeURIComponent(m[1]);
     const action = m[2];
+    if (action === 'chat' && method === 'POST') return handleChat(req, res, id, url.searchParams);
     if (action === 'roll' && method === 'POST') return handleRoll(req, res, id, url.searchParams);
     if (action === 'events' && method === 'GET') return handleEvents(req, res, id);
+    if (action === 'ping' && method === 'GET') {
+      // Heartbeat: room-id-only liveness check (no token). 404 tells the userscript
+      // its room was lost (server restart / TTL sweep) so it can re-provision.
+      const room = rooms.getRoom(id);
+      if (!room) return sendJson(res, 404, { error: 'unknown room' });
+      rooms.touch(room); // an open capture tab keeps the room from idling out
+      return sendJson(res, 200, { ok: true, clients: room.clients.size });
+    }
     if (action === 'overlay' && method === 'GET') {
       // overlay reads its room id from the path on the client side
       return serveFile(res, path.join(PUBLIC_DIR, 'overlay.html'));

@@ -3,7 +3,7 @@
 Relay Roll20 dice rolls onto a stream overlay.
 
 ```
-Roll20 tab (userscript) --HTTP POST--> Node server (rooms, in-memory) --SSE--> OBS Browser Source (overlay)
+Roll20 tab (userscript: relay raw chat records) --HTTP POST--> Node server (parse + rooms, in-memory) --SSE--> OBS Browser Source (overlay)
 ```
 
 ## Run
@@ -13,13 +13,21 @@ Roll20 tab (userscript) --HTTP POST--> Node server (rooms, in-memory) --SSE--> O
   `MAX_ROOMS`, rate-limit knobs (see `src/rooms.js`).
 
 ## Architecture
-- **Capture = Firebase transport hook.** The userscript runs at `document-start` and hooks the
-  page's `WebSocket` (via `unsafeWindow`) to read Roll20's Firebase Realtime DB frames, plus
-  wraps `ref.on` for clean players-roster snapshots. Rolls arrive as structured JSON for *every*
-  player, keyed by a stable Firebase push-id (reused as the dedup `id`). Chat history replayed on
-  initial sync is dropped by decoding each push-id's embedded timestamp (live rolls only).
+- **Capture = Firebase transport hook (thin relay).** The userscript runs at `document-start`
+  and hooks the page's `WebSocket` (via `unsafeWindow`) to read Roll20's Firebase Realtime DB
+  frames, plus wraps `ref.on` for clean players-roster snapshots. It does **no dice parsing**:
+  it forwards each *raw* chat record (keyed by its Firebase push-id) to the relay. It only
+  (a) drops history replayed on initial sync (push-id embedded timestamp) and (b) never relays
+  secret types (`whisper`/`gmrollresult`), so private rolls don't leave the page.
+- **Parse = server (`src/parser.js`).** The server turns a raw Roll20 chat record into the overlay
+  roll shape: flattens `inlinerolls`/rolltemplates, picks the shown roll honoring
+  advantage/disadvantage, labels it from `{{rname}}`, and applies crit/fumble rules. Crit/fumble is
+  **pluggable per game `system`** (default `dnd5e`; `generic` = totals only) so new systems or rule
+  tweaks ship server-side with **no userscript update**. The Firebase transport encodes arrays as
+  objects with numeric-string keys — `toArray` normalizes them. Unit-tested in `npm test`.
 - **Ingress = HTTP POST** from the userscript via `GM_xmlhttpRequest` (CSP-safe; the only
-  way to reach the relay that Roll20's `connect-src` doesn't block).
+  way to reach the relay that Roll20's `connect-src` doesn't block). `/chat` takes raw records
+  (server parses); `/roll` takes an already-parsed roll (tests / non-Roll20 producers).
 - **Egress = SSE** (`EventSource`) to the overlay — one-way, native, auto-reconnecting.
 - **State = in-memory**, single instance. Each room holds its publish token, retained last
   roll, connected SSE clients, and a bounded set of seen message ids.
@@ -29,8 +37,10 @@ Roll20 tab (userscript) --HTTP POST--> Node server (rooms, in-memory) --SSE--> O
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
 | POST | `/rooms` | IP rate-limit | Create room → `{ room, publishToken, overlayUrl, setupUrl }` |
-| POST | `/room/:id/roll` | `?token=` | Ingest one roll; dedup by message id; broadcast |
+| POST | `/room/:id/chat` | `?token=` | Ingest a raw Roll20 chat record `{ id, msg, ts? }`; server parses → roll; dedup by id; broadcast. Echoes the parsed `roll` (or `null`) |
+| POST | `/room/:id/roll` | `?token=` | Ingest one already-parsed roll; dedup by message id; broadcast |
 | GET  | `/room/:id/events` | room id | SSE stream; replays retained last-roll on connect |
+| GET  | `/room/:id/ping` | room id | Heartbeat liveness; 200 if room exists, 404 if lost (drives userscript re-provision) |
 | GET  | `/room/:id/overlay` | room id | Overlay HTML (`?player=<playerid>` filters to one player) |
 | GET  | `/room/:id/setup` | room id | Human setup page |
 | GET  | `/healthz` | none | Liveness |

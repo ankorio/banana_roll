@@ -70,23 +70,24 @@
     const statusEl = document.getElementById('status');
     const stage = document.getElementById('stage');
 
-    const DISPLAY_MS = 5000; // how long a card stays up
-    const queue = [];
-    let showing = false;
+    const DISPLAY_MS = 5000; // how long a card stays up before auto-hiding
 
-    function enqueue(roll) {
-      queue.push(roll);
-      if (!showing) next();
-    }
+    // Always show the NEWEST roll immediately. If a card is already up we cut it
+    // short and swap in the new one — queueing each roll for a full DISPLAY_MS
+    // made back-to-back rolls (e.g. during combat) lag seconds behind play.
+    let current = null; // { card, hideTimer } for the card on screen, or null
 
-    function next() {
-      const roll = queue.shift();
-      if (!roll) { showing = false; return; }
-      showing = true;
-      render(roll);
-    }
+    function show(roll) {
+      console.log('[overlay] roll received:', roll.who, roll.formula, '=', roll.total,
+        roll.isCrit ? '[CRIT]' : roll.isFumble ? '[FUMBLE]' : '', roll);
 
-    function render(roll) {
+      // Drop whatever is showing right now so the new roll pops instantly.
+      if (current) {
+        clearTimeout(current.hideTimer);
+        current.card.remove();
+        current = null;
+      }
+
       const card = document.createElement('div');
       card.className = 'card' + (roll.isCrit ? ' crit' : roll.isFumble ? ' fumble' : '');
       const tag = roll.isCrit ? '<div class="tag">Critical!</div>'
@@ -101,10 +102,12 @@
       stage.appendChild(card);
       requestAnimationFrame(() => card.classList.add('show'));
 
-      setTimeout(() => {
+      const hideTimer = setTimeout(() => {
         card.classList.remove('show');
-        setTimeout(() => { card.remove(); next(); }, 400);
+        setTimeout(() => { card.remove(); }, 400);
+        if (current && current.card === card) current = null;
       }, DISPLAY_MS);
+      current = { card, hideTimer };
     }
 
     // --- SSE ---
@@ -116,7 +119,10 @@
         try {
           const roll = JSON.parse(e.data);
           if (wantPlayer && roll.playerid !== wantPlayer) return; // not this player's overlay
-          enqueue(roll);
+          // Latency probe: roll.ts is the Firebase commit time, so this is the whole
+          // relay half (Firebase commit → overlay receipt). Shown in the corner.
+          if (roll.ts) statusEl.textContent = 'live · ' + (Date.now() - roll.ts) + 'ms';
+          show(roll);
         } catch {}
       };
       es.onerror = () => { statusEl.textContent = 'reconnecting…'; };
@@ -131,7 +137,7 @@
       fake++;
       const kind = fake % 3;
       const v = kind === 1 ? 20 : kind === 2 ? 1 : (3 + (fake % 16));
-      enqueue({
+      show({
         id: 'fake-' + fake, who: 'Preview', formula: '1d20 + 5',
         total: v + 5, dice: [{ sides: '20', value: v, crit: kind===1, fumble: kind===2 }],
         isCrit: kind === 1, isFumble: kind === 2, ts: Date.now(),
