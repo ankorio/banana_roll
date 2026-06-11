@@ -48,7 +48,7 @@
     .portrait img { width: 100%; height: 100%; object-fit: contain; display: block;
       filter: drop-shadow(0 1cqw 2.5cqw rgba(0, 0, 0, 0.5)); }
     .portrait.placeholder {
-      width: 100%; height: 100%; border-radius: 50%; overflow: hidden;
+      border-radius: 50%; overflow: hidden;
       background: radial-gradient(circle at 50% 35%,
         hsl(var(--hue, 40), 42%, 46%), hsl(var(--hue, 40), 40%, 30%));
       color: var(--gold-light); font-weight: 800; font-size: 10cqw; letter-spacing: 0.02em;
@@ -158,6 +158,7 @@
   const params = new URLSearchParams(location.search);
   const room = (location.pathname.match(/\/room\/([^/]+)\//) || [])[1] || params.get('room');
   const wantPlayer = params.get('player');     // per-player overlay filter
+  const DEMO = params.get('demo');             // landing-page demo: parent drives rolls via postMessage
   const statusEl = document.getElementById('status');
   const stage = document.getElementById('stage');
 
@@ -455,6 +456,9 @@
       if (Box) { try { Box.clearDice(); } catch {} }
     }
     busy = false;
+    // Demo mode: tell the embedding landing page the queue drained so it can pace
+    // the next auto-play roll without the queue piling up.
+    if (DEMO) { try { parent.postMessage({ type: 'demo-idle' }, location.origin); } catch {} }
   }
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -480,13 +484,25 @@
 
   // ── boot ────────────────────────────────────────────────────────────────────
   await Promise.allSettled([initDice(), initConfetti()]);
-  connect();
 
-  // Pre-warm every known player's dice textures now, then poll so a style edited on
-  // the customize page gets re-cached without waiting for that player's next roll.
-  if (Box && room) {
-    warmStyles();
-    setInterval(warmStyles, 15000);
+  if (DEMO) {
+    // Embedded on the landing page: no room/SSE. The parent page sends rolls via
+    // postMessage and we render them through the real pipeline (3D dice + plaque
+    // + particles), reporting ready/idle so it can drive buttons + auto-play.
+    statusEl.style.display = 'none';
+    window.addEventListener('message', (e) => {
+      if (e.origin !== location.origin) return;
+      if (e.data && e.data.type === 'demo-roll' && e.data.roll) enqueue(e.data.roll);
+    });
+    try { parent.postMessage({ type: 'demo-ready' }, location.origin); } catch {}
+  } else {
+    connect();
+    // Pre-warm every known player's dice textures now, then poll so a style edited on
+    // the customize page gets re-cached without waiting for that player's next roll.
+    if (Box && room) {
+      warmStyles();
+      setInterval(warmStyles, 15000);
+    }
   }
 
   // ── preview: press keys in a normal tab to test (no Roll20 needed) ───────────

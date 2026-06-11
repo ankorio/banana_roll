@@ -212,4 +212,11 @@ scripts/redis.test.mjs         Redis backend test with ioredis-mock
 scripts/smoke.mjs              end-to-end test
 ```
 
+### Credits
+
+Banana Roll stands on two excellent open-source libraries:
+
+- **[@3d-dice/dice-box-threejs](https://github.com/3d-dice/dice-box-threejs)** — the 3D physics dice engine that rolls the predetermined results onto the overlay.
+- **[canvas-confetti](https://github.com/catdad/canvas-confetti)** — the crit / fumble particle bursts.
+
 MIT License. Have fun, and may you avoid the fumble. 🎲

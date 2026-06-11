@@ -213,4 +213,11 @@ scripts/redis.test.mjs         test del backend Redis con ioredis-mock
 scripts/smoke.mjs              test end-to-end
 ```
 
+### Créditos
+
+Banana Roll se apoya en dos excelentes librerías de código abierto:
+
+- **[@3d-dice/dice-box-threejs](https://github.com/3d-dice/dice-box-threejs)** — el motor de dados 3D con físicas que tira los resultados predeterminados en el overlay.
+- **[canvas-confetti](https://github.com/catdad/canvas-confetti)** — las ráfagas de partículas de crítico / pifia.
+
 Licencia MIT. Diviértete y que no te salga una pifia. 🎲
