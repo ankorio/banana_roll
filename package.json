@@ -8,11 +8,17 @@
     "start": "node src/server.js",
     "prestart": "node scripts/build-dice.mjs",
     "dice:build": "node scripts/build-dice.mjs",
-    "test": "node scripts/parser.test.cjs",
-    "smoke": "node scripts/parser.test.cjs && node scripts/smoke.mjs"
+    "test": "node scripts/parser.test.cjs && node scripts/redis.test.mjs",
+    "smoke": "node scripts/parser.test.cjs && node scripts/redis.test.mjs && node scripts/smoke.mjs"
   },
   "engines": {
     "node": ">=18"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "ioredis": "^5.11.1"
+  },
+  "devDependencies": {
+    "ioredis-mock": "^8.13.1"
+  }
 }

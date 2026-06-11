@@ -211,12 +211,12 @@ function broadcast(room, roll) {
 }
 
 // --- routes -----------------------------------------------------------------
-function handleCreateRoom(req, res) {
+async function handleCreateRoom(req, res) {
   if (!rooms.allowCreate(clientIp(req))) {
     return sendJson(res, 429, { error: 'rate limited' });
   }
   let created;
-  try { created = rooms.createRoom(); }
+  try { created = await rooms.createRoom(); }
   catch (e) {
     if (e.code === 'CAPACITY') return sendJson(res, 503, { error: 'at capacity' });
     throw e;
@@ -258,7 +258,7 @@ function handleRoll(req, res, id, query) {
       if (style) roll.style = style;
       room.lastRoll = roll;
       broadcast(room, roll);
-      rooms.save(); // persist retained last-roll (no-op unless STATE_FILE set)
+      rooms.persistRoll(room, roll); // persist retained roll + fan out to other instances
       console.log(`  ↳ roll in ${id}: ${roll.who} ${roll.formula} = ${roll.total}` +
         `${roll.isCrit ? ' [CRIT]' : roll.isFumble ? ' [FUMBLE]' : ''} → ${room.clients.size} client(s)`);
     } else {
@@ -311,7 +311,7 @@ function handleChat(req, res, id, query) {
     if (style) roll.style = style;
     room.lastRoll = roll;
     broadcast(room, roll);
-    rooms.save();
+    rooms.persistRoll(room, roll);
     console.log(`  ↳ roll in ${id}: ${roll.who} ${roll.formula} = ${roll.total}` +
       `${roll.isCrit ? ' [CRIT]' : roll.isFumble ? ' [FUMBLE]' : ''} → ${room.clients.size} client(s)`);
     sendJson(res, 200, { ok: true, roll });
@@ -346,6 +346,7 @@ function handlePlayersPost(req, res, id, query) {
     if (!players) return sendJson(res, 400, { error: 'expected players array' });
     rooms.touch(room);
     room.players = players;
+    rooms.persist(room); // sync roster to other instances / durable store
     sendJson(res, 200, { ok: true, count: players.length });
   });
 }
@@ -398,7 +399,7 @@ function handleStylesPost(req, res, id, query) {
       }
       room.styles[player] = style;
     }
-    rooms.save();
+    rooms.persist(room);
     sendJson(res, 200, { ok: true, style });
   });
 }
@@ -512,14 +513,23 @@ const server = http.createServer((req, res) => {
   sendJson(res, 404, { error: 'not found' });
 });
 
-rooms.startSweeper();
-server.listen(PORT, () => {
-  console.log(`relay listening on http://localhost:${PORT}`);
+// Rolls posted to OTHER instances arrive via the backend's pub/sub; broadcast them
+// to this instance's own SSE clients. (No-op unless the Redis backend is active.)
+rooms.onRemoteRoll((room, roll) => broadcast(room, roll));
+
+// Load durable state (and connect the broker) before accepting traffic. Never fatal:
+// if the backend is unreachable we still serve in-memory and keep retrying.
+rooms.init().catch((e) => console.error('[state] init failed:', e.message)).finally(() => {
+  rooms.startSweeper();
+  server.listen(PORT, () => {
+    console.log(`relay listening on http://localhost:${PORT}`);
+  });
 });
 
 // Flush persisted state on shutdown so a clean restart keeps rooms.
 function shutdown() {
   rooms.flush();
+  rooms.close();
   server.close(() => process.exit(0));
   setTimeout(() => process.exit(0), 500).unref();
 }
