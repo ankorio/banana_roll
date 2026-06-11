@@ -319,11 +319,24 @@
     .sec-pad { padding: 70px 0; }
     .demo-row { grid-template-columns: 1fr; }
     .nav-right .btn-text-hide { display: none; }
+    /* coffee label is hidden here, so collapse its pill into a 40px icon button like GitHub */
+    .nav-right .btn-coffee { width: 40px; padding-left: 0; padding-right: 0; gap: 0; justify-content: center; }
   }
   @media (max-width: 520px) {
     .feat-grid { grid-template-columns: 1fr; }
     .foot-links { gap: 36px; }
     .step { grid-template-columns: 1fr; gap: 12px; }
+    /* keep the sticky header on one line on small phones */
+    .wrap { padding: 0 16px; }
+    .nav { gap: 10px; }
+    .brand { font-size: 15.5px; letter-spacing: .5px; gap: 8px; }
+    .brand .die { width: 26px; height: 26px; }
+    .nav-right { gap: 7px; }
+    .lang button { padding: 7px 8px; font-size: 12px; }
+    .icon-link, .nav-right .btn-coffee { width: 38px; height: 38px; }
+  }
+  @media (max-width: 360px) {
+    .nav .brand-name { display: none; } /* tightest phones: keep the die logo, drop the wordmark */
   }
 </style>
 </head>
@@ -332,7 +345,7 @@
   <!-- ════════ HEADER ════════ -->
   <header>
     <div class="wrap nav">
-      <div class="brand"><span class="die"><span>20</span></span>Banana&nbsp;Roll</div>
+      <div class="brand"><span class="die"><span>20</span></span><span class="brand-name">Banana&nbsp;Roll</span></div>
       <nav class="nav-links">
         <a href="#demo" data-i18n="nav_demo">Demo</a>
         <a href="#features" data-i18n="nav_features">Features</a>
