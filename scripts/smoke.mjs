@@ -107,6 +107,16 @@ async function main() {
   await sleep(100);
   check('non-roll not broadcast', liveEvents.length === before2);
 
+  // 5d. players roster round-trip (userscript push → setup page read)
+  const rp = await fetch(`${BASE}/room/${room}/players?token=${publishToken}`,
+    { method: 'POST', body: JSON.stringify([{ id: 'p-1', name: 'Blaze', color: '#e74c3c', online: true }]) });
+  const jp = await rp.json();
+  check('players post -> 200 count', rp.status === 200 && jp.count === 1);
+  const gp = await (await fetch(`${BASE}/room/${room}/players`)).json();
+  check('players get returns roster', Array.isArray(gp.players) && gp.players[0] && gp.players[0].name === 'Blaze');
+  const rpBad = await fetch(`${BASE}/room/${room}/players?token=wrong`, { method: 'POST', body: '[]' });
+  check('players post bad token -> 403', rpBad.status === 403);
+
   // 6. late subscriber gets retained last roll immediately
   const lateEvents = [];
   const closeLate = await sseClient(`${BASE}/room/${room}/events`, (e) => lateEvents.push(e));

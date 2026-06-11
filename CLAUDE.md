@@ -39,6 +39,8 @@ Roll20 tab (userscript: relay raw chat records) --HTTP POST--> Node server (pars
 | POST | `/rooms` | IP rate-limit | Create room → `{ room, publishToken, overlayUrl, setupUrl }` |
 | POST | `/room/:id/chat` | `?token=` | Ingest a raw Roll20 chat record `{ id, msg, ts? }`; server parses → roll; dedup by id; broadcast. Echoes the parsed `roll` (or `null`) |
 | POST | `/room/:id/roll` | `?token=` | Ingest one already-parsed roll; dedup by message id; broadcast |
+| POST | `/room/:id/players` | `?token=` | Userscript pushes the Roll20 roster `[{id,name,color,online}]`; stored on the room |
+| GET  | `/room/:id/players` | room id | Read the roster (no token; same names/ids as the per-player overlay URLs) — drives the setup page's per-player links |
 | GET  | `/room/:id/events` | room id | SSE stream; replays retained last-roll on connect |
 | GET  | `/room/:id/ping` | room id | Heartbeat liveness; 200 if room exists, 404 if lost (drives userscript re-provision) |
 | GET  | `/room/:id/overlay` | room id | Overlay HTML (`?player=<playerid>` filters to one player) |

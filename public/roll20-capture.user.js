@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Roll20 → OBS Overlay Capture
 // @namespace    roll20-obs-overlay
-// @version      0.5.0
+// @version      0.7.0
 // @description  Capture Roll20 dice rolls from the Firebase transport and POST them to your overlay relay.
 // @match        https://app.roll20.net/editor*
 // @match        https://app.roll20.net/campaigns/*
@@ -40,7 +40,7 @@
   // Loud, first-thing-that-runs banner so you can confirm injection in DevTools.
   // If you DON'T see this in the Roll20 tab's console, the script isn't matching
   // this URL (check Tampermonkey is enabled + the script is on) — nothing below ran.
-  console.log('%c[overlay] userscript v0.5.0 loaded on ' + location.href,
+  console.log('%c[overlay] userscript v0.7.0 loaded on ' + location.href,
     'background:#ffd24a;color:#000;padding:2px 6px;border-radius:3px;font-weight:700');
 
   // Only the editor page has live play; bail quietly on the campaign launch page.
@@ -62,8 +62,10 @@
   // even if the setup tab gets popup-blocked. Built lazily once <body> exists
   // (we run at document-start, so the DOM may not be ready yet).
   const ui = (() => {
-    let root, dot, statusText, urlInput, lastLine, playersWrap, playersList;
+    let root, dot, statusText, urlInput, lastLine, playersWrap, playersList, bodyEl, titleEl, minBtn;
     const pending = { room: null, status: null, roster: null };
+    // Persisted collapsed state: minimized shows just the 🎲 icon + status dot.
+    let collapsed = (() => { try { return GM_getValue('panel_collapsed', '') === '1'; } catch { return false; } })();
 
     function build() {
       if (root) return true;
@@ -76,28 +78,32 @@
         'box-shadow:0 6px 24px rgba(0,0,0,0.5)', 'border:1px solid #333',
       ].join(';');
       root.innerHTML =
-        '<div id="ov-head" style="display:flex;align-items:center;gap:6px;font-weight:700;margin-bottom:6px;cursor:move;user-select:none">' +
-          '<span id="ov-dot" style="width:9px;height:9px;border-radius:50%;background:#f5a623"></span>' +
-          '🎲 OBS Overlay' +
+        '<div id="ov-head" style="display:flex;align-items:center;gap:6px;font-weight:700;cursor:move;user-select:none">' +
+          '<span id="ov-dot" style="flex:0 0 auto;width:9px;height:9px;border-radius:50%;background:#f5a623"></span>' +
+          '<span id="ov-icon" style="cursor:pointer" title="expand / minimize">🎲</span>' +
+          '<span id="ov-title">OBS Overlay</span>' +
           '<span id="ov-status" style="margin-left:auto;font-weight:400;opacity:.7"></span>' +
+          '<span id="ov-min" style="cursor:pointer;opacity:.6;padding:0 4px;font-weight:700" title="minimize">–</span>' +
           '<span id="ov-x" style="cursor:pointer;opacity:.6;padding:0 4px" title="hide">✕</span>' +
         '</div>' +
-        '<div style="opacity:.7;margin-bottom:3px">Overlay URL (all players — paste into OBS):</div>' +
-        '<div style="display:flex;gap:5px">' +
-          '<input id="ov-url" readonly style="flex:1;min-width:0;padding:5px 6px;border-radius:6px;' +
-            'border:1px solid #444;background:#0c0c12;color:#ffd24a;font:11px monospace">' +
-          '<button id="ov-copy" style="border:0;border-radius:6px;background:#ffd24a;color:#2a2000;' +
-            'font-weight:700;cursor:pointer;padding:0 9px">Copy</button>' +
-        '</div>' +
-        '<div style="display:flex;gap:10px;margin-top:6px">' +
-          '<a id="ov-setup" target="_blank" style="color:#7db8ff">Setup page</a>' +
-          '<a id="ov-open" target="_blank" style="color:#7db8ff">Open overlay</a>' +
-        '</div>' +
-        '<div id="ov-players" style="margin-top:8px;display:none">' +
-          '<div style="opacity:.7;margin-bottom:3px">Per-player overlays:</div>' +
-          '<div id="ov-plist" style="display:flex;flex-direction:column;gap:3px;max-height:170px;overflow:auto"></div>' +
-        '</div>' +
-        '<div id="ov-last" style="margin-top:6px;opacity:.6">no rolls captured yet</div>';
+        '<div id="ov-body">' +
+          '<div style="opacity:.7;margin:6px 0 3px">Overlay URL (all players — paste into OBS):</div>' +
+          '<div style="display:flex;gap:5px">' +
+            '<input id="ov-url" readonly style="flex:1;min-width:0;padding:5px 6px;border-radius:6px;' +
+              'border:1px solid #444;background:#0c0c12;color:#ffd24a;font:11px monospace">' +
+            '<button id="ov-copy" style="border:0;border-radius:6px;background:#ffd24a;color:#2a2000;' +
+              'font-weight:700;cursor:pointer;padding:0 9px">Copy</button>' +
+          '</div>' +
+          '<div style="display:flex;gap:10px;margin-top:6px">' +
+            '<a id="ov-setup" target="_blank" style="color:#7db8ff">Setup page</a>' +
+            '<a id="ov-open" target="_blank" style="color:#7db8ff">Open overlay</a>' +
+          '</div>' +
+          '<div id="ov-players" style="margin-top:8px;display:none">' +
+            '<div style="opacity:.7;margin-bottom:3px">Per-player overlays:</div>' +
+            '<div id="ov-plist" style="display:flex;flex-direction:column;gap:3px;max-height:170px;overflow:auto"></div>' +
+          '</div>' +
+          '<div id="ov-last" style="margin-top:6px;opacity:.6">no rolls captured yet</div>' +
+        '</div>';
       (document.body || document.documentElement).appendChild(root);
       dot = root.querySelector('#ov-dot');
       statusText = root.querySelector('#ov-status');
@@ -105,14 +111,41 @@
       lastLine = root.querySelector('#ov-last');
       playersWrap = root.querySelector('#ov-players');
       playersList = root.querySelector('#ov-plist');
+      bodyEl = root.querySelector('#ov-body');
+      titleEl = root.querySelector('#ov-title');
+      minBtn = root.querySelector('#ov-min');
       root.querySelector('#ov-x').onclick = () => root.remove();
       root.querySelector('#ov-copy').onclick = () => copy(urlInput.value, urlInput);
+      minBtn.onclick = () => setCollapsed(!collapsed);
+      root.querySelector('#ov-icon').onclick = () => setCollapsed(!collapsed);
       makeDraggable(root, root.querySelector('#ov-head'));
+      applyCollapsed();
       // Re-apply anything that arrived before <body> existed.
       if (pending.room) api.setRoom(pending.room);
       if (pending.status) api.status(pending.status.text, pending.status.ok);
       if (pending.roster) api.setPlayers(pending.roster.list, pending.roster.room);
       return true;
+    }
+
+    // Minimized = just the dice icon + the colored status dot. Everything else
+    // (body, title, status text, the minimize/close buttons) is hidden; clicking
+    // the dice icon expands again.
+    function applyCollapsed() {
+      if (!root) return;
+      const hide = collapsed ? 'none' : '';
+      bodyEl.style.display = hide;
+      titleEl.style.display = hide;
+      statusText.style.display = hide;
+      minBtn.style.display = hide;
+      root.querySelector('#ov-x').style.display = hide;
+      root.style.width = collapsed ? 'auto' : '300px';
+      root.style.padding = collapsed ? '6px 9px' : '10px 12px';
+      root.querySelector('#ov-icon').title = collapsed ? 'expand' : 'minimize';
+    }
+    function setCollapsed(v) {
+      collapsed = v;
+      try { GM_setValue('panel_collapsed', v ? '1' : '0'); } catch {}
+      applyCollapsed();
     }
 
     // Drag the panel by its header. We render with position:fixed at a max z-index
@@ -132,8 +165,9 @@
         document.removeEventListener('mousemove', onMove, true);
         document.removeEventListener('mouseup', onUp, true);
       };
+      const noDrag = new Set(['ov-x', 'ov-min', 'ov-icon']);
       handle.addEventListener('mousedown', (e) => {
-        if (e.button !== 0 || (e.target && e.target.id === 'ov-x')) return;
+        if (e.button !== 0 || (e.target && noDrag.has(e.target.id))) return;
         const r = el.getBoundingClientRect();
         el.style.left = r.left + 'px';
         el.style.top = r.top + 'px';
@@ -420,6 +454,29 @@
     const list = Array.from(roster.values())
       .sort((a, b) => (Number(b.online) - Number(a.online)) || a.name.localeCompare(b.name));
     ui.setPlayers(list, CREDS && CREDS.room);
+    syncPlayers(list);
+  }
+
+  // Push the roster to the relay (debounced) so the setup page can list per-player
+  // overlay links. Presence toggles can burst, so coalesce into one POST.
+  let playersTimer = null, lastPlayersJson = '';
+  function syncPlayers(list) {
+    if (!CREDS) return;
+    const payload = JSON.stringify(list.map((p) => ({ id: p.id, name: p.name, color: p.color, online: p.online })));
+    if (payload === lastPlayersJson) return; // nothing changed
+    if (playersTimer) return;
+    playersTimer = setTimeout(() => {
+      playersTimer = null;
+      if (!CREDS) return;
+      lastPlayersJson = payload;
+      GM_xmlhttpRequest({
+        method: 'POST',
+        url: `${SERVER}/room/${CREDS.room}/players?token=${encodeURIComponent(CREDS.token)}`,
+        headers: { 'Content-Type': 'application/json' },
+        data: payload,
+        onerror: () => { lastPlayersJson = ''; }, // allow a retry on the next change
+      });
+    }, 500);
   }
 
   // Update the roster from any synced value whose path is the /players node.

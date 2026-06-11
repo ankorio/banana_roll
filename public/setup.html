@@ -9,57 +9,186 @@
            line-height: 1.55; }
     main { max-width: 720px; margin: 0 auto; padding: 32px 20px 80px; }
     h1 { font-size: 28px; } h2 { margin-top: 32px; font-size: 19px; color: #ffd24a; }
-    code, .url { font-family: ui-monospace, Menlo, monospace; }
+    code, .url, .mono { font-family: ui-monospace, Menlo, monospace; }
     .url { display: flex; gap: 8px; align-items: center; margin: 10px 0; }
-    .url input { flex: 1; padding: 10px 12px; border-radius: 8px; border: 1px solid #333;
+    .url input { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 8px; border: 1px solid #333;
                  background: #0c0c12; color: #ffd24a; font-size: 14px; }
     button { padding: 10px 14px; border-radius: 8px; border: 0; background: #ffd24a;
-             color: #2a2000; font-weight: 700; cursor: pointer; }
-    ol { padding-left: 22px; } li { margin: 8px 0; }
+             color: #2a2000; font-weight: 700; cursor: pointer; white-space: nowrap; }
     .note { color: #9a9aa6; font-size: 14px; }
     a { color: #7db8ff; }
+    /* per-player rows */
+    #players { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+    .prow { display: flex; gap: 8px; align-items: center; }
+    .pdot { flex: 0 0 auto; width: 10px; height: 10px; border-radius: 50%; background: #888; }
+    .pname { flex: 0 0 130px; max-width: 130px; overflow: hidden; text-overflow: ellipsis;
+             white-space: nowrap; font-weight: 600; }
+    .prow input { flex: 1; min-width: 0; padding: 9px 11px; border-radius: 8px; border: 1px solid #333;
+                  background: #0c0c12; color: #ffd24a; font-size: 13px; }
+    .prow .open { flex: 0 0 auto; }
+    .empty { color: #9a9aa6; font-size: 14px; padding: 6px 0; }
+    .lang { position: fixed; top: 14px; right: 16px; display: flex; gap: 4px; }
+    .lang button { background: #16161f; color: #9a9aa6; border: 1px solid #2a2a38;
+      border-radius: 8px; padding: 5px 10px; cursor: pointer; font-weight: 700; font-size: 13px; }
+    .lang button[aria-pressed="true"] { background: #ffd24a; color: #2a2000; border-color: #ffd24a; }
   </style>
 </head>
 <body>
+<div class="lang">
+  <button data-lang="en" type="button">EN</button>
+  <button data-lang="es" type="button">ES</button>
+</div>
 <main>
-  <h1>🎲 Your overlay is ready</h1>
-  <p class="note">This page is your room's control panel. The links below are secret —
+  <h1 data-i18n="h1">🎲 Your overlay is ready</h1>
+  <p class="note" data-i18n="intro">This page is your room's control panel. The links below are secret —
      anyone with them can view or feed your overlay. Don't share them publicly.</p>
 
-  <h2>1. Add the overlay to OBS</h2>
-  <p>In OBS: <strong>Sources → + → Browser</strong>, then paste this URL:</p>
+  <h2 data-i18n="s1_h">1. All-players overlay</h2>
+  <p data-i18n="s1_p">In OBS: <strong>Sources → + → Browser</strong>, then paste this URL. It shows every
+     player's rolls in one source.</p>
   <div class="url">
     <input id="overlayUrl" readonly />
-    <button onclick="copy('overlayUrl')">Copy</button>
+    <button id="copyBtn" onclick="copyEl('overlayUrl', this)" data-i18n="copy">Copy</button>
   </div>
-  <p class="note">Set Width/Height to your canvas (e.g. 1920 × 1080). Background is transparent.
-     <a id="overlayOpen" href="#" target="_blank">Open overlay in a tab</a> to preview
+  <p class="note" data-i18n="s1_note">Set Width/Height to your canvas (e.g. 1920 × 1080). Background is transparent.
+     <a id="overlayOpen" href="#" target="_blank" data-i18n="s1_preview">Open overlay in a tab</a> to preview
      (press <code>T</code> there for a fake roll).</p>
 
-  <h2>2. Install the capture script in Roll20</h2>
-  <ol>
-    <li>Install <a href="https://www.tampermonkey.net/" target="_blank">Tampermonkey</a>
-        in your browser if you haven't.</li>
-    <li>Open the capture script:
-        <a id="scriptOpen" href="/roll20-capture.user.js">install link</a>
-        and confirm in Tampermonkey.</li>
-    <li>Open your Roll20 game. The script connects to this room automatically.</li>
-    <li>Roll some dice — they appear on the overlay.</li>
-  </ol>
-  <p class="note">If you provisioned via the script instead, it already stored this room and
-     opened this page for you.</p>
+  <h2 data-i18n="s2_h">2. Per-player overlays</h2>
+  <p data-i18n="s2_p">One source per player — add each as its own Browser source so you can place them
+     separately. This list updates as players come online in your Roll20 game.</p>
+  <div id="players"></div>
 </main>
 <script>
   const m = location.pathname.match(/\/room\/([^/]+)\//);
   const room = m ? m[1] : '';
   const origin = location.origin;
   const overlayUrl = `${origin}/room/${room}/overlay`;
+  const playerUrl = (id) => `${origin}/room/${room}/overlay?player=${encodeURIComponent(id)}`;
   document.getElementById('overlayUrl').value = overlayUrl;
-  document.getElementById('overlayOpen').href = overlayUrl;
-  function copy(id) {
-    const el = document.getElementById(id);
-    el.select(); navigator.clipboard.writeText(el.value);
+
+  // ── i18n (EN/ES) ────────────────────────────────────────────────────────────
+  const I18N = {
+    en: {
+      doc_title: 'Overlay setup',
+      h1: '🎲 Your overlay is ready',
+      intro: "This page is your room's control panel. The links below are secret — anyone with them can view or feed your overlay. Don't share them publicly.",
+      s1_h: '1. All-players overlay',
+      s1_p: "In OBS: <strong>Sources → + → Browser</strong>, then paste this URL. It shows every player's rolls in one source.",
+      s1_note: 'Set Width/Height to your canvas (e.g. 1920 × 1080). Background is transparent. <a id="overlayOpen" href="#" target="_blank" data-i18n="s1_preview">Open overlay in a tab</a> to preview (press <code>T</code> there for a fake roll).',
+      s1_preview: 'Open overlay in a tab',
+      s2_h: '2. Per-player overlays',
+      s2_p: 'One source per player — add each as its own Browser source so you can place them separately. This list updates as players come online in your Roll20 game.',
+      empty: 'No players seen yet — open your Roll20 game and they\'ll appear here.',
+      open: 'Open', copy: 'Copy', copied: 'Copied!',
+    },
+    es: {
+      doc_title: 'Configuración del overlay',
+      h1: '🎲 Tu overlay está listo',
+      intro: 'Esta página es el panel de control de tu sala. Los enlaces de abajo son secretos — cualquiera que los tenga puede ver o alimentar tu overlay. No los compartas públicamente.',
+      s1_h: '1. Overlay de todos los jugadores',
+      s1_p: 'En OBS: <strong>Fuentes → + → Navegador</strong>, y pega esta URL. Muestra las tiradas de todos los jugadores en una sola fuente.',
+      s1_note: 'Ajusta el Ancho/Alto a tu lienzo (p. ej. 1920 × 1080). El fondo es transparente. <a id="overlayOpen" href="#" target="_blank" data-i18n="s1_preview">Abrir el overlay en una pestaña</a> para previsualizar (pulsa <code>T</code> allí para una tirada de prueba).',
+      s1_preview: 'Abrir el overlay en una pestaña',
+      s2_h: '2. Overlays por jugador',
+      s2_p: 'Una fuente por jugador — añade cada una como su propia fuente de Navegador para colocarlas por separado. Esta lista se actualiza a medida que los jugadores se conectan en tu partida de Roll20.',
+      empty: 'Aún no se ven jugadores — abre tu partida de Roll20 y aparecerán aquí.',
+      open: 'Abrir', copy: 'Copiar', copied: '¡Copiado!',
+    },
+  };
+
+  function detectLang() {
+    const saved = localStorage.getItem('ovr_lang');
+    if (saved === 'en' || saved === 'es') return saved;
+    return (navigator.language || 'en').toLowerCase().startsWith('es') ? 'es' : 'en';
   }
+  let lang = detectLang();
+  function dict() { return I18N[lang] || I18N.en; }
+
+  let players = []; // last roster fetched from the relay
+
+  function copyText(text, btn) {
+    try { navigator.clipboard.writeText(text); } catch {}
+    if (btn) { btn.textContent = dict().copied; setTimeout(() => { btn.textContent = dict().copy; }, 1200); }
+  }
+  function copyEl(id, btn) {
+    const el = document.getElementById(id);
+    el.select();
+    try { document.execCommand('copy'); } catch {}
+    copyText(el.value, btn);
+  }
+
+  function renderPlayers() {
+    const wrap = document.getElementById('players');
+    wrap.textContent = '';
+    if (!players.length) {
+      const e = document.createElement('div');
+      e.className = 'empty'; e.textContent = dict().empty;
+      wrap.appendChild(e);
+      return;
+    }
+    for (const p of players) {
+      const url = playerUrl(p.id);
+      const row = document.createElement('div');
+      row.className = 'prow';
+
+      const dot = document.createElement('span');
+      dot.className = 'pdot';
+      dot.style.background = p.color || '#888';
+      dot.style.opacity = p.online ? '1' : '.4';
+
+      const name = document.createElement('span');
+      name.className = 'pname';
+      name.textContent = p.name;
+      name.title = p.name + (p.online ? '' : ' (offline)');
+
+      const input = document.createElement('input');
+      input.readOnly = true; input.value = url;
+
+      const copyBtn = document.createElement('button');
+      copyBtn.textContent = dict().copy;
+      copyBtn.onclick = () => { input.select(); copyText(url, copyBtn); };
+
+      const open = document.createElement('a');
+      open.className = 'open'; open.href = url; open.target = '_blank'; open.textContent = dict().open;
+
+      row.append(dot, name, input, copyBtn, open);
+      wrap.appendChild(row);
+    }
+  }
+
+  function applyLang() {
+    const d = dict();
+    document.documentElement.lang = lang;
+    document.title = d.doc_title;
+    document.querySelectorAll('[data-i18n]').forEach((el) => {
+      const v = d[el.getAttribute('data-i18n')];
+      if (v != null) el.innerHTML = v;
+    });
+    const open = document.getElementById('overlayOpen');
+    if (open) open.href = overlayUrl;
+    document.querySelectorAll('[data-lang]').forEach((b) =>
+      b.setAttribute('aria-pressed', String(b.dataset.lang === lang)));
+    renderPlayers(); // re-render rows so button/labels follow the language
+  }
+  function setLang(l) { lang = l; try { localStorage.setItem('ovr_lang', l); } catch {} applyLang(); }
+  document.querySelectorAll('[data-lang]').forEach((b) =>
+    b.addEventListener('click', () => setLang(b.dataset.lang)));
+
+  // Poll the relay for the roster the userscript pushes; refresh the list live.
+  async function fetchPlayers() {
+    try {
+      const res = await fetch(`/room/${room}/players`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const next = Array.isArray(data.players) ? data.players : [];
+      if (JSON.stringify(next) !== JSON.stringify(players)) { players = next; renderPlayers(); }
+    } catch {}
+  }
+
+  applyLang();
+  fetchPlayers();
+  setInterval(fetchPlayers, 4000);
 </script>
 </body>
 </html>

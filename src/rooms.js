@@ -45,6 +45,7 @@ function createRoom() {
     id,
     publishToken,
     lastRoll: null,
+    players: [],              // roster pushed by the userscript (for per-player links)
     clients: new Set(),       // Set<ServerResponse>
     seen: new Set(),          // bounded set of message ids
     seenOrder: [],            // FIFO order for bounding `seen`
@@ -179,7 +180,7 @@ function load() {
     const data = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
     for (const r of (data.rooms || [])) {
       rooms.set(r.id, {
-        id: r.id, publishToken: r.publishToken, lastRoll: r.lastRoll || null,
+        id: r.id, publishToken: r.publishToken, lastRoll: r.lastRoll || null, players: [],
         clients: new Set(), seen: new Set(r.seenOrder || []), seenOrder: r.seenOrder || [],
         rollHits: [], createdAt: r.createdAt || Date.now(), lastActivity: r.lastActivity || Date.now(),
       });

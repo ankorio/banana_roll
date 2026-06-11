@@ -63,6 +63,21 @@ function serveFile(res, file, headers = {}) {
   });
 }
 
+// Landing/setup page, served at `/` with this deployment's origin baked in so the
+// Tampermonkey install link + shown URLs always point at wherever this is running
+// (localhost, a LAN IP, or a public domain) — no hardcoding.
+let landingTemplate = null;
+function serveLanding(req, res) {
+  try {
+    if (landingTemplate == null) {
+      landingTemplate = fs.readFileSync(path.join(PUBLIC_DIR, 'landing.html'), 'utf8');
+    }
+  } catch { return sendJson(res, 404, { error: 'not found' }); }
+  const body = landingTemplate.replace(/__ORIGIN__/g, baseUrl(req));
+  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+  res.end(body);
+}
+
 // Serve the capture userscript with this deployment's origin baked in, so users
 // don't hand-edit SERVER / @connect. (The token is NOT baked in — the script
 // self-provisions, keeping the token off room-id-only responses.)
@@ -237,6 +252,46 @@ function handleChat(req, res, id, query) {
   });
 }
 
+// Normalize the roster the userscript observes on Roll20's /players node.
+function validatePlayers(arr) {
+  if (!Array.isArray(arr)) return null;
+  return arr.slice(0, 200).map((p) => ({
+    id: typeof p.id === 'string' ? p.id.slice(0, 100) : '',
+    name: typeof p.name === 'string' ? p.name.slice(0, 100) : 'Player',
+    color: typeof p.color === 'string' ? p.color.slice(0, 32) : '#888',
+    online: !!p.online,
+  })).filter((p) => p.id);
+}
+
+// Userscript → server: push the players roster so the setup page can render
+// per-player overlay links (the server otherwise never sees Roll20's player list).
+function handlePlayersPost(req, res, id, query) {
+  const room = rooms.getRoom(id);
+  if (!room) return sendJson(res, 404, { error: 'unknown room' });
+  if (query.get('token') !== room.publishToken) {
+    return sendJson(res, 403, { error: 'bad token' });
+  }
+  readBody(req, MAX_BODY, (err, buf) => {
+    if (err) return sendJson(res, 400, { error: 'bad body' });
+    let parsed;
+    try { parsed = JSON.parse(buf.toString('utf8')); }
+    catch { return sendJson(res, 400, { error: 'invalid json' }); }
+    const players = validatePlayers(Array.isArray(parsed) ? parsed : parsed && parsed.players);
+    if (!players) return sendJson(res, 400, { error: 'expected players array' });
+    rooms.touch(room);
+    room.players = players;
+    sendJson(res, 200, { ok: true, count: players.length });
+  });
+}
+
+// Room-id-only read for the setup page. Returns the roster (no token); these are the
+// same names/ids already encoded in the per-player overlay URLs (bearer capabilities).
+function handlePlayersGet(req, res, id) {
+  const room = rooms.getRoom(id);
+  if (!room) return sendJson(res, 404, { error: 'unknown room' });
+  sendJson(res, 200, { players: room.players || [] });
+}
+
 function handleEvents(req, res, id) {
   const room = rooms.getRoom(id);
   if (!room) return sendJson(res, 404, { error: 'unknown room' });
@@ -290,9 +345,8 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     return res.end('ok');
   }
-  if (pathname === '/' || pathname === '/index.html') {
-    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-    return res.end('Roll20 → OBS overlay relay. POST /rooms to begin.');
+  if ((pathname === '/' || pathname === '/index.html') && method === 'GET') {
+    return serveLanding(req, res);
   }
   if (pathname === '/rooms' && method === 'POST') {
     return handleCreateRoom(req, res);
@@ -305,12 +359,14 @@ const server = http.createServer((req, res) => {
   }
 
   // /room/:id/<action>
-  const m = pathname.match(/^\/room\/([^/]+)\/(roll|chat|events|overlay|setup|ping)$/);
+  const m = pathname.match(/^\/room\/([^/]+)\/(roll|chat|events|overlay|setup|ping|players)$/);
   if (m) {
     const id = decodeURIComponent(m[1]);
     const action = m[2];
     if (action === 'chat' && method === 'POST') return handleChat(req, res, id, url.searchParams);
     if (action === 'roll' && method === 'POST') return handleRoll(req, res, id, url.searchParams);
+    if (action === 'players' && method === 'POST') return handlePlayersPost(req, res, id, url.searchParams);
+    if (action === 'players' && method === 'GET') return handlePlayersGet(req, res, id);
     if (action === 'events' && method === 'GET') return handleEvents(req, res, id);
     if (action === 'ping' && method === 'GET') {
       // Heartbeat: room-id-only liveness check (no token). 404 tells the userscript
