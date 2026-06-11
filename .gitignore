@@ -39,6 +39,7 @@ Thumbs.db
 dist/
 build/
 *.tgz
+public/assets/dice-manifest.json
 
 # Claude Code
 .claude/

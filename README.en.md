@@ -4,17 +4,17 @@
 
 ## TL;DR
 
-Show your Roll20 dice rolls on stream with animated 3D overlays. A Roll20 tab sends each roll to a small Node relay, which then pushes it through SSE to an OBS Browser Source. That way, your audience can watch the dice roll and land exactly on the number that came up at the table.
+Show your Roll20 dice rolls on stream with animated 3D overlays. A Roll20 tab sends each roll to a small Node relay, which then pushes it through SSE to an OBS Browser Source. That way, your audience gets to watch the dice roll and land on the exact number that came up at the table.
 
 👉 **Live demo: https://bananaroll.up.railway.app**
 
-Heads up: this was **vibe-coded in a single day**, so treat it for what it is: a fun hobby project, not bulletproof production software. It works and has already been used live, but the commit history is short and the bus factor is one. PRs are welcome. 🍌
+Heads up: this came out of an intense **single-day vibe-coding sprint**, so treat it for what it is: a fun hobby project, not bulletproof production software. It works and has already been used live, but the commit history is short and the bus factor is one. PRs are welcome. 🍌
 
 ```text
 Roll20 tab (userscript) --HTTP POST--> Node relay (rooms + parsing) --SSE--> OBS Browser Source
 ```
 
-Tokens are getting expensive: https://buymeacoffee.com/ankorio ☕
+If this is useful and you want to help with the running costs: https://buymeacoffee.com/ankorio ☕
 
 ## What it does
 
@@ -47,7 +47,7 @@ Each player gets a filtered overlay URL, for example `…/overlay?player=<id>`, 
 </details>
 
 <details>
-<summary><strong>Per-player dice skins.</strong></summary>
+<summary><strong>Per-player dice styles.</strong></summary>
 
 The customization page lets each player choose the texture, material, and colors of their dice. Preferences are saved on the server and persist between sessions.
 
@@ -148,7 +148,7 @@ That said, keep replicas at 1 for now unless you have tested it under real load.
 
 This is the setup used by the live demo.
 
-1. Connect the GitHub repository to a Railway project and deploy on every push. That is the “pipeline”. The build uses Nixpacks; `railway.json` defines the start command and the `/healthz` healthcheck.
+1. Connect the GitHub repository to a Railway project and deploy on every push. That becomes your deployment pipeline. The build uses Nixpacks; `railway.json` defines the start command and the `/healthz` healthcheck.
 
 2. Add a **Redis** database to the project and set `REDIS_URL = ${{Redis.REDIS_URL}}` on the app service.
 

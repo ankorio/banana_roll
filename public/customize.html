@@ -42,11 +42,11 @@
 </div>
 <main>
   <h1 data-i18n="h1">🎲 Customize dice</h1>
-  <p class="note"><span data-i18n="for">Styling dice for</span> <span class="who" id="who"></span></p>
+  <p class="note"><span data-i18n="for">Editing dice style for</span> <span class="who" id="who"></span></p>
 
   <div class="grid">
     <div>
-      <h2 data-i18n="look">Look</h2>
+      <h2 data-i18n="look">Appearance</h2>
       <label data-i18n="texture">Texture</label>
       <select id="texture"></select>
 
@@ -74,11 +74,11 @@
 
       <div class="bar">
         <button id="save" data-i18n="save">Save</button>
-        <button class="ghost" id="rollBtn" data-i18n="roll">Roll preview</button>
+        <button class="ghost" id="rollBtn" data-i18n="roll">Test roll</button>
         <span id="saved" data-i18n="saved">Saved!</span>
       </div>
-      <p class="note" style="margin-top:14px" data-i18n="tip">Changes preview live on the right. Click <b>Save</b> to apply
-        them to this player's overlay — the next time they roll, their dice use this look.</p>
+      <p class="note" style="margin-top:14px" data-i18n="tip">The preview updates live on the right. Click <b>Save</b> to
+        apply this style to the selected overlay. The next time this player rolls, their dice will use it.</p>
     </div>
 
     <div>
@@ -107,20 +107,24 @@
 
   // ── i18n (EN/ES) ─────────────────────────────────────────────────────────────
   const I18N = {
-    en: { doc: 'Customize dice', h1: '🎲 Customize dice', for: 'Styling dice for', look: 'Look',
+    en: { doc: 'Customize Dice', h1: '🎲 Customize dice', for: 'Editing dice style for', look: 'Appearance',
       texture: 'Texture', material: 'Material', color: 'Color', palette: 'Palette', custom: 'Custom colors',
-      fg: 'Numbers', bg: 'Body', edge: 'Edge', save: 'Save', roll: 'Roll preview', saved: 'Saved!',
-      preview: 'Preview', allPlayers: 'All players (default)',
-      tip: "Changes preview live on the right. Click <b>Save</b> to apply them to this player's overlay — the next time they roll, their dice use this look.",
-      engineLocal: 'Engine: local bundle.', engineCdn: 'Engine: CDN fallback (custom textures unavailable).',
-      engineOff: 'Engine unavailable — preview disabled.' },
-    es: { doc: 'Personalizar dados', h1: '🎲 Personalizar dados', for: 'Estilo de dados para', look: 'Aspecto',
-      texture: 'Textura', material: 'Material', color: 'Color', palette: 'Paleta', custom: 'Colores propios',
-      fg: 'Números', bg: 'Cuerpo', edge: 'Borde', save: 'Guardar', roll: 'Probar tirada', saved: '¡Guardado!',
-      preview: 'Vista previa', allPlayers: 'Todos los jugadores (por defecto)',
-      tip: 'Los cambios se ven a la derecha. Pulsa <b>Guardar</b> para aplicarlos al overlay de este jugador — en su próxima tirada sus dados usarán este aspecto.',
-      engineLocal: 'Motor: paquete local.', engineCdn: 'Motor: respaldo CDN (texturas propias no disponibles).',
-      engineOff: 'Motor no disponible — vista previa desactivada.' },
+      fg: 'Numbers', bg: 'Body', edge: 'Edge', save: 'Save', roll: 'Test roll', saved: 'Saved!',
+      preview: 'Preview', allPlayers: 'All players (default style)',
+      tip: 'The preview updates live on the right. Click <b>Save</b> to apply this style to the selected overlay. The next time this player rolls, their dice will use it.',
+      engineLocal: 'Preview engine: local bundle.', engineCdn: 'Preview engine: CDN fallback (custom textures unavailable).',
+      engineOff: 'Preview engine unavailable — live preview disabled.',
+      saveFailed: 'Could not save your changes.',
+      saveFailedStatus: 'Could not save your changes (HTTP {status}).' },
+    es: { doc: 'Personalizar dados', h1: '🎲 Personalizar dados', for: 'Editando el estilo de dados de', look: 'Apariencia',
+      texture: 'Textura', material: 'Material', color: 'Colores', palette: 'Paleta', custom: 'Colores personalizados',
+      fg: 'Números', bg: 'Cuerpo', edge: 'Borde', save: 'Guardar', roll: 'Tirada de prueba', saved: '¡Guardado!',
+      preview: 'Vista previa', allPlayers: 'Todos los jugadores (estilo por defecto)',
+      tip: 'La vista previa de la derecha se actualiza al momento. Pulsa <b>Guardar</b> para aplicar este estilo al overlay seleccionado. La próxima vez que este jugador tire, sus dados usarán este aspecto.',
+      engineLocal: 'Motor de vista previa: paquete local.', engineCdn: 'Motor de vista previa: respaldo por CDN (las texturas propias no estarán disponibles).',
+      engineOff: 'Motor de vista previa no disponible; vista previa desactivada.',
+      saveFailed: 'No se han podido guardar los cambios.',
+      saveFailedStatus: 'No se han podido guardar los cambios (HTTP {status}).' },
   };
   function detectLang() {
     const s = localStorage.getItem('ovr_lang');
@@ -129,6 +133,10 @@
   }
   let lang = detectLang();
   const dict = () => I18N[lang] || I18N.en;
+  function saveError(status) {
+    const template = status ? dict().saveFailedStatus : dict().saveFailed;
+    return template.replace('{status}', status);
+  }
   function applyLang() {
     const d = dict();
     document.documentElement.lang = lang; document.title = d.doc;
@@ -266,8 +274,8 @@
         body: JSON.stringify({ style: styleFromForm() }),
       });
       if (r.ok) { const s = $('saved'); s.classList.add('show'); setTimeout(() => s.classList.remove('show'), 1400); }
-      else { alert('Save failed: ' + r.status); }
-    } catch (err) { alert('Save failed'); }
+      else { alert(saveError(r.status)); }
+    } catch (err) { alert(saveError('')); }
   });
 
   // ── boot ─────────────────────────────────────────────────────────────────────

@@ -40,24 +40,24 @@
 </div>
 <main>
   <h1 data-i18n="h1">🎲 Your overlay is ready</h1>
-  <p class="note" data-i18n="intro">This page is your room's control panel. The links below are secret —
-     anyone with them can view or feed your overlay. Don't share them publicly.</p>
+  <p class="note" data-i18n="intro">This is your room's control panel. The links below are secret:
+     anyone who has them can view your overlay or send rolls to it. Don't share them publicly.</p>
 
   <h2 data-i18n="s1_h">1. All-players overlay</h2>
-  <p data-i18n="s1_p">In OBS: <strong>Sources → + → Browser</strong>, then paste this URL. It shows every
-     player's rolls in one source.</p>
+  <p data-i18n="s1_p">In OBS, go to <strong>Sources → + → Browser</strong> and paste this URL. It shows every
+     player's rolls in a single source.</p>
   <div class="url">
     <input id="overlayUrl" readonly />
     <button id="copyBtn" onclick="copyEl('overlayUrl', this)" data-i18n="copy">Copy</button>
   </div>
-  <p class="note" data-i18n="s1_note">Set Width/Height to your canvas (e.g. 1920 × 1080). Background is transparent.
-     <a id="overlayOpen" href="#" target="_blank" data-i18n="s1_preview">Open overlay in a tab</a> to preview
-     (press <code>T</code> there for a fake roll).</p>
+  <p class="note" data-i18n="s1_note">Set the width and height to match your canvas (for example 1920 × 1080). The background is transparent.
+     <a id="overlayOpen" href="#" target="_blank" data-i18n="s1_preview">Open the overlay in a tab</a> to preview it
+     (press <code>T</code> there to trigger a test roll).</p>
 
   <h2 data-i18n="s2_h">2. Per-player overlays</h2>
-  <p data-i18n="s2_p">One source per player — add each as its own Browser source so you can place them
-     separately. This list updates as players come online in your Roll20 game.</p>
-  <p class="note"><a id="defaultCustomize" href="#" target="_blank" data-i18n="default_dice">🎲 Customize the default dice (all players)</a></p>
+  <p data-i18n="s2_p">Add one Browser source per player if you want to place them independently. This list updates
+     as players come online in Roll20.</p>
+  <p class="note"><a id="defaultCustomize" href="#" target="_blank" data-i18n="default_dice">🎲 Customize the default dice style</a></p>
   <div id="players"></div>
 </main>
 <script>
@@ -73,32 +73,34 @@
   // ── i18n (EN/ES) ────────────────────────────────────────────────────────────
   const I18N = {
     en: {
-      doc_title: 'Overlay setup',
+      doc_title: 'Overlay Setup',
       h1: '🎲 Your overlay is ready',
-      intro: "This page is your room's control panel. The links below are secret — anyone with them can view or feed your overlay. Don't share them publicly.",
+      intro: "This is your room's control panel. The links below are secret: anyone who has them can view your overlay or send rolls to it. Don't share them publicly.",
       s1_h: '1. All-players overlay',
-      s1_p: "In OBS: <strong>Sources → + → Browser</strong>, then paste this URL. It shows every player's rolls in one source.",
-      s1_note: 'Set Width/Height to your canvas (e.g. 1920 × 1080). Background is transparent. <a id="overlayOpen" href="#" target="_blank" data-i18n="s1_preview">Open overlay in a tab</a> to preview (press <code>T</code> there for a fake roll).',
-      s1_preview: 'Open overlay in a tab',
+      s1_p: "In OBS, go to <strong>Sources → + → Browser</strong> and paste this URL. It shows every player's rolls in a single source.",
+      s1_note: 'Set the width and height to match your canvas (for example 1920 × 1080). The background is transparent. <a id="overlayOpen" href="#" target="_blank" data-i18n="s1_preview">Open the overlay in a tab</a> to preview it (press <code>T</code> there to trigger a test roll).',
+      s1_preview: 'Open the overlay in a tab',
       s2_h: '2. Per-player overlays',
-      s2_p: 'One source per player — add each as its own Browser source so you can place them separately. This list updates as players come online in your Roll20 game.',
-      empty: 'No players seen yet — open your Roll20 game and they\'ll appear here.',
-      open: 'Open', copy: 'Copy', copied: 'Copied!', customize: 'Customize dice',
-      default_dice: '🎲 Customize the default dice (all players)',
+      s2_p: 'Add one Browser source per player if you want to place them independently. This list updates as players come online in Roll20.',
+      empty: 'No players have been seen yet — open your Roll20 game and they will appear here.',
+      open: 'Open', copy: 'Copy', copied: 'Copied!', customize: "Customize this player's dice",
+      default_dice: '🎲 Customize the default dice style',
+      offline: ' (offline)',
     },
     es: {
       doc_title: 'Configuración del overlay',
       h1: '🎲 Tu overlay está listo',
-      intro: 'Esta página es el panel de control de tu sala. Los enlaces de abajo son secretos — cualquiera que los tenga puede ver o alimentar tu overlay. No los compartas públicamente.',
+      intro: 'Este es el panel de control de tu sala. Los enlaces de abajo son secretos: cualquiera que los tenga puede ver tu overlay o enviarle tiradas. No los compartas en público.',
       s1_h: '1. Overlay de todos los jugadores',
-      s1_p: 'En OBS: <strong>Fuentes → + → Navegador</strong>, y pega esta URL. Muestra las tiradas de todos los jugadores en una sola fuente.',
-      s1_note: 'Ajusta el Ancho/Alto a tu lienzo (p. ej. 1920 × 1080). El fondo es transparente. <a id="overlayOpen" href="#" target="_blank" data-i18n="s1_preview">Abrir el overlay en una pestaña</a> para previsualizar (pulsa <code>T</code> allí para una tirada de prueba).',
-      s1_preview: 'Abrir el overlay en una pestaña',
+      s1_p: 'En OBS, ve a <strong>Fuentes → + → Navegador</strong> y pega esta URL. Muestra las tiradas de toda la mesa en una sola fuente.',
+      s1_note: 'Ajusta el ancho y el alto para que coincidan con tu lienzo (por ejemplo 1920 × 1080). El fondo es transparente. <a id="overlayOpen" href="#" target="_blank" data-i18n="s1_preview">Abre el overlay en una pestaña</a> para previsualizarlo (pulsa <code>T</code> allí para lanzar una tirada de prueba).',
+      s1_preview: 'Abre el overlay en una pestaña',
       s2_h: '2. Overlays por jugador',
-      s2_p: 'Una fuente por jugador — añade cada una como su propia fuente de Navegador para colocarlas por separado. Esta lista se actualiza a medida que los jugadores se conectan en tu partida de Roll20.',
-      empty: 'Aún no se ven jugadores — abre tu partida de Roll20 y aparecerán aquí.',
-      open: 'Abrir', copy: 'Copiar', copied: '¡Copiado!', customize: 'Personalizar dados',
-      default_dice: '🎲 Personalizar los dados por defecto (todos los jugadores)',
+      s2_p: 'Añade una fuente de Navegador por jugador si quieres colocarlas por separado. Esta lista se actualiza conforme la gente va entrando en tu partida de Roll20.',
+      empty: 'Todavía no aparece ningún jugador: abre tu partida de Roll20 y se listarán aquí.',
+      open: 'Abrir', copy: 'Copiar', copied: '¡Copiado!', customize: 'Personalizar los dados de este jugador',
+      default_dice: '🎲 Personalizar el estilo de dados por defecto',
+      offline: ' (desconectado)',
     },
   };
 
@@ -145,7 +147,7 @@
       const name = document.createElement('span');
       name.className = 'pname';
       name.textContent = p.name;
-      name.title = p.name + (p.online ? '' : ' (offline)');
+      name.title = p.name + (p.online ? '' : dict().offline);
 
       const input = document.createElement('input');
       input.readOnly = true; input.value = url;

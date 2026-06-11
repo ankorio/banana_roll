@@ -161,6 +161,46 @@
   const DEMO = params.get('demo');             // landing-page demo: parent drives rolls via postMessage
   const statusEl = document.getElementById('status');
   const stage = document.getElementById('stage');
+  const I18N = {
+    en: {
+      adv: 'Advantage',
+      dis: 'Disadvantage',
+      crit: 'Critical hit!',
+      fumble: 'Fumble',
+      someone: 'Someone',
+      statusConnecting: 'connecting…',
+      statusLive: 'live',
+      statusMissingRoom: 'missing room id',
+      statusReconnecting: 'reconnecting…',
+      previewWho: 'Preview',
+      previewCheck: 'Check',
+      previewAttack: 'Fire Bolt',
+    },
+    es: {
+      adv: 'Ventaja',
+      dis: 'Desventaja',
+      crit: '¡Crítico!',
+      fumble: 'Pifia',
+      someone: 'Alguien',
+      statusConnecting: 'conectando…',
+      statusLive: 'en directo',
+      statusMissingRoom: 'falta el id de la sala',
+      statusReconnecting: 'reconectando…',
+      previewWho: 'Vista previa',
+      previewCheck: 'Prueba',
+      previewAttack: 'Rayo de fuego',
+    },
+  };
+  function detectLang() {
+    let saved = '';
+    try { saved = localStorage.getItem('ovr_lang') || localStorage.getItem('br_lang') || ''; } catch {}
+    if (saved === 'en' || saved === 'es') return saved;
+    return (navigator.language || 'en').toLowerCase().startsWith('es') ? 'es' : 'en';
+  }
+  const lang = detectLang();
+  const t = (key) => ((I18N[lang] || I18N.en)[key] || I18N.en[key] || key);
+  document.documentElement.lang = lang;
+  if (statusEl) statusEl.textContent = t('statusConnecting');
 
   // ── optional libraries (3D dice + particles), loaded with graceful fallback ──
   let Box = null;       // dice-box-threejs instance, or null → plaque-only
@@ -377,10 +417,10 @@
     const el = document.createElement('div');
     el.className = 'plaque' + (roll.isCrit ? ' crit' : roll.isFumble ? ' fumble' : '');
     const { name, expr } = splitFormula(roll.formula);
-    const badge = roll.mode === 'advantage' ? '<div class="badge adv">Advantage</div>'
-                : roll.mode === 'disadvantage' ? '<div class="badge dis">Disadvantage</div>' : '';
-    const tag = roll.isCrit ? '<div class="tag">Critical!</div>'
-              : roll.isFumble ? '<div class="tag">Fumble</div>' : '';
+    const badge = roll.mode === 'advantage' ? `<div class="badge adv">${t('adv')}</div>`
+                : roll.mode === 'disadvantage' ? `<div class="badge dis">${t('dis')}</div>` : '';
+    const tag = roll.isCrit ? `<div class="tag">${t('crit')}</div>`
+              : roll.isFumble ? `<div class="tag">${t('fumble')}</div>` : '';
     el.innerHTML =
       '<div class="portrait"></div>' +
       '<div class="who"></div>' +
@@ -406,7 +446,7 @@
     } else {
       setInitials(portrait, roll.who);
     }
-    el.querySelector('.who').textContent = roll.who || 'Someone';
+    el.querySelector('.who').textContent = roll.who || t('someone');
     el.querySelector('.total').textContent = (roll.total ?? '?');
     if (name) el.querySelector('.rname').textContent = name;
     if (expr) el.querySelector('.expr').textContent = expr;
@@ -466,20 +506,20 @@
 
   // ── SSE ───────────────────────────────────────────────────────────────────────
   function connect() {
-    if (!room) { statusEl.textContent = 'no room id in URL'; return; }
+    if (!room) { statusEl.textContent = t('statusMissingRoom'); return; }
     const es = new EventSource('/room/' + room + '/events');
-    es.onopen = () => { statusEl.textContent = 'live'; };
+    es.onopen = () => { statusEl.textContent = t('statusLive'); };
     es.onmessage = (e) => {
       try {
         const roll = JSON.parse(e.data);
         if (wantPlayer && roll.playerid !== wantPlayer) return; // not this player's overlay
-        if (roll.ts) statusEl.textContent = 'live · ' + (Date.now() - roll.ts) + 'ms';
+        if (roll.ts) statusEl.textContent = t('statusLive') + ' · ' + (Date.now() - roll.ts) + 'ms';
         console.log('[overlay] roll received:', roll.who, roll.formula, '=', roll.total,
           roll.mode && roll.mode !== 'normal' ? '(' + roll.mode + ')' : '', roll.isCrit ? '[CRIT]' : roll.isFumble ? '[FUMBLE]' : '', roll);
         enqueue(roll);
       } catch {}
     };
-    es.onerror = () => { statusEl.textContent = 'reconnecting…'; };
+    es.onerror = () => { statusEl.textContent = t('statusReconnecting'); };
   }
 
   // ── boot ────────────────────────────────────────────────────────────────────
@@ -516,12 +556,12 @@
     if (k === 'a' || k === 'd') {
       const a = 4 + (n * 7) % 17, b = 2 + (n * 11) % 18;
       const kept = k === 'a' ? Math.max(a, b) : Math.min(a, b);
-      enqueue({ id: 'k' + n, who: 'Preview', formula: 'Check: 1d20 + 5', total: kept + 5, modifier: 5,
+      enqueue({ id: 'k' + n, who: t('previewWho'), formula: `${t('previewCheck')}: 1d20 + 5`, total: kept + 5, modifier: 5,
         mode: k === 'a' ? 'advantage' : 'disadvantage', d20: { values: [a, b], keptIndex: (k === 'a' ? (a >= b ? 0 : 1) : (a <= b ? 0 : 1)) },
         dice: [d20(kept)], isCrit: kept === 20, isFumble: kept === 1, ts: Date.now() });
     } else {
       const v = k === 'c' ? 20 : k === 'f' ? 1 : 2 + (n % 18);
-      enqueue({ id: 'k' + n, who: 'Preview', formula: 'Fire Bolt: 1d20 + 7', total: v + 7, modifier: 7,
+      enqueue({ id: 'k' + n, who: t('previewWho'), formula: `${t('previewAttack')}: 1d20 + 7`, total: v + 7, modifier: 7,
         mode: 'normal', d20: null, dice: [d20(v)], isCrit: v === 20, isFumble: v === 1, ts: Date.now() });
     }
   });
