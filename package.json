@@ -6,6 +6,8 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
+    "prestart": "node scripts/build-dice.mjs",
+    "dice:build": "node scripts/build-dice.mjs",
     "test": "node scripts/parser.test.cjs",
     "smoke": "node scripts/parser.test.cjs && node scripts/smoke.mjs"
   },

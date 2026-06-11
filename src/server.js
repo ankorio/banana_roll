@@ -56,6 +56,9 @@ const STATIC_TYPES = {
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
   '.svg': 'image/svg+xml',
+  '.webp': 'image/webp',
+  '.mp3': 'audio/mpeg',
+  '.json': 'application/json; charset=utf-8',
   '.woff2': 'font/woff2',
 };
 function serveFile(res, file, headers = {}) {
@@ -65,6 +68,19 @@ function serveFile(res, file, headers = {}) {
     res.writeHead(200, { 'Content-Type': type, ...headers });
     res.end(data);
   });
+}
+
+// Serve a vendored static asset under public/assets/ (overlay art/fonts, the dice
+// engine bundle, textures, sounds, manifest). Supports nested paths (e.g.
+// /assets/textures/marble.webp) with a path-traversal guard: the resolved path must
+// stay inside public/assets/.
+const ASSETS_DIR = path.join(PUBLIC_DIR, 'assets');
+function serveAsset(res, rel) {
+  const target = path.normalize(path.join(ASSETS_DIR, rel));
+  if (target !== ASSETS_DIR && !target.startsWith(ASSETS_DIR + path.sep)) {
+    return sendJson(res, 403, { error: 'forbidden' });
+  }
+  serveFile(res, target, { 'Cache-Control': 'public, max-age=86400' });
 }
 
 // Landing/setup page, served at `/` with this deployment's origin baked in so the
@@ -155,6 +171,32 @@ function validateRoll(obj) {
   return out;
 }
 
+// --- dice styles ------------------------------------------------------------
+// A style is a small cosmetic object describing how a player's dice look. All
+// fields optional; anything unrecognized/malformed is dropped. Returns a sanitized
+// style (possibly {}), or null if the input isn't an object.
+const STYLE_MATERIALS = new Set(['none', 'metal', 'wood', 'glass', 'plastic']);
+const KEY_RE = /^[\w-]{1,40}$/;
+const HEX_RE = /^#[0-9a-fA-F]{3,8}$/;
+function validateStyle(obj) {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return null;
+  const out = {};
+  if (typeof obj.texture === 'string' && KEY_RE.test(obj.texture)) out.texture = obj.texture;
+  if (typeof obj.colorset === 'string' && KEY_RE.test(obj.colorset)) out.colorset = obj.colorset;
+  if (typeof obj.material === 'string' && STYLE_MATERIALS.has(obj.material)) out.material = obj.material;
+  for (const k of ['foreground', 'background', 'edge']) {
+    if (typeof obj[k] === 'string' && HEX_RE.test(obj[k])) out[k] = obj[k];
+  }
+  return out;
+}
+
+// Resolve the style to stamp on a roll: the rolling player's style, else the room
+// default, else null (overlay falls back to its built-in CONFIG defaults).
+function styleForRoll(room, playerid) {
+  if (playerid && room.styles && room.styles[playerid]) return room.styles[playerid];
+  return room.defaultStyle || null;
+}
+
 // --- SSE --------------------------------------------------------------------
 function writeSse(res, data, id) {
   if (id != null) res.write(`id: ${id}\n`);
@@ -212,6 +254,8 @@ function handleRoll(req, res, id, query) {
     rooms.touch(room);
     const isNew = rooms.markSeen(room, roll.id);
     if (isNew) {
+      const style = styleForRoll(room, roll.playerid);
+      if (style) roll.style = style;
       room.lastRoll = roll;
       broadcast(room, roll);
       rooms.save(); // persist retained last-roll (no-op unless STATE_FILE set)
@@ -263,6 +307,8 @@ function handleChat(req, res, id, query) {
       return sendJson(res, 200, { ok: true, roll: null });
     }
 
+    const style = styleForRoll(room, roll.playerid);
+    if (style) roll.style = style;
     room.lastRoll = roll;
     broadcast(room, roll);
     rooms.save();
@@ -310,6 +356,51 @@ function handlePlayersGet(req, res, id) {
   const room = rooms.getRoom(id);
   if (!room) return sendJson(res, 404, { error: 'unknown room' });
   sendJson(res, 200, { players: room.players || [] });
+}
+
+// Room-id-only read of the dice styles map (no token; cosmetic, bearer-capability
+// model like the per-player overlay URL). Drives the customize page's current state.
+function handleStylesGet(req, res, id) {
+  const room = rooms.getRoom(id);
+  if (!room) return sendJson(res, 404, { error: 'unknown room' });
+  sendJson(res, 200, { styles: room.styles || {}, defaultStyle: room.defaultStyle || null });
+}
+
+// Set one player's dice style (or the room default when player=default). Room-id
+// capability only: a self-serve player link can't carry the secret publish token,
+// and styles are purely cosmetic. Validated, size-capped, and rate-limited.
+const STYLES_MAX = 200; // cap distinct per-player styles per room
+function handleStylesPost(req, res, id, query) {
+  const room = rooms.getRoom(id);
+  if (!room) return sendJson(res, 404, { error: 'unknown room' });
+  if (!rooms.allowRoll(room)) return sendJson(res, 429, { error: 'rate limited' });
+  const player = query.get('player');
+  if (!player) return sendJson(res, 400, { error: 'missing ?player=' });
+
+  readBody(req, MAX_BODY, (err, buf) => {
+    if (err) return sendJson(res, 400, { error: 'bad body' });
+    let parsed;
+    try { parsed = JSON.parse(buf.toString('utf8')); }
+    catch { return sendJson(res, 400, { error: 'invalid json' }); }
+    const style = validateStyle(parsed && parsed.style != null ? parsed.style : parsed);
+    if (!style) return sendJson(res, 400, { error: 'invalid style' });
+
+    rooms.touch(room);
+    if (player === 'default') {
+      room.defaultStyle = style;
+    } else {
+      if (!/^[\w-]{1,100}$/.test(player)) {
+        return sendJson(res, 400, { error: 'invalid player id' });
+      }
+      if (!room.styles) room.styles = {};
+      if (!room.styles[player] && Object.keys(room.styles).length >= STYLES_MAX) {
+        return sendJson(res, 507, { error: 'too many styles' });
+      }
+      room.styles[player] = style;
+    }
+    rooms.save();
+    sendJson(res, 200, { ok: true, style });
+  });
 }
 
 function handleEvents(req, res, id) {
@@ -374,18 +465,18 @@ const server = http.createServer((req, res) => {
   if (pathname === '/roll20-capture.user.js' && method === 'GET') {
     return serveUserscript(req, res);
   }
-  // Static overlay assets (plaque art, fonts). Basename-only — no path traversal.
-  const asset = pathname.match(/^\/assets\/([\w.-]+)$/);
+  // Static overlay assets (plaque art, fonts, dice engine bundle, textures, sounds,
+  // dice manifest). Nested paths allowed; serveAsset() guards against traversal.
+  const asset = pathname.match(/^\/assets\/(.+)$/);
   if (asset && method === 'GET') {
-    return serveFile(res, path.join(PUBLIC_DIR, 'assets', asset[1]),
-      { 'Cache-Control': 'public, max-age=86400' });
+    return serveAsset(res, decodeURIComponent(asset[1]));
   }
   if (pathname === '/roll20-capture.meta.js' && method === 'GET') {
     return serveUserscriptMeta(req, res);
   }
 
   // /room/:id/<action>
-  const m = pathname.match(/^\/room\/([^/]+)\/(roll|chat|events|overlay|setup|ping|players)$/);
+  const m = pathname.match(/^\/room\/([^/]+)\/(roll|chat|events|overlay|setup|ping|players|styles|customize)$/);
   if (m) {
     const id = decodeURIComponent(m[1]);
     const action = m[2];
@@ -393,6 +484,8 @@ const server = http.createServer((req, res) => {
     if (action === 'roll' && method === 'POST') return handleRoll(req, res, id, url.searchParams);
     if (action === 'players' && method === 'POST') return handlePlayersPost(req, res, id, url.searchParams);
     if (action === 'players' && method === 'GET') return handlePlayersGet(req, res, id);
+    if (action === 'styles' && method === 'POST') return handleStylesPost(req, res, id, url.searchParams);
+    if (action === 'styles' && method === 'GET') return handleStylesGet(req, res, id);
     if (action === 'events' && method === 'GET') return handleEvents(req, res, id);
     if (action === 'ping' && method === 'GET') {
       // Heartbeat: room-id-only liveness check (no token). 404 tells the userscript
@@ -408,6 +501,10 @@ const server = http.createServer((req, res) => {
     }
     if (action === 'setup' && method === 'GET') {
       return serveFile(res, path.join(PUBLIC_DIR, 'setup.html'));
+    }
+    if (action === 'customize' && method === 'GET') {
+      // self-serve dice styling page; reads room id + ?player= on the client side
+      return serveFile(res, path.join(PUBLIC_DIR, 'customize.html'));
     }
     return sendJson(res, 405, { error: 'method not allowed' });
   }

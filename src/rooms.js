@@ -46,6 +46,8 @@ function createRoom() {
     publishToken,
     lastRoll: null,
     players: [],              // roster pushed by the userscript (for per-player links)
+    styles: {},               // playerid -> dice style (set via the customize page)
+    defaultStyle: null,       // fallback style for players with no entry / all-players overlay
     clients: new Set(),       // Set<ServerResponse>
     seen: new Set(),          // bounded set of message ids
     seenOrder: [],            // FIFO order for bounding `seen`
@@ -145,6 +147,7 @@ function serialize() {
   for (const r of rooms.values()) {
     out.push({
       id: r.id, publishToken: r.publishToken, lastRoll: r.lastRoll,
+      styles: r.styles, defaultStyle: r.defaultStyle,
       seenOrder: r.seenOrder, createdAt: r.createdAt, lastActivity: r.lastActivity,
     });
   }
@@ -181,6 +184,7 @@ function load() {
     for (const r of (data.rooms || [])) {
       rooms.set(r.id, {
         id: r.id, publishToken: r.publishToken, lastRoll: r.lastRoll || null, players: [],
+        styles: r.styles || {}, defaultStyle: r.defaultStyle || null,
         clients: new Set(), seen: new Set(r.seenOrder || []), seenOrder: r.seenOrder || [],
         rollHits: [], createdAt: r.createdAt || Date.now(), lastActivity: r.lastActivity || Date.now(),
       });

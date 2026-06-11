@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Customize dice</title>
+  <style>
+    body { margin: 0; background: #14141c; color: #e8e8ee; font-family: system-ui, sans-serif; line-height: 1.5; }
+    main { max-width: 860px; margin: 0 auto; padding: 28px 20px 80px; }
+    h1 { font-size: 26px; margin: 0 0 4px; } h2 { font-size: 17px; color: #ffd24a; margin: 26px 0 10px; }
+    .note { color: #9a9aa6; font-size: 14px; }
+    a { color: #7db8ff; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; align-items: start; }
+    @media (max-width: 680px) { .grid { grid-template-columns: 1fr; } }
+    label { display: block; font-size: 13px; color: #c9c9d4; margin: 12px 0 4px; font-weight: 600; }
+    select, input[type=color] { width: 100%; box-sizing: border-box; padding: 9px 10px; border-radius: 8px;
+      border: 1px solid #333; background: #0c0c12; color: #ffd24a; font-size: 14px; }
+    input[type=color] { height: 40px; padding: 4px; cursor: pointer; }
+    .row { display: flex; gap: 10px; } .row > div { flex: 1; }
+    .modes { display: flex; gap: 16px; margin: 6px 0 2px; }
+    .modes label { display: flex; align-items: center; gap: 6px; margin: 0; cursor: pointer; }
+    #preview { width: 100%; aspect-ratio: 1 / 1; background: #ffffff;
+      border: 1px solid #2a2a38; border-radius: 12px; overflow: hidden; position: relative; }
+    .bar { display: flex; gap: 10px; align-items: center; margin-top: 18px; }
+    button { padding: 11px 16px; border-radius: 8px; border: 0; background: #ffd24a; color: #2a2000;
+      font-weight: 700; cursor: pointer; }
+    button.ghost { background: #16161f; color: #c9c9d4; border: 1px solid #2a2a38; }
+    #saved { color: #6bd28a; font-size: 14px; opacity: 0; transition: opacity .2s; }
+    #saved.show { opacity: 1; }
+    .who { display: inline-flex; align-items: center; gap: 8px; }
+    .who .dot { width: 11px; height: 11px; border-radius: 50%; background: #888; }
+    .lang { position: fixed; top: 14px; right: 16px; display: flex; gap: 4px; }
+    .lang button { background: #16161f; color: #9a9aa6; border: 1px solid #2a2a38; border-radius: 8px;
+      padding: 5px 10px; font-weight: 700; font-size: 13px; }
+    .lang button[aria-pressed="true"] { background: #ffd24a; color: #2a2000; border-color: #ffd24a; }
+  </style>
+</head>
+<body>
+<div class="lang">
+  <button data-lang="en" type="button">EN</button>
+  <button data-lang="es" type="button">ES</button>
+</div>
+<main>
+  <h1 data-i18n="h1">🎲 Customize dice</h1>
+  <p class="note"><span data-i18n="for">Styling dice for</span> <span class="who" id="who"></span></p>
+
+  <div class="grid">
+    <div>
+      <h2 data-i18n="look">Look</h2>
+      <label data-i18n="texture">Texture</label>
+      <select id="texture"></select>
+
+      <label data-i18n="material">Material</label>
+      <select id="material"></select>
+
+      <h2 data-i18n="color">Color</h2>
+      <div class="modes">
+        <label><input type="radio" name="mode" value="palette" checked /> <span data-i18n="palette">Palette</span></label>
+        <label><input type="radio" name="mode" value="custom" /> <span data-i18n="custom">Custom colors</span></label>
+      </div>
+
+      <div id="paletteWrap">
+        <label data-i18n="palette">Palette</label>
+        <select id="colorset"></select>
+      </div>
+
+      <div id="customWrap" style="display:none">
+        <div class="row">
+          <div><label data-i18n="fg">Numbers</label><input type="color" id="foreground" value="#ffffff" /></div>
+          <div><label data-i18n="bg">Body</label><input type="color" id="background" value="#a01010" /></div>
+          <div><label data-i18n="edge">Edge</label><input type="color" id="edge" value="#000000" /></div>
+        </div>
+      </div>
+
+      <div class="bar">
+        <button id="save" data-i18n="save">Save</button>
+        <button class="ghost" id="rollBtn" data-i18n="roll">Roll preview</button>
+        <span id="saved" data-i18n="saved">Saved!</span>
+      </div>
+      <p class="note" style="margin-top:14px" data-i18n="tip">Changes preview live on the right. Click <b>Save</b> to apply
+        them to this player's overlay — the next time they roll, their dice use this look.</p>
+    </div>
+
+    <div>
+      <h2 data-i18n="preview">Preview</h2>
+      <div id="preview"></div>
+      <p class="note" id="engineNote"></p>
+    </div>
+  </div>
+</main>
+
+<script type="module">
+  const ASSET_PATH = '/assets/';
+  const LOCAL_ENGINE = '/assets/dice-box/dice-box.bundle.js';
+  const CDN = 'https://cdn.jsdelivr.net/npm/@3d-dice/dice-box-threejs@0.0.12';
+
+  const m = location.pathname.match(/\/room\/([^/]+)\//);
+  const room = m ? m[1] : '';
+  const params = new URLSearchParams(location.search);
+  const player = params.get('player') || 'default';
+
+  const $ = (id) => document.getElementById(id);
+  const els = {
+    texture: $('texture'), material: $('material'), colorset: $('colorset'),
+    foreground: $('foreground'), background: $('background'), edge: $('edge'),
+  };
+
+  // ── i18n (EN/ES) ─────────────────────────────────────────────────────────────
+  const I18N = {
+    en: { doc: 'Customize dice', h1: '🎲 Customize dice', for: 'Styling dice for', look: 'Look',
+      texture: 'Texture', material: 'Material', color: 'Color', palette: 'Palette', custom: 'Custom colors',
+      fg: 'Numbers', bg: 'Body', edge: 'Edge', save: 'Save', roll: 'Roll preview', saved: 'Saved!',
+      preview: 'Preview', allPlayers: 'All players (default)',
+      tip: "Changes preview live on the right. Click <b>Save</b> to apply them to this player's overlay — the next time they roll, their dice use this look.",
+      engineLocal: 'Engine: local bundle.', engineCdn: 'Engine: CDN fallback (custom textures unavailable).',
+      engineOff: 'Engine unavailable — preview disabled.' },
+    es: { doc: 'Personalizar dados', h1: '🎲 Personalizar dados', for: 'Estilo de dados para', look: 'Aspecto',
+      texture: 'Textura', material: 'Material', color: 'Color', palette: 'Paleta', custom: 'Colores propios',
+      fg: 'Números', bg: 'Cuerpo', edge: 'Borde', save: 'Guardar', roll: 'Probar tirada', saved: '¡Guardado!',
+      preview: 'Vista previa', allPlayers: 'Todos los jugadores (por defecto)',
+      tip: 'Los cambios se ven a la derecha. Pulsa <b>Guardar</b> para aplicarlos al overlay de este jugador — en su próxima tirada sus dados usarán este aspecto.',
+      engineLocal: 'Motor: paquete local.', engineCdn: 'Motor: respaldo CDN (texturas propias no disponibles).',
+      engineOff: 'Motor no disponible — vista previa desactivada.' },
+  };
+  function detectLang() {
+    const s = localStorage.getItem('ovr_lang');
+    if (s === 'en' || s === 'es') return s;
+    return (navigator.language || 'en').toLowerCase().startsWith('es') ? 'es' : 'en';
+  }
+  let lang = detectLang();
+  const dict = () => I18N[lang] || I18N.en;
+  function applyLang() {
+    const d = dict();
+    document.documentElement.lang = lang; document.title = d.doc;
+    document.querySelectorAll('[data-i18n]').forEach((el) => { const v = d[el.getAttribute('data-i18n')]; if (v != null) el.innerHTML = v; });
+    document.querySelectorAll('[data-lang]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.lang === lang)));
+    renderWho();
+  }
+  document.querySelectorAll('[data-lang]').forEach((b) =>
+    b.addEventListener('click', () => { lang = b.dataset.lang; try { localStorage.setItem('ovr_lang', lang); } catch {} applyLang(); }));
+
+  // ── who are we styling ───────────────────────────────────────────────────────
+  let playerInfo = null;
+  function renderWho() {
+    const who = $('who');
+    if (player === 'default') { who.innerHTML = ''; who.textContent = dict().allPlayers; return; }
+    const name = playerInfo ? playerInfo.name : player;
+    const color = playerInfo ? (playerInfo.color || '#888') : '#888';
+    who.innerHTML = `<span class="dot" style="background:${color}"></span>${name}`;
+  }
+  async function fetchWho() {
+    if (player === 'default') return;
+    try {
+      const r = await fetch(`/room/${room}/players`);
+      if (!r.ok) return;
+      const d = await r.json();
+      playerInfo = (d.players || []).find((p) => p.id === player) || null;
+      renderWho();
+    } catch {}
+  }
+
+  // ── build current style from the form ────────────────────────────────────────
+  function currentMode() { return document.querySelector('input[name=mode]:checked').value; }
+  function styleFromForm() {
+    const s = { texture: els.texture.value, material: els.material.value };
+    if (currentMode() === 'custom') {
+      s.foreground = els.foreground.value; s.background = els.background.value; s.edge = els.edge.value;
+    } else if (els.colorset.value) {
+      s.colorset = els.colorset.value;
+    }
+    return s;
+  }
+  function seedForm(style) {
+    const s = style || {};
+    if (s.texture != null) els.texture.value = s.texture;
+    if (s.material) els.material.value = s.material;
+    const custom = s.foreground || s.background || s.edge;
+    document.querySelector(`input[name=mode][value=${custom ? 'custom' : 'palette'}]`).checked = true;
+    if (s.foreground) els.foreground.value = s.foreground;
+    if (s.background) els.background.value = s.background;
+    if (s.edge) els.edge.value = s.edge;
+    if (s.colorset) els.colorset.value = s.colorset;
+    syncMode();
+  }
+  function syncMode() {
+    const custom = currentMode() === 'custom';
+    $('customWrap').style.display = custom ? '' : 'none';
+    $('paletteWrap').style.display = custom ? 'none' : '';
+  }
+
+  // Mirror of the overlay's styleToConfig so the preview matches the real overlay.
+  function styleToConfig(style) {
+    const s = style || {};
+    const texture = s.texture != null ? s.texture : 'marble';
+    const material = s.material != null ? s.material : 'glass';
+    if (s.foreground || s.background || s.edge) {
+      return { theme_texture: texture, theme_material: material, theme_customColorset: {
+        foreground: s.foreground || '#ffffff', background: s.background || s.foreground || '#cccccc',
+        outline: s.edge || s.background || 'black', edge: s.edge || s.background || '', texture, material } };
+    }
+    return { theme_customColorset: null, theme_colorset: s.colorset || 'white', theme_texture: texture, theme_material: material };
+  }
+
+  // ── manifest → option lists ──────────────────────────────────────────────────
+  async function loadManifest() {
+    const r = await fetch('/assets/dice-manifest.json');
+    const man = await r.json();
+    for (const t of man.textures) {
+      const o = document.createElement('option');
+      o.value = t.id; o.textContent = t.name + (t.custom ? ' ★' : '');
+      els.texture.appendChild(o);
+    }
+    for (const mat of man.materials) {
+      const o = document.createElement('option'); o.value = mat; o.textContent = mat; els.material.appendChild(o);
+    }
+    for (const c of man.colorsets) {
+      const o = document.createElement('option'); o.value = c.id; o.textContent = c.name; els.colorset.appendChild(o);
+    }
+    els.texture.value = 'marble'; els.material.value = 'glass'; els.colorset.value = 'white';
+  }
+
+  // ── preview dice box ─────────────────────────────────────────────────────────
+  let Box = null;
+  async function initPreview() {
+    try {
+      let usedCdn = false, mod;
+      try { mod = await import(LOCAL_ENGINE); }
+      catch { usedCdn = true; mod = await import(`${CDN}/dist/dice-box-threejs.es.js`); }
+      Box = new mod.default('#preview', {
+        assetPath: usedCdn ? `${CDN}/public/` : ASSET_PATH, sounds: false, shadows: true,
+        baseScale: 90, strength: 1.4, theme_material: 'glass', theme_texture: 'marble', theme_colorset: 'white',
+      });
+      await Box.initialize();
+      $('engineNote').textContent = usedCdn ? dict().engineCdn : dict().engineLocal;
+      rollPreview();
+    } catch (e) {
+      console.warn('preview engine unavailable', e);
+      $('engineNote').textContent = dict().engineOff;
+    }
+  }
+  let rolling = false;
+  async function rollPreview() {
+    if (!Box || rolling) return;
+    rolling = true;
+    // Clear the engine's colorset memo so a texture change actually re-resolves
+    // (getColorSet caches by colorset name and would otherwise reuse the old texture).
+    try { if (Box.DiceColors) Box.DiceColors.colorsets = {}; } catch {}
+    try { await Box.updateConfig(styleToConfig(styleFromForm())); Box.clearDice(); await Box.roll('1d20@20'); }
+    catch (e) { console.warn('preview roll failed', e); }
+    rolling = false;
+  }
+  // debounce live updates as the user fiddles
+  let t = null;
+  const onChange = () => { syncMode(); clearTimeout(t); t = setTimeout(rollPreview, 180); };
+  document.querySelectorAll('select, input[type=color], input[name=mode]').forEach((el) => {
+    el.addEventListener('input', onChange); el.addEventListener('change', onChange);
+  });
+  $('rollBtn').addEventListener('click', (e) => { e.preventDefault(); rollPreview(); });
+
+  // ── save ─────────────────────────────────────────────────────────────────────
+  $('save').addEventListener('click', async (e) => {
+    e.preventDefault();
+    try {
+      const r = await fetch(`/room/${room}/styles?player=${encodeURIComponent(player)}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ style: styleFromForm() }),
+      });
+      if (r.ok) { const s = $('saved'); s.classList.add('show'); setTimeout(() => s.classList.remove('show'), 1400); }
+      else { alert('Save failed: ' + r.status); }
+    } catch (err) { alert('Save failed'); }
+  });
+
+  // ── boot ─────────────────────────────────────────────────────────────────────
+  applyLang();
+  await loadManifest();
+  // seed from any saved style for this player
+  try {
+    const r = await fetch(`/room/${room}/styles`);
+    if (r.ok) {
+      const d = await r.json();
+      const existing = player === 'default' ? d.defaultStyle : (d.styles || {})[player];
+      if (existing) seedForm(existing); else syncMode();
+    }
+  } catch { syncMode(); }
+  fetchWho();
+  initPreview();
+</script>
+</body>
+</html>

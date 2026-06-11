@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <title>Roll Overlay</title>
-  <!-- Cinzel (plaque typeface) from Google Fonts CDN; degrades to serif if unavailable. -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Cinzel (plaque typeface). Self-hosted first so the overlay never depends on a CDN;
+       the Google Fonts link stays as a fallback. Either way it degrades to serif. -->
+  <link href="/assets/fonts/cinzel.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -128,16 +128,16 @@
 
   <script type="module">
   /* ─────────────────────────────────────────────────────────────────────────
-     OVERLAY CONFIG — tweak the dice look here (easy templating).
+     OVERLAY CONFIG — the DEFAULT dice look (used when a roll carries no per-player
+     style). Per-player styles are set on the customize page and arrive on each roll
+     as `roll.style`; styleToConfig() below maps them onto the engine.
      Materials: "glass" (translucent), "plastic", "metal", "wood", "none".
-     Textures:  "" | "marble" | "water" | "stainedglass" | "ice" | "speckles" | "stars" …
-                (full list: dice-box-threejs /public/textures)
-     Colorsets: "white","black","necrotic","fire","ice","poison","radiant","force" …
+     Textures/colorsets: see /assets/dice-manifest.json (built-ins + your custom ones).
      ───────────────────────────────────────────────────────────────────────── */
   const CONFIG = {
     enable3d: true,            // master switch; falls back to the plaque-only overlay if false/unavailable
     theme_material: 'glass',   // translucent dice by default
-    theme_texture: 'marble',   // surface texture (try 'water', 'stainedglass', '')
+    theme_texture: 'marble',   // surface texture
     theme_colorset: 'white',   // base color palette
     scale: 100,                // dice size (baseScale)
     strength: 1.6,             // toss strength
@@ -146,6 +146,12 @@
     settleTimeoutMs: 6000,     // safety: proceed even if physics never reports done
   };
 
+  // Assets are served locally from /assets/ (vendored). The dice engine + confetti
+  // load local-first and fall back to the CDN only if the local copy is missing —
+  // so a CDN outage never breaks the overlay. (Custom textures only exist in the
+  // locally-built bundle; the CDN fallback gives built-in textures only.)
+  const ASSET_PATH = '/assets/';
+  const LOCAL_ENGINE = '/assets/dice-box/dice-box.bundle.js';
   const CDN = 'https://cdn.jsdelivr.net/npm/@3d-dice/dice-box-threejs@0.0.12';
   const SUPPORTED_SIDES = new Set([4, 6, 8, 10, 12, 20, 100]);
 
@@ -159,12 +165,24 @@
   let Box = null;       // dice-box-threejs instance, or null → plaque-only
   let confetti = null;  // canvas-confetti, or null → no particles
 
+  // Import a module local-first, falling back to the CDN URL if the local copy fails.
+  // Returns { mod, usedCdn } so callers can adjust paths (e.g. assetPath) accordingly.
+  async function importLocalFirst(localUrl, cdnUrl, label) {
+    try { return { mod: await import(localUrl), usedCdn: false }; }
+    catch (e) {
+      console.warn(`[overlay] local ${label} unavailable, trying CDN`, e);
+      return { mod: await import(cdnUrl), usedCdn: true };
+    }
+  }
+
   async function initDice() {
     if (!CONFIG.enable3d) return;
     try {
-      const { default: DiceBox } = await import(`${CDN}/dist/dice-box-threejs.es.js`);
+      const { mod, usedCdn } = await importLocalFirst(LOCAL_ENGINE, `${CDN}/dist/dice-box-threejs.es.js`, 'dice engine');
+      const DiceBox = mod.default;
       Box = new DiceBox('#dice', {
-        assetPath: `${CDN}/public/`,
+        // Local assetPath with the local engine; CDN public/ if we fell back.
+        assetPath: usedCdn ? `${CDN}/public/` : ASSET_PATH,
         sounds: false,
         shadows: CONFIG.shadows,
         baseScale: CONFIG.scale,
@@ -181,7 +199,108 @@
     }
   }
   async function initConfetti() {
-    try { confetti = (await import('https://esm.sh/canvas-confetti@1.9.3')).default; } catch {}
+    try {
+      const { mod } = await importLocalFirst('/assets/vendor/canvas-confetti.js',
+        'https://esm.sh/canvas-confetti@1.9.3', 'confetti');
+      confetti = mod.default;
+    } catch {}
+  }
+
+  // Map a per-player style (from roll.style) onto dice-box-threejs config. With custom
+  // colors we use theme_customColorset (which also carries texture+material); otherwise
+  // a named colorset + texture + material. Missing fields fall back to CONFIG defaults.
+  function styleToConfig(style) {
+    const s = style || {};
+    const texture = s.texture != null ? s.texture : CONFIG.theme_texture;
+    const material = s.material != null ? s.material : CONFIG.theme_material;
+    const hasCustomColors = s.foreground || s.background || s.edge;
+    if (hasCustomColors) {
+      return {
+        theme_texture: texture,
+        theme_material: material,
+        theme_customColorset: {
+          foreground: s.foreground || '#ffffff',
+          background: s.background || s.foreground || '#cccccc',
+          outline: s.edge || s.background || 'black',
+          edge: s.edge || s.background || '',
+          texture,
+          material,
+        },
+      };
+    }
+    return {
+      theme_customColorset: null,
+      theme_colorset: s.colorset || CONFIG.theme_colorset,
+      theme_texture: texture,
+      theme_material: material,
+    };
+  }
+
+  // ── per-style texture cache ──────────────────────────────────────────────────
+  // Resolving a style runs the engine's loadTheme → ImageLoader (loads the texture
+  // image) and produces a `colorData` object holding the loaded texture. We cache
+  // that colorData per distinct style so repeat rolls just re-apply it (no reload),
+  // and the overlay pre-warms every known player's style on connect. A style change
+  // yields a new key → it's re-resolved (re-cached) the next time it's needed.
+  const styleCache = new Map();        // styleKey -> resolved colorData
+  const STYLE_CACHE_MAX = 64;
+  function styleKey(style) {
+    const s = style || {};
+    return JSON.stringify([s.texture || '', s.material || '', s.colorset || '',
+      s.foreground || '', s.background || '', s.edge || '']);
+  }
+
+  // Serialize everything that touches the engine (warming vs. rolling) so their
+  // async steps never interleave on the single shared DiceBox/DiceFactory.
+  let engineLock = Promise.resolve();
+  function withEngine(fn) {
+    const p = engineLock.then(fn, fn);
+    engineLock = p.catch(() => {});
+    return p;
+  }
+
+  // Resolve+cache a style if needed, then make the dice use it. Fast path: a cache
+  // hit just re-applies the stored colorData (no network, no engine re-resolve).
+  function applyStyle(style) {
+    return withEngine(async () => {
+      if (!Box) return;
+      const key = styleKey(style);
+      const cached = styleCache.get(key);
+      if (cached) {
+        try { Box.DiceFactory.applyColorSet(cached); Box.colorData = cached; }
+        catch (e) { console.warn('[overlay] applyColorSet failed', e); }
+        return;
+      }
+      // Miss: resolve via the engine (clear its name-keyed memo first so the texture
+      // actually re-resolves), then capture and cache the loaded colorData.
+      try { if (Box.DiceColors) Box.DiceColors.colorsets = {}; } catch {}
+      try {
+        await Box.updateConfig(styleToConfig(style));
+        if (Box.colorData) {
+          styleCache.set(key, Box.colorData);
+          while (styleCache.size > STYLE_CACHE_MAX) styleCache.delete(styleCache.keys().next().value);
+        }
+      } catch (e) { console.warn('[overlay] style resolve failed', e); }
+    });
+  }
+
+  // Pre-load (and re-load on change) every known player's dice textures so the first
+  // roll for each player is instant. Polls /styles; prunes cache to the current set.
+  let lastStylesJson = '';
+  async function warmStyles() {
+    if (!Box || !room) return;
+    try {
+      const r = await fetch('/room/' + room + '/styles');
+      if (!r.ok) return;
+      const txt = await r.text();
+      if (txt === lastStylesJson) return;       // unchanged since last poll
+      lastStylesJson = txt;
+      const d = JSON.parse(txt);
+      const styles = [d.defaultStyle, ...Object.values(d.styles || {})].filter(Boolean);
+      const keep = new Set([styleKey(null), ...styles.map(styleKey)]);
+      for (const k of [...styleCache.keys()]) if (!keep.has(k)) styleCache.delete(k); // drop updated/removed
+      for (const s of styles) if (!styleCache.has(styleKey(s))) await applyStyle(s);   // warm new ones
+    } catch {}
   }
 
   // ── notation builder: turn parsed dice into a PREDETERMINED roll string ──────
@@ -321,6 +440,8 @@
       const plan = rollPlan(roll);
       try {
         if (Box && plan.notation) {
+          // Re-theme to the rolling player's style (cached → no texture reload).
+          await applyStyle(roll.style);
           Box.clearDice();
           await withTimeout(Box.roll(plan.notation), CONFIG.settleTimeoutMs);
         }
@@ -360,6 +481,13 @@
   // ── boot ────────────────────────────────────────────────────────────────────
   await Promise.allSettled([initDice(), initConfetti()]);
   connect();
+
+  // Pre-warm every known player's dice textures now, then poll so a style edited on
+  // the customize page gets re-cached without waiting for that player's next roll.
+  if (Box && room) {
+    warmStyles();
+    setInterval(warmStyles, 15000);
+  }
 
   // ── preview: press keys in a normal tab to test (no Roll20 needed) ───────────
   //   T = normal d20   A = advantage   D = disadvantage   C = crit   F = fumble

@@ -1,0 +1,4 @@
+{
+  "_README": "Drop your own dice textures here. Put a .webp next to this file, then add one entry below keyed by the texture id (lowercase letters/digits/dash/underscore). Run `npm run dice:build` to register it. Fields: file (required, the .webp filename), name (shown in pickers), material (none|metal|wood|glass|plastic), bump (optional .webp used as a bump map), composite (advanced: multiply|destination-in, default multiply).",
+  "_example": { "file": "lava.webp", "name": "Lava", "material": "glass" }
+}

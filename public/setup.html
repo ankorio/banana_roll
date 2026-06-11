@@ -57,6 +57,7 @@
   <h2 data-i18n="s2_h">2. Per-player overlays</h2>
   <p data-i18n="s2_p">One source per player — add each as its own Browser source so you can place them
      separately. This list updates as players come online in your Roll20 game.</p>
+  <p class="note"><a id="defaultCustomize" href="#" target="_blank" data-i18n="default_dice">🎲 Customize the default dice (all players)</a></p>
   <div id="players"></div>
 </main>
 <script>
@@ -65,7 +66,9 @@
   const origin = location.origin;
   const overlayUrl = `${origin}/room/${room}/overlay`;
   const playerUrl = (id) => `${origin}/room/${room}/overlay?player=${encodeURIComponent(id)}`;
+  const customizeUrl = (id) => `${origin}/room/${room}/customize?player=${encodeURIComponent(id)}`;
   document.getElementById('overlayUrl').value = overlayUrl;
+  document.getElementById('defaultCustomize').href = customizeUrl('default');
 
   // ── i18n (EN/ES) ────────────────────────────────────────────────────────────
   const I18N = {
@@ -80,7 +83,8 @@
       s2_h: '2. Per-player overlays',
       s2_p: 'One source per player — add each as its own Browser source so you can place them separately. This list updates as players come online in your Roll20 game.',
       empty: 'No players seen yet — open your Roll20 game and they\'ll appear here.',
-      open: 'Open', copy: 'Copy', copied: 'Copied!',
+      open: 'Open', copy: 'Copy', copied: 'Copied!', customize: 'Customize dice',
+      default_dice: '🎲 Customize the default dice (all players)',
     },
     es: {
       doc_title: 'Configuración del overlay',
@@ -93,7 +97,8 @@
       s2_h: '2. Overlays por jugador',
       s2_p: 'Una fuente por jugador — añade cada una como su propia fuente de Navegador para colocarlas por separado. Esta lista se actualiza a medida que los jugadores se conectan en tu partida de Roll20.',
       empty: 'Aún no se ven jugadores — abre tu partida de Roll20 y aparecerán aquí.',
-      open: 'Abrir', copy: 'Copiar', copied: '¡Copiado!',
+      open: 'Abrir', copy: 'Copiar', copied: '¡Copiado!', customize: 'Personalizar dados',
+      default_dice: '🎲 Personalizar los dados por defecto (todos los jugadores)',
     },
   };
 
@@ -152,7 +157,11 @@
       const open = document.createElement('a');
       open.className = 'open'; open.href = url; open.target = '_blank'; open.textContent = dict().open;
 
-      row.append(dot, name, input, copyBtn, open);
+      const custom = document.createElement('a');
+      custom.className = 'open'; custom.href = customizeUrl(p.id); custom.target = '_blank';
+      custom.title = dict().customize; custom.textContent = '🎲';
+
+      row.append(dot, name, input, copyBtn, open, custom);
       wrap.appendChild(row);
     }
   }

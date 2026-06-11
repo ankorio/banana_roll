@@ -7,7 +7,9 @@ Roll20 tab (userscript: relay raw chat records) --HTTP POST--> Node server (pars
 ```
 
 ## Run
-- `npm start` — boots the server on `PORT` (default 8765).
+- `npm start` — boots the server on `PORT` (default 8765); runs `dice:build` first (`prestart`).
+- `npm run dice:build` — rebuild the vendored dice engine + manifest after adding custom textures
+  (see **Dice styles** below).
 - `npm run smoke` — end-to-end smoke test (create room, SSE, post + duplicate, bad token).
 - Env: `PORT`, `BASE_URL` (absolute URL base for generated links), `ROOM_TTL` (ms),
   `MAX_ROOMS`, rate-limit knobs (see `src/rooms.js`).
@@ -48,7 +50,10 @@ Roll20 tab (userscript: relay raw chat records) --HTTP POST--> Node server (pars
 | GET  | `/room/:id/ping` | room id | Heartbeat liveness; 200 if room exists, 404 if lost (drives userscript re-provision) |
 | GET  | `/room/:id/overlay` | room id | Overlay HTML (`?player=<playerid>` filters to one player) |
 | GET  | `/room/:id/setup` | room id | Human setup page |
-| GET  | `/assets/<file>` | none | Static overlay art/fonts (e.g. the Arcane Plaque PNG); basename-only, no traversal |
+| GET  | `/room/:id/styles` | room id | Read the per-player dice styles map `{ styles, defaultStyle }` (drives the customize page) |
+| POST | `/room/:id/styles?player=<pid\|default>` | room id | Set one player's dice style (or the room default); body `{ style }`. Cosmetic, validated, rate-limited |
+| GET  | `/room/:id/customize` | room id | Self-serve dice-styling page (`?player=<pid>`; `default` = all-players fallback) |
+| GET  | `/assets/<path>` | none | Static vendored assets (plaque PNG, fonts, dice engine bundle, textures, sounds, `dice-manifest.json`); nested paths allowed, traversal-guarded to `public/assets/` |
 | GET  | `/healthz` | none | Liveness |
 
 **Roll event shape:** (`id` is the Firebase chat push-id; `playerid` is optional)
@@ -63,7 +68,9 @@ Roll20 tab (userscript: relay raw chat records) --HTTP POST--> Node server (pars
 `normal | advantage | disadvantage`; for adv/dis, `d20: { values:[v1,v2], keptIndex }`
 carries both d20s so the overlay rolls two dice and selects the winner. The overlay reads
 `playerid` so a per-player overlay URL (`…/overlay?player=<playerid>`) shows only that
-player's rolls; omit the param for the all-players overlay. `avatar` (optional, http(s) only)
+player's rolls; omit the param for the all-players overlay. `style` (optional) is the rolling
+player's dice look (see **Dice styles** below), stamped on the roll server-side at ingest.
+`avatar` (optional, http(s) only)
 is the rolling character's token image, set by the userscript from `/characters` (`msg.avatar`).
 The overlay loads it as an `<img>` and falls back to a coloured initials disc when it's absent or
 fails to load — note Roll20's *account* avatar endpoint (`app.roll20.net/users/avatar/…`) is
@@ -75,10 +82,32 @@ a circular **portrait** (the `avatar`), the big **total**, plus boxes for the ro
 breakdown (`🎲 16 + 7`), advantage/disadvantage badge, and crit/fumble tag. Behind it, **predetermined**
 3D physics dice roll via [`@3d-dice/dice-box-threejs`](https://github.com/3d-dice/dice-box-threejs)
 (notation like `2d20@13,8` lands on the parser's exact values; transparent canvas for OBS), with
-crit/fumble particles (`canvas-confetti`). Dice/confetti/font load from CDN at runtime and **degrade
-gracefully** (plaque-only, serif) if unavailable — so OBS never shows a broken source. See the
-`CONFIG` block at the top of the overlay `<script>` for styling; zone CSS uses `cqw` so every box
-scales with the plaque.
+crit/fumble particles (`canvas-confetti`). The dice engine, textures, sounds, confetti, and font are
+**vendored under `public/assets/` and load local-first** (CDN only as a last-resort fallback), so a
+CDN outage never breaks the overlay; everything still **degrades gracefully** (plaque-only, serif) if
+all sources fail. The `CONFIG` block at the top of the overlay `<script>` is the **default** dice
+look; zone CSS uses `cqw` so every box scales with the plaque.
+
+## Dice styles (per-player customization)
+- **A style** is a small cosmetic object — `{ texture, material, colorset?, foreground?, background?,
+  edge? }` (all optional) — describing how one player's dice look. Stored per room: `room.styles`
+  (`playerid → style`) and `room.defaultStyle`. Set via the self-serve **customize page**
+  (`/room/:id/customize?player=<pid>`); the setup page links one per roster player plus a `default`.
+  Writes are room-id capability (no publish token — a player link can't carry the secret), validated
+  (`validateStyle` in `src/server.js`), size-capped, and rate-limited.
+- **How it renders:** the server stamps the rolling player's style onto each roll as `roll.style` at
+  ingest (`styleForRoll`); the overlay's `styleToConfig` maps it to dice-box-threejs config and calls
+  `Box.updateConfig(...)` to **re-theme per roll** before tossing. Custom colors → `theme_customColorset`;
+  otherwise a named `theme_colorset` + texture + material. Missing fields fall back to `CONFIG`.
+- **Adding your own textures (drop-in + build):** put a `.webp` in `public/assets/custom-textures/`,
+  add one entry to `dice-textures.json` (`{ "<id>": { "file", "name"?, "material"?, "bump"? } }`), then
+  run `npm run dice:build`. `scripts/build-dice.mjs` injects it into the texturelist of the vendored
+  upstream engine (anchored on the `cloudy:` key) → `public/assets/dice-box/dice-box.bundle.js`, and
+  regenerates `public/assets/dice-manifest.json` (textures + colorsets + materials) that drives the
+  customize-page pickers. The manifest only advertises built-in textures whose art is actually vendored.
+  `npm start` runs the build first (`prestart`). Bump the pinned upstream version → re-vendor
+  `public/assets/dice-box/upstream/` (engine `.es.js` + `const/*.mjs`); the build throws loudly if the
+  injection anchor is missing.
 
 ## Invariants
 - The **publish token is never** sent over SSE, shown on the overlay, or returned by any
