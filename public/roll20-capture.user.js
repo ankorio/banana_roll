@@ -513,6 +513,67 @@
     if (changed) renderPlayers();
   }
 
+  // ── character portraits (per-character token image for the overlay) ──────────
+  // The roll's profile image isn't in the chat record, so we index Roll20's
+  // /characters node (snapshotted on sync, same WS frames as chat/players) and
+  // resolve each roll to its character's token image — preferring the default
+  // token (personalised per character) and falling back to the bio avatar.
+  const charById = new Map();   // characterid       -> img url
+  const charByName = new Map(); // lowercased name   -> img url
+
+  function normImg(src) {
+    if (typeof src !== 'string') return '';
+    let s = src.trim();
+    if (!s) return '';
+    if (s.startsWith('//')) s = 'https:' + s;
+    return /^https?:\/\//.test(s) ? s : '';
+  }
+  function characterImg(rec) {
+    // Default token first (each character personalises it), then the avatar image.
+    if (typeof rec.defaulttoken === 'string' && rec.defaulttoken) {
+      let dt = rec.defaulttoken;
+      try { dt = decodeURIComponent(dt); } catch {}
+      const tok = tryParse(dt);
+      const url = normImg(tok && (tok.imgsrc || tok.imgSrc));
+      if (url) return url;
+    }
+    return normImg(rec.avatar);
+  }
+  function indexChar(cid, rec) {
+    if (!cid || !rec || typeof rec !== 'object') return;
+    const img = characterImg(rec);
+    if (!img) return;
+    charById.set(cid, img);
+    const name = clean(rec.name);
+    if (name) charByName.set(name.toLowerCase(), img);
+  }
+  // Walk a synced value on the /characters path and (re)index whatever it carries.
+  function collectCharacters(path, value) {
+    const p = String(path || '');
+    if (!/\/characters(\/|$)/.test(p)) return;
+    const after = p.split('/characters/')[1]; // undefined => the /characters collection
+    if (after === undefined || after === '') {
+      if (!value || typeof value !== 'object') return;
+      for (const [cid, rec] of Object.entries(value)) {
+        if (cid[0] !== '.') indexChar(cid, rec);
+      }
+    } else {
+      const segs = after.split('/');
+      const cid = segs[0];
+      if (segs.length === 1) { indexChar(cid, value); }
+      else if (segs[1] === 'avatar') { const u = normImg(value); if (u) charById.set(cid, u); }
+    }
+  }
+  // Resolve a chat record to its character's token image (characterid → name).
+  function resolveAvatar(msg) {
+    if (!msg) return '';
+    const cid = msg.characterid || msg.characterId;
+    if (cid && charById.has(cid)) return charById.get(cid);
+    const who = clean(msg.who).toLowerCase();
+    if (who && charByName.has(who)) return charByName.get(who);
+    return '';
+  }
+
   // ── the single capture pipeline ──────────────────────────────────────────────
   // The client is a thin relay: it forwards each LIVE chat record verbatim to the
   // server, which parses it (parser.js) into an overlay roll. So new game systems /
@@ -520,6 +581,7 @@
   const seenKeys = new Set(); // chat keys relayed this tab (relay-once)
 
   function onFirebaseData(path, value) {
+    try { collectCharacters(path, value); } catch (e) { dbg('character handling failed', e); }
     try {
       for (const { key, msg } of collectMessages(path, value)) {
         // Drop chat history replayed on initial Firebase sync; keep only live events.
@@ -530,6 +592,11 @@
         if (msg && SECRET_TYPES.has(msg.type)) continue;
         if (key) { seenKeys.add(key); if (seenKeys.size > 3000) seenKeys.clear(); }
 
+        // Attach the rolling character's token image so the overlay portrait fills.
+        if (msg && !msg.avatar) {
+          const av = resolveAvatar(msg);
+          if (av) { msg.avatar = av; dbg('avatar for', msg.who, '→', av); }
+        }
         const record = { id: key, msg, ts: Number.isFinite(t) ? t : Date.now() };
         console.log('[overlay] relaying chat', key, 'type=' + (msg && msg.type));
         if (CREDS) postChat(CREDS, record);

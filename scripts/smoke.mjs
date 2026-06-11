@@ -95,6 +95,9 @@ async function main() {
   const jc = await rc.json();
   check('raw chat parsed -> 200 with roll', rc.status === 200 && jc.roll && jc.roll.total === 18);
   check('chat roll names the skill (history)', !!jc.roll && /history/i.test(jc.roll.formula));
+  check('advantage carries mode + both d20s for the animation',
+    !!jc.roll && jc.roll.mode === 'advantage' && Array.isArray(jc.roll.d20?.values) &&
+    jc.roll.d20.values.length === 2 && jc.roll.d20.keptIndex === 0 && jc.roll.modifier === 5);
   await sleep(150);
   check('chat roll broadcast over SSE', liveEvents.some((e) => e && e.id === 'chat-adv-1' && e.total === 18));
 

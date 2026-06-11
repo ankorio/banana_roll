@@ -18,7 +18,10 @@ Roll20 tab (userscript: relay raw chat records) --HTTP POST--> Node server (pars
   frames, plus wraps `ref.on` for clean players-roster snapshots. It does **no dice parsing**:
   it forwards each *raw* chat record (keyed by its Firebase push-id) to the relay. It only
   (a) drops history replayed on initial sync (push-id embedded timestamp) and (b) never relays
-  secret types (`whisper`/`gmrollresult`), so private rolls don't leave the page.
+  secret types (`whisper`/`gmrollresult`), so private rolls don't leave the page. It also indexes
+  the synced `/characters` node (token image / bio avatar, keyed by characterid + name) and stamps
+  the matching character's token-image URL onto each relayed record as `msg.avatar` — the chat
+  record itself carries no portrait, so this is how the overlay's plaque portrait gets filled.
 - **Parse = server (`src/parser.js`).** The server turns a raw Roll20 chat record into the overlay
   roll shape: flattens `inlinerolls`/rolltemplates, picks the shown roll honoring
   advantage/disadvantage, labels it from `{{rname}}`, and applies crit/fumble rules. Crit/fumble is
@@ -45,17 +48,37 @@ Roll20 tab (userscript: relay raw chat records) --HTTP POST--> Node server (pars
 | GET  | `/room/:id/ping` | room id | Heartbeat liveness; 200 if room exists, 404 if lost (drives userscript re-provision) |
 | GET  | `/room/:id/overlay` | room id | Overlay HTML (`?player=<playerid>` filters to one player) |
 | GET  | `/room/:id/setup` | room id | Human setup page |
+| GET  | `/assets/<file>` | none | Static overlay art/fonts (e.g. the Arcane Plaque PNG); basename-only, no traversal |
 | GET  | `/healthz` | none | Liveness |
 
 **Roll event shape:** (`id` is the Firebase chat push-id; `playerid` is optional)
 ```json
-{ "id": "<firebase-chat-key>", "who": "Player", "formula": "1d20 + 5", "total": 23,
-  "dice": [{ "sides": "20", "value": 18, "crit": false, "fumble": false }],
-  "isCrit": false, "isFumble": false, "playerid": "-OSo…", "ts": 1733800000000 }
+{ "id": "<firebase-chat-key>", "who": "Player", "formula": "Fire Bolt: 1d20 + 7", "total": 23,
+  "dice": [{ "sides": "20", "value": 16, "crit": false, "fumble": false }],
+  "modifier": 7, "mode": "normal", "d20": null,
+  "isCrit": false, "isFumble": false, "playerid": "-OSo…", "avatar": "https://files.d20.io/…",
+  "ts": 1733800000000 }
 ```
-The overlay reads `playerid` so a per-player overlay URL (`…/overlay?player=<playerid>`) shows
-only that player's rolls; omit the param for the all-players overlay. The userscript builds these
-URLs from the live players roster it observes on the Firebase `/players` node.
+`modifier` is the flat bonus (`total − Σdice`) shown as `+N`/`−N`. `mode` is
+`normal | advantage | disadvantage`; for adv/dis, `d20: { values:[v1,v2], keptIndex }`
+carries both d20s so the overlay rolls two dice and selects the winner. The overlay reads
+`playerid` so a per-player overlay URL (`…/overlay?player=<playerid>`) shows only that
+player's rolls; omit the param for the all-players overlay. `avatar` (optional, http(s) only)
+is the rolling character's token image, set by the userscript from `/characters` (`msg.avatar`).
+The overlay loads it as an `<img>` and falls back to a coloured initials disc when it's absent or
+fails to load — note Roll20's *account* avatar endpoint (`app.roll20.net/users/avatar/…`) is
+CORP-blocked cross-origin so it can't be used; the `files.d20.io` token CDN loads fine.
+
+**Overlay rendering:** the overlay (`public/overlay.html`) is the **Arcane Plaque** design — an
+ornate frame (`/assets/arcane-plaque.png`, Cinzel from Google Fonts) whose zones map to the roll:
+a circular **portrait** (the `avatar`), the big **total**, plus boxes for the roll name, dice
+breakdown (`🎲 16 + 7`), advantage/disadvantage badge, and crit/fumble tag. Behind it, **predetermined**
+3D physics dice roll via [`@3d-dice/dice-box-threejs`](https://github.com/3d-dice/dice-box-threejs)
+(notation like `2d20@13,8` lands on the parser's exact values; transparent canvas for OBS), with
+crit/fumble particles (`canvas-confetti`). Dice/confetti/font load from CDN at runtime and **degrade
+gracefully** (plaque-only, serif) if unavailable — so OBS never shows a broken source. See the
+`CONFIG` block at the top of the overlay `<script>` for styling; zone CSS uses `cqw` so every box
+scales with the plaque.
 
 ## Invariants
 - The **publish token is never** sent over SSE, shown on the overlay, or returned by any

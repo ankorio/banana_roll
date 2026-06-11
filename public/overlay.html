@@ -3,146 +3,384 @@
 <head>
   <meta charset="utf-8" />
   <title>Roll Overlay</title>
+  <!-- Cinzel (plaque typeface) from Google Fonts CDN; degrades to serif if unavailable. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    html, body {
-      margin: 0; height: 100%; background: transparent; overflow: hidden;
-      font-family: system-ui, "Segoe UI", sans-serif;
+    :root {
+      --gold: #c79a4b;
+      --gold-light: #e6c87f;
+      --gold-deep: #a47a32;
     }
-    #stage {
-      position: fixed; inset: 0;
-      display: flex; align-items: flex-end; justify-content: center;
-      padding-bottom: 8vh;
+    html, body { margin: 0; height: 100%; background: transparent; overflow: hidden;
+      font-family: 'Cinzel', serif; }
+    /* 3D dice canvas fills the screen; the plaque result sits on top. */
+    #dice { position: fixed; inset: 0; z-index: 1; }
+    #dice canvas { width: 100% !important; height: 100% !important; }
+    #stage { position: fixed; inset: 0; z-index: 2; display: flex;
+      align-items: center; justify-content: center; pointer-events: none; }
+
+    /* ── Arcane Plaque result card ──────────────────────────────────────────────
+       The square plaque art is the frame; absolutely-positioned zones (portrait,
+       big total, supporting boxes) map onto it. Sizes use cqw so every zone scales
+       with the plaque (container-type: inline-size). */
+    .plaque {
+      position: relative;
+      width: min(80vh, 86vw, 560px);
+      aspect-ratio: 1 / 1;
+      container-type: inline-size;
+      background: url('/assets/arcane-plaque.png') center / contain no-repeat;
+      filter: drop-shadow(0 12px 40px rgba(0, 0, 0, 0.55));
+      transform: translateY(34px) scale(0.95); opacity: 0;
+      transition: transform 0.4s cubic-bezier(.2,.9,.25,1.2), opacity 0.4s ease;
     }
-    .card {
-      min-width: 260px; max-width: 70vw;
-      padding: 18px 28px; border-radius: 16px;
-      background: rgba(20, 20, 28, 0.82);
-      border: 2px solid rgba(255, 255, 255, 0.12);
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.55);
-      color: #f4f4f6; text-align: center;
-      transform: translateY(40px) scale(0.96); opacity: 0;
-      transition: transform 0.35s cubic-bezier(.2,.9,.25,1.2), opacity 0.35s ease;
+    .plaque.show { transform: translateY(0) scale(1); opacity: 1; }
+
+    /* ZONE 1 — portrait, upper trefoil (center ≈ 50%, 22.5%). Token images already
+       carry their own border, so they render as-is (no imposed ring/clip); only the
+       initials fallback gets the round disc. */
+    .portrait {
+      position: absolute; left: 50%; top: 22.5%; width: 25%; height: 25%;
+      transform: translate(-50%, -50%);
+      display: grid; place-items: center;
     }
-    .card.show { transform: translateY(0) scale(1); opacity: 1; }
-    .who { font-size: 20px; font-weight: 600; opacity: 0.85; letter-spacing: 0.3px; }
+    .portrait img { width: 100%; height: 100%; object-fit: contain; display: block;
+      filter: drop-shadow(0 1cqw 2.5cqw rgba(0, 0, 0, 0.5)); }
+    .portrait.placeholder {
+      width: 100%; height: 100%; border-radius: 50%; overflow: hidden;
+      background: radial-gradient(circle at 50% 35%,
+        hsl(var(--hue, 40), 42%, 46%), hsl(var(--hue, 40), 40%, 30%));
+      color: var(--gold-light); font-weight: 800; font-size: 10cqw; letter-spacing: 0.02em;
+      box-shadow: 0 0 0 0.6cqw var(--gold), 0 0 0 1cqw var(--gold-deep),
+                  0 1.2cqw 4cqw rgba(0, 0, 0, 0.55);
+    }
+
+    /* Player / character name, just under the portrait */
+    .who {
+      position: absolute; left: 50%; top: 37.5%; transform: translate(-50%, -50%);
+      max-width: 76%; text-align: center;
+      font-size: 3cqw; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--gold-light); text-shadow: 0 1px 5px rgba(0, 0, 0, 0.7);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    /* ZONE 2 — the lower panel: badge, big total, label, breakdown, tag stacked. */
+    .lower {
+      position: absolute; left: 13%; right: 13%; top: 42%; bottom: 8%;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 1.3cqw; text-align: center;
+    }
     .total {
-      font-size: 84px; font-weight: 800; line-height: 1.05; margin: 4px 0;
-      font-variant-numeric: tabular-nums;
+      font-size: 19cqw; font-weight: 800; line-height: 0.88; color: var(--gold-light);
+      font-variant-numeric: tabular-nums; letter-spacing: 0.01em;
+      text-shadow: 0 2px 0 var(--gold-deep), 0 0 5cqw rgba(199, 154, 75, 0.45),
+                   0 6px 18px rgba(0, 0, 0, 0.6);
     }
-    .formula { font-size: 18px; opacity: 0.7; font-variant-numeric: tabular-nums; }
+    .rname {
+      font-size: 4cqw; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--gold); max-width: 100%;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .expr { font-size: 2.6cqw; font-weight: 500; color: var(--gold-light); opacity: 0.6;
+      font-variant-numeric: tabular-nums; }
+    .breakdown { font-size: 3.2cqw; font-weight: 600; color: var(--gold-light); opacity: 0.92;
+      font-variant-numeric: tabular-nums; }
+    .breakdown .drop { opacity: 0.4; text-decoration: line-through; }
+    .breakdown .keep { font-weight: 800; color: #fff3d6; }
+    .breakdown .mod { opacity: 0.85; }
+    .badge {
+      padding: 0.5cqw 2.4cqw; border-radius: 999px; font-size: 2.4cqw; font-weight: 800;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      background: rgba(199, 154, 75, 0.22); color: var(--gold-light);
+    }
+    .badge.adv { background: rgba(46, 125, 50, 0.85); color: #d7ffd9; }
+    .badge.dis { background: rgba(141, 47, 47, 0.9); color: #ffdada; }
     .tag {
-      display: inline-block; margin-top: 8px; padding: 3px 12px; border-radius: 999px;
-      font-size: 15px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+      padding: 0.6cqw 2.8cqw; border-radius: 999px; font-size: 2.8cqw; font-weight: 800;
+      letter-spacing: 0.12em; text-transform: uppercase; background: var(--gold); color: #2a1c00;
     }
-    /* crit */
-    .card.crit {
-      border-color: rgba(255, 210, 74, 0.9);
-      box-shadow: 0 0 40px rgba(255, 190, 0, 0.55), 0 10px 40px rgba(0,0,0,0.5);
+
+    /* Crit / fumble flavor on the whole plaque */
+    .plaque.crit {
+      filter: drop-shadow(0 0 7cqw rgba(255, 190, 0, 0.6)) drop-shadow(0 12px 40px rgba(0, 0, 0, 0.5));
     }
-    .card.crit .total { color: #ffd24a; text-shadow: 0 0 18px rgba(255,190,0,0.8); }
-    .card.crit .tag { background: #ffd24a; color: #3a2c00; }
-    /* fumble */
-    .card.fumble { border-color: rgba(255, 80, 80, 0.9); }
-    .card.fumble .total { color: #ff6b6b; text-shadow: 0 0 18px rgba(255,40,40,0.7); }
-    .card.fumble .tag { background: #ff5050; color: #2a0000; }
-    .card.fumble.show { animation: shake 0.5s ease; }
-    @keyframes shake {
-      0%,100% { transform: translateX(0); }
-      20% { transform: translateX(-10px); } 40% { transform: translateX(9px); }
-      60% { transform: translateX(-6px); } 80% { transform: translateX(4px); }
+    .plaque.crit .total { color: #ffe08a;
+      text-shadow: 0 2px 0 var(--gold-deep), 0 0 6cqw rgba(255, 200, 40, 0.9); }
+    .plaque.crit .tag { background: #ffd24a; color: #3a2c00; box-shadow: 0 0 4cqw rgba(255, 200, 40, 0.7); }
+    .plaque.fumble {
+      filter: drop-shadow(0 0 6cqw rgba(255, 60, 40, 0.45)) drop-shadow(0 12px 40px rgba(0, 0, 0, 0.5));
     }
-    #status {
-      position: fixed; top: 6px; left: 8px; font-size: 11px; color: #888;
-      font-family: monospace; opacity: 0.5;
-    }
+    .plaque.fumble .total { color: #ff7b6b; text-shadow: 0 0 6cqw rgba(255, 60, 40, 0.75); }
+    .plaque.fumble .tag { background: #ff5050; color: #2a0000; }
+    .plaque.fumble.show { animation: shake 0.5s ease; }
+    @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-10px)}
+      40%{transform:translateX(9px)} 60%{transform:translateX(-6px)} 80%{transform:translateX(4px)} }
+
+    #status { position: fixed; top: 6px; left: 8px; z-index: 3; font-size: 11px; color: #888;
+      font-family: monospace; opacity: 0.5; }
   </style>
 </head>
 <body>
+  <div id="dice"></div>
   <div id="stage"></div>
   <div id="status">connecting…</div>
-  <script>
-    // Room id is the path segment: /room/<id>/overlay
-    const params = new URLSearchParams(location.search);
-    const m = location.pathname.match(/\/room\/([^/]+)\//);
-    const room = m ? m[1] : params.get('room');
-    // Per-player overlay: ?player=<playerid> shows only that player's rolls.
-    const wantPlayer = params.get('player');
-    const statusEl = document.getElementById('status');
-    const stage = document.getElementById('stage');
 
-    const DISPLAY_MS = 5000; // how long a card stays up before auto-hiding
+  <script type="module">
+  /* ─────────────────────────────────────────────────────────────────────────
+     OVERLAY CONFIG — tweak the dice look here (easy templating).
+     Materials: "glass" (translucent), "plastic", "metal", "wood", "none".
+     Textures:  "" | "marble" | "water" | "stainedglass" | "ice" | "speckles" | "stars" …
+                (full list: dice-box-threejs /public/textures)
+     Colorsets: "white","black","necrotic","fire","ice","poison","radiant","force" …
+     ───────────────────────────────────────────────────────────────────────── */
+  const CONFIG = {
+    enable3d: true,            // master switch; falls back to the plaque-only overlay if false/unavailable
+    theme_material: 'glass',   // translucent dice by default
+    theme_texture: 'marble',   // surface texture (try 'water', 'stainedglass', '')
+    theme_colorset: 'white',   // base color palette
+    scale: 100,                // dice size (baseScale)
+    strength: 1.6,             // toss strength
+    shadows: true,
+    displayMs: 4200,           // how long the result plaque stays up
+    settleTimeoutMs: 6000,     // safety: proceed even if physics never reports done
+  };
 
-    // Always show the NEWEST roll immediately. If a card is already up we cut it
-    // short and swap in the new one — queueing each roll for a full DISPLAY_MS
-    // made back-to-back rolls (e.g. during combat) lag seconds behind play.
-    let current = null; // { card, hideTimer } for the card on screen, or null
+  const CDN = 'https://cdn.jsdelivr.net/npm/@3d-dice/dice-box-threejs@0.0.12';
+  const SUPPORTED_SIDES = new Set([4, 6, 8, 10, 12, 20, 100]);
 
-    function show(roll) {
-      console.log('[overlay] roll received:', roll.who, roll.formula, '=', roll.total,
-        roll.isCrit ? '[CRIT]' : roll.isFumble ? '[FUMBLE]' : '', roll);
+  const params = new URLSearchParams(location.search);
+  const room = (location.pathname.match(/\/room\/([^/]+)\//) || [])[1] || params.get('room');
+  const wantPlayer = params.get('player');     // per-player overlay filter
+  const statusEl = document.getElementById('status');
+  const stage = document.getElementById('stage');
 
-      // Drop whatever is showing right now so the new roll pops instantly.
-      if (current) {
-        clearTimeout(current.hideTimer);
-        current.card.remove();
-        current = null;
-      }
+  // ── optional libraries (3D dice + particles), loaded with graceful fallback ──
+  let Box = null;       // dice-box-threejs instance, or null → plaque-only
+  let confetti = null;  // canvas-confetti, or null → no particles
 
-      const card = document.createElement('div');
-      card.className = 'card' + (roll.isCrit ? ' crit' : roll.isFumble ? ' fumble' : '');
-      const tag = roll.isCrit ? '<div class="tag">Critical!</div>'
-                : roll.isFumble ? '<div class="tag">Fumble</div>' : '';
-      card.innerHTML =
-        '<div class="who"></div>' +
-        '<div class="total"></div>' +
-        '<div class="formula"></div>' + tag;
-      card.querySelector('.who').textContent = roll.who || 'Someone';
-      card.querySelector('.total').textContent = (roll.total ?? '?');
-      card.querySelector('.formula').textContent = roll.formula || '';
-      stage.appendChild(card);
-      requestAnimationFrame(() => card.classList.add('show'));
-
-      const hideTimer = setTimeout(() => {
-        card.classList.remove('show');
-        setTimeout(() => { card.remove(); }, 400);
-        if (current && current.card === card) current = null;
-      }, DISPLAY_MS);
-      current = { card, hideTimer };
-    }
-
-    // --- SSE ---
-    function connect() {
-      if (!room) { statusEl.textContent = 'no room id in URL'; return; }
-      const es = new EventSource('/room/' + room + '/events');
-      es.onopen = () => { statusEl.textContent = 'live'; };
-      es.onmessage = (e) => {
-        try {
-          const roll = JSON.parse(e.data);
-          if (wantPlayer && roll.playerid !== wantPlayer) return; // not this player's overlay
-          // Latency probe: roll.ts is the Firebase commit time, so this is the whole
-          // relay half (Firebase commit → overlay receipt). Shown in the corner.
-          if (roll.ts) statusEl.textContent = 'live · ' + (Date.now() - roll.ts) + 'ms';
-          show(roll);
-        } catch {}
-      };
-      es.onerror = () => { statusEl.textContent = 'reconnecting…'; };
-      // EventSource auto-reconnects; nothing else to do.
-    }
-    connect();
-
-    // --- preview: press T for a fake roll in a normal browser tab ---
-    let fake = 0;
-    window.addEventListener('keydown', (e) => {
-      if (e.key.toLowerCase() !== 't') return;
-      fake++;
-      const kind = fake % 3;
-      const v = kind === 1 ? 20 : kind === 2 ? 1 : (3 + (fake % 16));
-      show({
-        id: 'fake-' + fake, who: 'Preview', formula: '1d20 + 5',
-        total: v + 5, dice: [{ sides: '20', value: v, crit: kind===1, fumble: kind===2 }],
-        isCrit: kind === 1, isFumble: kind === 2, ts: Date.now(),
+  async function initDice() {
+    if (!CONFIG.enable3d) return;
+    try {
+      const { default: DiceBox } = await import(`${CDN}/dist/dice-box-threejs.es.js`);
+      Box = new DiceBox('#dice', {
+        assetPath: `${CDN}/public/`,
+        sounds: false,
+        shadows: CONFIG.shadows,
+        baseScale: CONFIG.scale,
+        strength: CONFIG.strength,
+        theme_material: CONFIG.theme_material,
+        theme_texture: CONFIG.theme_texture,
+        theme_colorset: CONFIG.theme_colorset,
       });
-    });
+      await Box.initialize();
+      console.log('[overlay] 3D dice ready');
+    } catch (e) {
+      Box = null;
+      console.warn('[overlay] 3D dice unavailable — using plaque-only overlay', e);
+    }
+  }
+  async function initConfetti() {
+    try { confetti = (await import('https://esm.sh/canvas-confetti@1.9.3')).default; } catch {}
+  }
+
+  // ── notation builder: turn parsed dice into a PREDETERMINED roll string ──────
+  // e.g. [{sides:'20',value:13}] → "1d20@13";  two d20s → "2d20@13,8".
+  function notationFromDice(dice) {
+    const groups = new Map(); // sides -> [values] (preserves a stable term order)
+    for (const d of dice) {
+      const s = Number(d.sides);
+      if (!SUPPORTED_SIDES.has(s) || !Number.isFinite(Number(d.value))) continue;
+      if (!groups.has(s)) groups.set(s, []);
+      groups.get(s).push(Number(d.value));
+    }
+    if (!groups.size) return null;
+    const terms = [], values = [];
+    for (const [sides, vals] of groups) { terms.push(`${vals.length}d${sides}`); values.push(...vals); }
+    return `${terms.join('+')}@${values.join(',')}`;
+  }
+
+  // What dice to physically roll for this event. Advantage/disadvantage rolls
+  // BOTH d20s (so you see the pair) and we mark which one won.
+  function rollPlan(roll) {
+    if ((roll.mode === 'advantage' || roll.mode === 'disadvantage') &&
+        roll.d20 && Array.isArray(roll.d20.values) && roll.d20.values.length === 2) {
+      const [a, b] = roll.d20.values.map(Number);
+      return { notation: `2d20@${a},${b}`, pair: { a, b, kept: roll.d20.keptIndex === 1 ? b : a, keptIndex: roll.d20.keptIndex } };
+    }
+    return { notation: notationFromDice(roll.dice || []), pair: null };
+  }
+
+  // ── plaque result card ─────────────────────────────────────────────────────
+  const fmtMod = (m) => (m > 0 ? `+ ${m}` : m < 0 ? `− ${Math.abs(m)}` : '');
+
+  // Split "Fire Bolt: 1d20 + 7" → { name:"Fire Bolt", expr:"1d20 + 7" }.
+  function splitFormula(f) {
+    const s = (f || '').trim();
+    const i = s.indexOf(':');
+    if (i > 0) return { name: s.slice(0, i).trim(), expr: s.slice(i + 1).trim() };
+    return { name: '', expr: s };
+  }
+  // Initials for the portrait placeholder when no avatar is available.
+  function initials(name) {
+    const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return '?';
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+  // Stable hue per name so the placeholder colour is consistent for a given player.
+  function hueFor(s) { let h = 0; for (const c of (s || '')) h = (h * 31 + c.charCodeAt(0)) % 360; return h; }
+
+  // Render the coloured initials disc (the portrait fallback). Replaces any <img>.
+  function setInitials(portrait, who) {
+    portrait.classList.add('placeholder');
+    portrait.style.setProperty('--hue', hueFor(who));
+    portrait.textContent = initials(who);
+  }
+
+  function buildBreakdown(roll, plan) {
+    if (plan && plan.pair) {
+      const { a, b, keptIndex } = plan.pair;
+      const aCls = keptIndex === 0 ? 'keep' : 'drop';
+      const bCls = keptIndex === 1 ? 'keep' : 'drop';
+      const mod = roll.modifier ? ` <span class="mod">${fmtMod(roll.modifier)}</span>` : '';
+      return `🎲 <span class="${aCls}">${a}</span> · <span class="${bCls}">${b}</span>${mod}`;
+    }
+    const vals = (roll.dice || []).map((d) => d.value).filter((v) => Number.isFinite(Number(v)));
+    if (!vals.length) return '';
+    const dicePart = vals.join(' + ');
+    const mod = roll.modifier ? ` <span class="mod">${fmtMod(roll.modifier)}</span>` : '';
+    return `🎲 ${dicePart}${mod}`;
+  }
+
+  function showCard(roll, plan) {
+    const el = document.createElement('div');
+    el.className = 'plaque' + (roll.isCrit ? ' crit' : roll.isFumble ? ' fumble' : '');
+    const { name, expr } = splitFormula(roll.formula);
+    const badge = roll.mode === 'advantage' ? '<div class="badge adv">Advantage</div>'
+                : roll.mode === 'disadvantage' ? '<div class="badge dis">Disadvantage</div>' : '';
+    const tag = roll.isCrit ? '<div class="tag">Critical!</div>'
+              : roll.isFumble ? '<div class="tag">Fumble</div>' : '';
+    el.innerHTML =
+      '<div class="portrait"></div>' +
+      '<div class="who"></div>' +
+      '<div class="lower">' +
+        badge +
+        '<div class="total"></div>' +
+        (name ? '<div class="rname"></div>' : '') +
+        (expr ? '<div class="expr"></div>' : '') +
+        '<div class="breakdown">' + buildBreakdown(roll, plan) + '</div>' +
+        tag +
+      '</div>';
+
+    // Portrait: the character's token image if present (loaded as a real <img> so a
+    // blocked/broken URL falls back to the coloured initials disc), else initials.
+    const portrait = el.querySelector('.portrait');
+    if (roll.avatar) {
+      const img = new Image();
+      img.referrerPolicy = 'no-referrer';
+      img.alt = '';
+      img.onerror = () => { portrait.textContent = ''; setInitials(portrait, roll.who); };
+      img.src = roll.avatar;
+      portrait.appendChild(img);
+    } else {
+      setInitials(portrait, roll.who);
+    }
+    el.querySelector('.who').textContent = roll.who || 'Someone';
+    el.querySelector('.total').textContent = (roll.total ?? '?');
+    if (name) el.querySelector('.rname').textContent = name;
+    if (expr) el.querySelector('.expr').textContent = expr;
+
+    stage.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('show'));
+    return el;
+  }
+
+  function fireParticles(roll) {
+    if (!confetti) return;
+    if (roll.isCrit) {
+      const gold = ['#ffd24a', '#ffb300', '#fff3c4', '#ffffff'];
+      confetti({ particleCount: 120, spread: 80, startVelocity: 55, origin: { x: 0.5, y: 0.75 }, colors: gold });
+      setTimeout(() => confetti({ particleCount: 60, angle: 60, spread: 70, origin: { x: 0, y: 0.9 }, colors: gold }), 120);
+      setTimeout(() => confetti({ particleCount: 60, angle: 120, spread: 70, origin: { x: 1, y: 0.9 }, colors: gold }), 120);
+    } else if (roll.isFumble) {
+      confetti({ particleCount: 40, spread: 100, startVelocity: 18, gravity: 1.6, ticks: 120,
+        origin: { x: 0.5, y: 0.4 }, colors: ['#ff5050', '#7a0000', '#2a0000'], scalar: 0.9 });
+    }
+  }
+
+  // ── one-at-a-time roll queue ──────────────────────────────────────────────────
+  const queue = [];
+  let busy = false;
+  function enqueue(roll) { queue.push(roll); if (!busy) drain(); }
+
+  async function drain() {
+    busy = true;
+    while (queue.length) {
+      const roll = queue.shift();
+      const plan = rollPlan(roll);
+      try {
+        if (Box && plan.notation) {
+          Box.clearDice();
+          await withTimeout(Box.roll(plan.notation), CONFIG.settleTimeoutMs);
+        }
+      } catch (e) { console.warn('[overlay] dice roll failed', e); }
+      const card = showCard(roll, plan);
+      fireParticles(roll);
+      await sleep(CONFIG.displayMs);
+      card.classList.remove('show');
+      await sleep(420);
+      card.remove();
+      if (Box) { try { Box.clearDice(); } catch {} }
+    }
+    busy = false;
+  }
+
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const withTimeout = (p, ms) => Promise.race([Promise.resolve(p), sleep(ms)]);
+
+  // ── SSE ───────────────────────────────────────────────────────────────────────
+  function connect() {
+    if (!room) { statusEl.textContent = 'no room id in URL'; return; }
+    const es = new EventSource('/room/' + room + '/events');
+    es.onopen = () => { statusEl.textContent = 'live'; };
+    es.onmessage = (e) => {
+      try {
+        const roll = JSON.parse(e.data);
+        if (wantPlayer && roll.playerid !== wantPlayer) return; // not this player's overlay
+        if (roll.ts) statusEl.textContent = 'live · ' + (Date.now() - roll.ts) + 'ms';
+        console.log('[overlay] roll received:', roll.who, roll.formula, '=', roll.total,
+          roll.mode && roll.mode !== 'normal' ? '(' + roll.mode + ')' : '', roll.isCrit ? '[CRIT]' : roll.isFumble ? '[FUMBLE]' : '', roll);
+        enqueue(roll);
+      } catch {}
+    };
+    es.onerror = () => { statusEl.textContent = 'reconnecting…'; };
+  }
+
+  // ── boot ────────────────────────────────────────────────────────────────────
+  await Promise.allSettled([initDice(), initConfetti()]);
+  connect();
+
+  // ── preview: press keys in a normal tab to test (no Roll20 needed) ───────────
+  //   T = normal d20   A = advantage   D = disadvantage   C = crit   F = fumble
+  let n = 0;
+  window.addEventListener('keydown', (e) => {
+    const k = e.key.toLowerCase();
+    if (!'tadcf'.includes(k)) return;
+    n++;
+    const d20 = (v) => ({ sides: '20', value: v, crit: v === 20, fumble: v === 1 });
+    if (k === 'a' || k === 'd') {
+      const a = 4 + (n * 7) % 17, b = 2 + (n * 11) % 18;
+      const kept = k === 'a' ? Math.max(a, b) : Math.min(a, b);
+      enqueue({ id: 'k' + n, who: 'Preview', formula: 'Check: 1d20 + 5', total: kept + 5, modifier: 5,
+        mode: k === 'a' ? 'advantage' : 'disadvantage', d20: { values: [a, b], keptIndex: (k === 'a' ? (a >= b ? 0 : 1) : (a <= b ? 0 : 1)) },
+        dice: [d20(kept)], isCrit: kept === 20, isFumble: kept === 1, ts: Date.now() });
+    } else {
+      const v = k === 'c' ? 20 : k === 'f' ? 1 : 2 + (n % 18);
+      enqueue({ id: 'k' + n, who: 'Preview', formula: 'Fire Bolt: 1d20 + 7', total: v + 7, modifier: 7,
+        mode: 'normal', d20: null, dice: [d20(v)], isCrit: v === 20, isFumble: v === 1, ts: Date.now() });
+    }
+  });
   </script>
 </body>
 </html>

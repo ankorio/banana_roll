@@ -34,20 +34,38 @@ t('skill check (normal) keeps r1, names the skill', () => {
   assert.strictEqual(r.formula, 'deception: 1d20+2[charisma]');
 });
 
-t('advantage keeps the HIGHER d20', () => {
+t('advantage keeps the HIGHER d20 + reports both dice for the animation', () => {
   const msg = rec('simple', ' {{rname=^{history-u}}} {{r1=$[[0]]}} {{advantage=1}} {{r2=$[[1]]}}', {
     0: inl('1d20+5', 18, die(20, 13)),
     1: inl('1d20+5', 13, die(20, 8)),
   });
-  assert.strictEqual(parseChatRecord('k3', msg, {}).total, 18);
+  const r = parseChatRecord('k3', msg, {});
+  assert.strictEqual(r.total, 18);
+  assert.strictEqual(r.mode, 'advantage');
+  assert.deepStrictEqual(r.d20, { values: [13, 8], keptIndex: 0 });
+  assert.strictEqual(r.modifier, 5); // total 18 − kept d20 13
 });
 
-t('disadvantage keeps the LOWER d20', () => {
+t('disadvantage keeps the LOWER d20 + marks the kept index', () => {
   const msg = rec('simple', ' {{rname=^{insight-u}}} {{r1=$[[0]]}} {{disadvantage=1}} {{r2=$[[1]]}}', {
     0: inl('1d20+1', 12, die(20, 11)),
     1: inl('1d20+1', 4, die(20, 3)),
   });
-  assert.strictEqual(parseChatRecord('k4', msg, {}).total, 4);
+  const r = parseChatRecord('k4', msg, {});
+  assert.strictEqual(r.total, 4);
+  assert.strictEqual(r.mode, 'disadvantage');
+  assert.deepStrictEqual(r.d20, { values: [11, 3], keptIndex: 1 });
+});
+
+t('normal roll has mode "normal", no d20 pair, and a modifier', () => {
+  const msg = rec('simple', ' {{rname=^{deception-u}}} {{r1=$[[0]]}} {{normal=1}} {{r2=$[[1]]}}', {
+    0: inl('1d20+2', 7, die(20, 5)),
+    1: inl('0d20+2', 2),
+  });
+  const r = parseChatRecord('kn', msg, {});
+  assert.strictEqual(r.mode, 'normal');
+  assert.strictEqual(r.d20, null);
+  assert.strictEqual(r.modifier, 2);
 });
 
 t('attack nat-1 with customCrit point is a FUMBLE not a crit', () => {

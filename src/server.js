@@ -53,6 +53,10 @@ const STATIC_TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.svg': 'image/svg+xml',
+  '.woff2': 'font/woff2',
 };
 function serveFile(res, file, headers = {}) {
   fs.readFile(file, (err, data) => {
@@ -126,12 +130,28 @@ function validateRoll(obj) {
     formula: typeof obj.formula === 'string' ? obj.formula.slice(0, 200) : '',
     total: Number(obj.total),
     dice,
+    modifier: Number.isFinite(obj.modifier) ? obj.modifier : 0,
     isCrit: !!obj.isCrit,
     isFumble: !!obj.isFumble,
     ts: Number.isFinite(obj.ts) ? obj.ts : Date.now(),
   };
+  // Roll mode drives the dice animation: advantage/disadvantage rolls two d20s and
+  // selects the winner. `d20` carries both raw values + which index was kept.
+  if (obj.mode === 'advantage' || obj.mode === 'disadvantage') {
+    out.mode = obj.mode;
+    if (obj.d20 && Array.isArray(obj.d20.values)) {
+      out.d20 = {
+        values: obj.d20.values.slice(0, 2).map((v) => Number(v)),
+        keptIndex: obj.d20.keptIndex === 1 ? 1 : 0,
+      };
+    }
+  } else {
+    out.mode = 'normal';
+  }
   // Optional: which Roll20 player made this roll, so per-player overlays can filter.
   if (typeof obj.playerid === 'string' && obj.playerid) out.playerid = obj.playerid.slice(0, 100);
+  // Optional avatar URL for the plaque portrait — only http(s) so it's safe in an <img src>.
+  if (typeof obj.avatar === 'string' && /^https?:\/\//.test(obj.avatar)) out.avatar = obj.avatar.slice(0, 500);
   return out;
 }
 
@@ -353,6 +373,12 @@ const server = http.createServer((req, res) => {
   }
   if (pathname === '/roll20-capture.user.js' && method === 'GET') {
     return serveUserscript(req, res);
+  }
+  // Static overlay assets (plaque art, fonts). Basename-only — no path traversal.
+  const asset = pathname.match(/^\/assets\/([\w.-]+)$/);
+  if (asset && method === 'GET') {
+    return serveFile(res, path.join(PUBLIC_DIR, 'assets', asset[1]),
+      { 'Cache-Control': 'public, max-age=86400' });
   }
   if (pathname === '/roll20-capture.meta.js' && method === 'GET') {
     return serveUserscriptMeta(req, res);

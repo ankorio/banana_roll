@@ -86,8 +86,17 @@ function refIndex(content, field) {
   return m ? Number(m[1]) : -1;
 }
 
-function pickPrimaryInline(inl, content) {
-  if (!inl.length) return null;
+// The raw value of the first die in an inlineroll (the d20 of a check/attack).
+function primaryDieValue(inlObj) {
+  const dice = flattenDice(inlObj && inlObj.results && inlObj.results.rolls, []);
+  const d20 = dice.find((x) => x.sides === '20');
+  return (d20 || dice[0] || {}).value ?? null;
+}
+
+// Choose the inlineroll that drives the card, and report the roll mode. For
+// advantage/disadvantage we also return BOTH d20 values + which one won, so the
+// overlay can show two dice rolling and then select the winner.
+function selectInline(inl, content) {
   const adv = /\{\{\s*advantage\s*=\s*1\s*\}\}/.test(content);
   const dis = /\{\{\s*disadvantage\s*=\s*1\s*\}\}/.test(content);
   let i1 = refIndex(content, 'r1');
@@ -96,10 +105,14 @@ function pickPrimaryInline(inl, content) {
   if ((adv || dis) && inl[i1] && inl[i2]) {
     const t1 = inlTotal(inl[i1]), t2 = inlTotal(inl[i2]);
     const keepFirst = adv ? (t1 >= t2) : (t1 <= t2);
-    return keepFirst ? inl[i1] : inl[i2];
+    return {
+      primary: keepFirst ? inl[i1] : inl[i2],
+      mode: adv ? 'advantage' : 'disadvantage',
+      d20: { values: [primaryDieValue(inl[i1]), primaryDieValue(inl[i2])], keptIndex: keepFirst ? 0 : 1 },
+    };
   }
-  if (i1 >= 0 && inl[i1] && hasRealDie(inl[i1])) return inl[i1];
-  return inl.find(hasRealDie) || inl[0];
+  if (i1 >= 0 && inl[i1] && hasRealDie(inl[i1])) return { primary: inl[i1], mode: 'normal' };
+  return { primary: inl.find(hasRealDie) || inl[0], mode: 'normal' };
 }
 
 // Pull a readable label out of {{rname=…}}: a [Name](link), a ^{loc-key}, or plain text.
@@ -128,7 +141,7 @@ function parseChatRecord(id, msg, opts = {}) {
   if (typeof msg.type === 'string' && !ROLL_TYPES.has(msg.type)) return null;
 
   const inl = toArray(msg.inlinerolls);
-  let total = null, rolls = null, formula = '';
+  let total = null, rolls = null, formula = '', mode = 'normal', d20 = null;
 
   if (msg.type === 'rollresult' && typeof msg.content === 'string') {
     // Plain /roll — content is the roll JSON ({ type:"V", rolls:[…], total }).
@@ -140,12 +153,14 @@ function parseChatRecord(id, msg, opts = {}) {
   } else if (inl.length) {
     // Sheet roll template (attack/check/save/damage).
     const content = typeof msg.content === 'string' ? msg.content : '';
-    const primary = pickPrimaryInline(inl, content);
-    const r = primary && primary.results;
+    const sel = selectInline(inl, content);
+    const r = sel.primary && sel.primary.results;
     if (!r) return null;
     total = num(r.total);
     rolls = r.rolls;
-    const expr = clean(primary.expression) || clean(msg.origRoll);
+    mode = sel.mode;
+    d20 = sel.d20 || null;
+    const expr = clean(sel.primary.expression) || clean(msg.origRoll);
     const name = parseRname(content);
     formula = name ? (expr ? `${name}: ${expr}` : name) : expr;
   } else {
@@ -163,6 +178,10 @@ function parseChatRecord(id, msg, opts = {}) {
   for (const d of dice) { if (d.crit) isCrit = true; if (d.fumble) isFumble = true; }
   if (isCrit && isFumble) { isCrit = false; isFumble = false; } // mixed nat20+nat1 → neither
 
+  // Flat bonus = total minus the summed dice — what the overlay shows as "+N" / "−N".
+  const diceSum = dice.reduce((s, d) => s + (Number.isFinite(d.value) ? d.value : 0), 0);
+  const modifier = Number.isFinite(total) ? total - diceSum : 0;
+
   const ts = Number.isFinite(opts.ts) ? opts.ts : Date.now();
   return {
     id: id || ('fb-' + ts),
@@ -170,9 +189,15 @@ function parseChatRecord(id, msg, opts = {}) {
     formula,
     total: Number.isFinite(total) ? total : null,
     dice,
+    modifier,
+    mode,                 // 'normal' | 'advantage' | 'disadvantage'
+    d20,                  // adv/dis only: { values:[v1,v2], keptIndex } — the two d20s
     isCrit,
     isFumble,
     playerid: typeof msg.playerid === 'string' ? msg.playerid : undefined,
+    // Roll20 attributes a character/token roll with an avatar image URL; the overlay
+    // fills the plaque's portrait circle with it (falls back to the player's initials).
+    avatar: typeof msg.avatar === 'string' && msg.avatar ? msg.avatar : undefined,
     ts,
   };
 }
