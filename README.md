@@ -4,18 +4,18 @@
 
 ## TL;DR
 
-Muestra las tiradas de Roll20 en tus directos mediante overlays 3D animados. Una pestaña de Roll20 envía cada tirada a un pequeño relay en Node, que a su vez la reenvía por SSE a una Browser Source de OBS. Así, tu audiencia ve los dados rodar y caer exactamente en el número que ha salido en la mesa.
+Muestra las tiradas de Roll20 en directo con overlays 3D animados. Una pestaña de Roll20 envía cada tirada a un pequeño relay en Node, que a su vez la reenvía por SSE a una Browser Source de OBS. Así, tu audiencia ve los dados rodar y caer exactamente en el número que ha salido en mesa.
 
 👉 **Demo en vivo: https://bananaroll.up.railway.app**
 
-Aviso: esto está hecho a base de **vibe coding en un solo día**, así que tómatelo como lo que es: un proyecto hobby divertido, no un software a prueba de bombas. Funciona y ya se ha usado en directo, pero el historial de commits es corto y el bus factor es uno. Se aceptan PRs. 
+Aviso: esto salió de una sesión intensa de **vibe coding en un solo día**, así que conviene tomarlo como lo que es: un proyecto hobby divertido, no un software blindado. Funciona y ya se ha usado en directo, pero el historial de commits es corto y el bus factor es uno. Se aceptan PRs.
 
 
 ```text
 Pestaña de Roll20 (userscript) --HTTP POST--> Relay en Node (salas + parseo) --SSE--> Browser Source de OBS
 ```
 
-Los tokens se estan poniendo caros: https://buymeacoffee.com/ankorio ☕
+Si te está siendo útil y quieres ayudar con los costes del proyecto: https://buymeacoffee.com/ankorio ☕
 
 ## Qué hace
 
@@ -41,14 +41,14 @@ El diseño “Arcane Plaque” incluye marco ornamentado, retrato, total grande,
 </details>
 
 <details>
-<summary><strong>Overlay conjunto o por jugador/a.</strong></summary>
+<summary><strong>Overlay general o por jugador.</strong></summary>
 
 Cada jugador tiene una URL de overlay filtrada, por ejemplo `…/overlay?player=<id>`, útil para escenas individuales, cámaras separadas o composiciones personalizadas en OBS.
 
 </details>
 
 <details>
-<summary><strong>Skins de dados por jugador.</strong></summary>
+<summary><strong>Estilos de dados por jugador.</strong></summary>
 
 La página de personalización permite que cada jugador elija textura, material y colores para sus dados. Las preferencias se guardan en el servidor y se mantienen entre sesiones.
 
@@ -110,7 +110,7 @@ npm run dice:build # recompila el bundle de dados y el manifest después de aña
 
 ### Arquitectura en una frase
 
-* **Captura (`userscript`):** se ejecuta en `document-start`, engancha el WebSocket de la página para leer los frames de Firebase de Roll20 y reenvía cada registro de chat en crudo al relay. No hay lógica de dados en el cliente.
+* **Captura (`userscript`):** se ejecuta en `document-start`, intercepta el WebSocket de la página para leer los frames de Firebase de Roll20 y reenvía cada registro de chat en crudo al relay. No hay lógica de dados en el cliente.
 
 * **Parseo (`src/parser.js`):** convierte el registro crudo de Roll20 en el formato de tirada que usa el overlay. Aplana inline rolls y rolltemplates, elige la tirada mostrada respetando ventaja/desventaja y aplica la lógica de crítico/pifia. Tiene tests unitarios.
 
@@ -149,7 +149,7 @@ Aun así, mantén las réplicas en 1 por ahora salvo que lo hayas probado con ca
 
 Este es el montaje que se usa en la demo en vivo.
 
-1. Conecta el repositorio de GitHub a un proyecto de Railway y despliega en cada push. Esa es la “pipeline”. El build usa Nixpacks; `railway.json` fija el comando de arranque y el healthcheck en `/healthz`.
+1. Conecta el repositorio de GitHub a un proyecto de Railway y despliega en cada push. Ese será tu flujo de despliegue. El build usa Nixpacks; `railway.json` fija el comando de arranque y el healthcheck en `/healthz`.
 
 2. Añade una base de datos **Redis** al proyecto y configura `REDIS_URL = ${{Redis.REDIS_URL}}` en el servicio de la app.
 
