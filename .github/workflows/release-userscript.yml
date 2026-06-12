@@ -1,0 +1,87 @@
+name: Release userscript
+
+# Publishes a GitHub Release whenever a merge into master changes the capture
+# userscript. The release tag/name come from the script's own `@version`, the
+# attached asset is rewritten to point at the production relay (so it's directly
+# installable), and `version.json` (the runtime update manifest) must already agree
+# with `@version` — a mismatch fails the run so a release never ships out of sync.
+#
+# Normal flow: in your PR, bump `@version` in the userscript AND `latest` in
+# version.json (and `minSupported` if it's a breaking change), then merge to master.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'public/roll20-capture.user.js'
+
+permissions:
+  contents: write          # needed to create releases
+
+concurrency:
+  group: release-userscript
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read versions
+        id: ver
+        run: |
+          SCRIPT_V=$(grep -oP '^//\s*@version\s+\K[0-9][0-9A-Za-z.+-]*' public/roll20-capture.user.js | head -1)
+          MANIFEST_V=$(jq -r '.latest' version.json)
+          if [ -z "$SCRIPT_V" ]; then echo "::error::could not read @version from the userscript"; exit 1; fi
+          echo "script=$SCRIPT_V"     >> "$GITHUB_OUTPUT"
+          echo "manifest=$MANIFEST_V" >> "$GITHUB_OUTPUT"
+          echo "Userscript @version = $SCRIPT_V · version.json latest = $MANIFEST_V"
+
+      - name: Verify version.json is in sync
+        run: |
+          if [ "${{ steps.ver.outputs.script }}" != "${{ steps.ver.outputs.manifest }}" ]; then
+            echo "::error::version.json latest (${{ steps.ver.outputs.manifest }}) != userscript @version (${{ steps.ver.outputs.script }}). Bump both together in the PR."
+            exit 1
+          fi
+
+      - name: Skip if this release already exists
+        id: exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "v${{ steps.ver.outputs.script }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Release v${{ steps.ver.outputs.script }} already exists — bump @version to publish a new one."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build installable asset (bake the production relay origin)
+        if: steps.exists.outputs.exists == 'false'
+        env:
+          # Set repo variable RELAY_ORIGIN (Settings → Secrets and variables → Actions →
+          # Variables) to override; defaults to the hosted relay. This mirrors the
+          # substitution src/server.js does when serving the script live.
+          RELAY_ORIGIN: ${{ vars.RELAY_ORIGIN || 'https://bananaroll.up.railway.app' }}
+        run: |
+          HOST="${RELAY_ORIGIN#http://}"; HOST="${HOST#https://}"; HOST="${HOST%%/*}"; HOST="${HOST%%:*}"
+          mkdir -p dist
+          sed \
+            -e "s#const SERVER = '[^']*';#const SERVER = '${RELAY_ORIGIN}';#" \
+            -e "s#^// @connect      localhost#// @connect      ${HOST}#" \
+            -e "s#__ORIGIN__#${RELAY_ORIGIN}#g" \
+            public/roll20-capture.user.js > dist/roll20-capture.user.js
+          cp version.json dist/version.json
+          echo "Baked origin ${RELAY_ORIGIN} (host ${HOST}) into the release asset:"
+          grep -m1 "const SERVER =" dist/roll20-capture.user.js
+
+      - name: Publish release
+        if: steps.exists.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ steps.ver.outputs.script }}" \
+            dist/roll20-capture.user.js dist/version.json \
+            --title "Userscript v${{ steps.ver.outputs.script }}" \
+            --generate-notes

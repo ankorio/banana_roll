@@ -44,17 +44,37 @@ Roll20 tab (userscript: relay raw chat records) --HTTP POST--> Node server (pars
 | POST | `/rooms` | IP rate-limit | Create room → `{ room, publishToken, overlayUrl, setupUrl }` |
 | POST | `/room/:id/chat` | `?token=` | Ingest a raw Roll20 chat record `{ id, msg, ts? }`; server parses → roll; dedup by id; broadcast. Echoes the parsed `roll` (or `null`) |
 | POST | `/room/:id/roll` | `?token=` | Ingest one already-parsed roll; dedup by message id; broadcast |
-| POST | `/room/:id/players` | `?token=` | Userscript pushes the Roll20 roster `[{id,name,color,online}]`; stored on the room |
+| POST | `/room/:id/players` | `?token=` | Userscript pushes the Roll20 roster `[{id,name,color,online,userid}]`; stored on the room. `id` = per-campaign player id; `userid` = stable Roll20 account id (`d20userid`) used to key cross-campaign profiles |
 | GET  | `/room/:id/players` | room id | Read the roster (no token; same names/ids as the per-player overlay URLs) — drives the setup page's per-player links |
 | GET  | `/room/:id/events` | room id | SSE stream; replays retained last-roll on connect |
 | GET  | `/room/:id/ping` | room id | Heartbeat liveness; 200 if room exists, 404 if lost (drives userscript re-provision) |
 | GET  | `/room/:id/overlay` | room id | Overlay HTML (`?player=<playerid>` filters to one player) |
 | GET  | `/room/:id/setup` | room id | Human setup page |
 | GET  | `/room/:id/styles` | room id | Read the per-player dice styles map `{ styles, defaultStyle }` (drives the customize page) |
-| POST | `/room/:id/styles?player=<pid\|default>` | room id | Set one player's dice style (or the room default); body `{ style }`. Cosmetic, validated, rate-limited |
-| GET  | `/room/:id/customize` | room id | Self-serve dice-styling page (`?player=<pid>`; `default` = all-players fallback) |
-| GET  | `/assets/<path>` | none | Static vendored assets (plaque PNG, fonts, dice engine bundle, textures, sounds, `dice-manifest.json`); nested paths allowed, traversal-guarded to `public/assets/` |
+| POST | `/room/:id/styles?player=<pid\|default>` | room id | Set one player's dice style (or the room default); body `{ style }`. Cosmetic, validated, rate-limited. A real `pid` is mirrored to that player's cross-room profile |
+| GET  | `/room/:id/templates` | room id | List seeded plaque templates (frame art + default zones + editable color map) for the customizer |
+| GET  | `/room/:id/plaque` | room id | Read the per-player plaque configs `{ plaques, defaultPlaque }` |
+| POST | `/room/:id/plaque?player=<pid\|default>` | room id | Set one player's plaque config (or the room default); body is the plaque config (`{ templateId, colors, zones, background }`). Validated (`validatePlaque` in `src/templates.js`), larger body cap for the inline base64 PNG background, rate-limited. A real `pid` is mirrored to the cross-room profile |
+| GET  | `/room/:id/profile?player=<pid>` | room id | Read a player's cross-room profile `{ style, plaque }` (what they saved in any previous room); seeds the customizer when this room has nothing yet |
+| GET/POST | `/room/:id/settings` | room id | Read/set room settings `{ displaySeconds, system, confetti, sound, hideGm }`; `system` selects the parser's crit/fumble rules |
+| GET  | `/room/:id/customize` | room id | Self-serve Canva-style dice + plaque editor (`?player=<pid>`; `default` = all-players fallback) |
+| GET  | `/assets/<path>` | none | Static vendored assets (plaque PNG, fonts, dice engine bundle, textures, sounds, `dice-manifest.json`, customizer `editor.{js,css}`/`data.js`); nested paths allowed, traversal-guarded to `public/assets/` |
 | GET  | `/healthz` | none | Liveness |
+
+**Plaque config + cross-room profiles:** the customize page (`public/customize.html` +
+`public/assets/customizer/{data,editor}.js`, `editor.css`) is a three-pane editor that styles a
+player's **dice** (existing `/styles` shape) and their **plaque** (a `templateId` + editable
+`colors` + draggable `zones` + an optional inline base64-PNG `background`, validated in
+`src/templates.js`). Dice → `/styles`, plaque → `/plaque` (two stores). Saving for a real player also writes a
+**global profile keyed by the player's stable Roll20 account id** (`d20userid`, carried on the roster
+as `userid` — *not* the per-campaign player id, which changes every game), via `rooms.saveProfile`.
+So the look follows the **account** across campaigns: when the userscript pushes the roster, the
+server resolves each player's `userid` (`useridFor`) and seeds that campaign's `room.styles`/
+`room.plaques[playerid]` from the account profile if the room has nothing yet (read-on-demand, off the
+per-roll path). The per-campaign `playerid` still drives roll filtering, per-player overlay URLs, and
+display; only the **profile key** is the account id. Requires userscript ≥ 0.8.0 (older scripts omit
+`userid`, so customizations stay per-campaign). The live overlay does **not** yet render `plaqueConfig` (deferred — it keeps
+its fixed CSS plaque); plaque configs persist but don't drive the overlay yet.
 
 **Roll event shape:** (`id` is the Firebase chat push-id; `playerid` is optional)
 ```json

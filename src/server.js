@@ -5,10 +5,14 @@ const fs = require('fs');
 const path = require('path');
 const rooms = require('./rooms');
 const parser = require('./parser');
+const templates = require('./templates');
 
 const PORT = parseInt(process.env.PORT, 10) || 8765;
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 const MAX_BODY = 16 * 1024; // 16KB cap on POST bodies
+// Plaque configs can carry an inline base64 PNG background, so they need a bigger cap
+// than other endpoints. Kept just above templates.PLAQUE_BG_MAX (base64 + JSON overhead).
+const PLAQUE_MAX_BODY = 600 * 1024;
 
 // BASE_URL is used to build absolute links handed to users. Falls back per-request.
 function baseUrl(req) {
@@ -191,10 +195,30 @@ function validateStyle(obj) {
 }
 
 // Resolve the style to stamp on a roll: the rolling player's style, else the room
-// default, else null (overlay falls back to its built-in CONFIG defaults).
+// default, else null (overlay falls back to its built-in CONFIG defaults). Keyed by
+// the per-campaign playerid (room.styles is seeded from the cross-campaign profile on
+// roster push — see seedProfiles).
 function styleForRoll(room, playerid) {
   if (playerid && room.styles && room.styles[playerid]) return room.styles[playerid];
   return room.defaultStyle || null;
+}
+
+// Remember the character identity (name + token image) from a player's most recent
+// roll, so the customize editor can preview the real portrait/name when editing for
+// that player. The roster only carries the player account name + no image; the roll
+// (msg.who / msg.avatar) is the only place character info appears server-side.
+function rememberChar(room, roll) {
+  if (!roll || !roll.playerid) return;
+  if (!room.charInfo) room.charInfo = {};
+  room.charInfo[roll.playerid] = { who: roll.who || null, avatar: roll.avatar || null };
+}
+
+// Map a per-campaign playerid → the player's stable Roll20 account id (d20userid),
+// looked up in the room roster. Cross-campaign profiles are keyed on this account id;
+// returns '' if the roster doesn't (yet) carry a userid for that player.
+function useridFor(room, playerid) {
+  const p = (room.players || []).find((x) => x.id === playerid);
+  return (p && p.userid) || '';
 }
 
 // --- SSE --------------------------------------------------------------------
@@ -256,6 +280,7 @@ function handleRoll(req, res, id, query) {
     if (isNew) {
       const style = styleForRoll(room, roll.playerid);
       if (style) roll.style = style;
+      rememberChar(room, roll);
       room.lastRoll = roll;
       broadcast(room, roll);
       rooms.persistRoll(room, roll); // persist retained roll + fan out to other instances
@@ -298,7 +323,7 @@ function handleChat(req, res, id, query) {
     }
 
     const raw = parser.parseChatRecord(parsed.id, parsed.msg, {
-      system: room.system || parser.DEFAULT_SYSTEM,
+      system: (room.settings && room.settings.system) || room.system || parser.DEFAULT_SYSTEM,
       ts: Number(parsed.ts),
     });
     const roll = validateRoll(raw); // null if not a roll, or normalize/cap a parsed roll
@@ -309,6 +334,7 @@ function handleChat(req, res, id, query) {
 
     const style = styleForRoll(room, roll.playerid);
     if (style) roll.style = style;
+    rememberChar(room, roll);
     room.lastRoll = roll;
     broadcast(room, roll);
     rooms.persistRoll(room, roll);
@@ -326,6 +352,9 @@ function validatePlayers(arr) {
     name: typeof p.name === 'string' ? p.name.slice(0, 100) : 'Player',
     color: typeof p.color === 'string' ? p.color.slice(0, 32) : '#888',
     online: !!p.online,
+    // Stable Roll20 account id (d20userid): the cross-campaign key for saved
+    // customizations. Optional — older userscripts don't send it.
+    userid: typeof p.userid === 'string' && /^[\w-]{1,100}$/.test(p.userid) ? p.userid : '',
   })).filter((p) => p.id);
 }
 
@@ -347,8 +376,31 @@ function handlePlayersPost(req, res, id, query) {
     rooms.touch(room);
     room.players = players;
     rooms.persist(room); // sync roster to other instances / durable store
+    seedProfiles(room, players); // cross-room: pull each player's saved look into this room
     sendJson(res, 200, { ok: true, count: players.length });
   });
+}
+
+// Cross-campaign persistence (auto-apply): for each rostered player that hasn't
+// customized in THIS room yet, seed their dice style + plaque from the profile keyed
+// by their stable Roll20 account id (p.userid). Maps the persistent id back onto the
+// per-campaign playerid (room.styles/room.plaques) so the rest of the pipeline — roll
+// filtering, per-player overlays — keeps using the campaign id. Fire-and-forget and
+// off the hot per-roll path, so styleForRoll stays a plain sync room.styles lookup.
+async function seedProfiles(room, players) {
+  for (const p of players) {
+    if (!p.id || !p.userid) continue;
+    const haveStyle = room.styles && room.styles[p.id];
+    const havePlaque = room.plaques && room.plaques[p.id];
+    if (haveStyle && havePlaque) continue;
+    let prof;
+    try { prof = await rooms.getProfile(p.userid); } catch { prof = null; }
+    if (!prof) continue;
+    let changed = false;
+    if (!haveStyle && prof.style) { (room.styles || (room.styles = {}))[p.id] = prof.style; changed = true; }
+    if (!havePlaque && prof.plaque) { (room.plaques || (room.plaques = {}))[p.id] = prof.plaque; changed = true; }
+    if (changed) rooms.persist(room);
+  }
 }
 
 // Room-id-only read for the setup page. Returns the roster (no token); these are the
@@ -356,7 +408,15 @@ function handlePlayersPost(req, res, id, query) {
 function handlePlayersGet(req, res, id) {
   const room = rooms.getRoom(id);
   if (!room) return sendJson(res, 404, { error: 'unknown room' });
-  sendJson(res, 200, { players: room.players || [] });
+  // Enrich the roster with the character name/portrait captured from each player's
+  // last roll (used by the customize editor's preview; absent until they've rolled).
+  const ci = room.charInfo || {};
+  const players = (room.players || []).map((p) => {
+    const c = ci[p.id];
+    if (!c) return p;
+    return { ...p, charName: c.who || undefined, avatar: c.avatar || undefined };
+  });
+  sendJson(res, 200, { players });
 }
 
 // Room-id-only read of the dice styles map (no token; cosmetic, bearer-capability
@@ -398,9 +458,113 @@ function handleStylesPost(req, res, id, query) {
         return sendJson(res, 507, { error: 'too many styles' });
       }
       room.styles[player] = style;
+      // Mirror to the player's cross-CAMPAIGN profile (keyed by stable account id) so
+      // their dice follow them into other games. No-op until the roster carries a userid.
+      const userid = useridFor(room, player);
+      if (userid) rooms.saveProfile(userid, { style });
     }
     rooms.persist(room);
     sendJson(res, 200, { ok: true, style });
+  });
+}
+
+// --- plaque config (per player / room default) ------------------------------
+// Room-id capability (no publish token), validated, size-capped, rate-limited — same
+// model as dice styles. Backgrounds are inline base64 PNGs (validated in templates.js),
+// so the body cap is larger than the global MAX_BODY.
+function handlePlaqueGet(req, res, id) {
+  const room = rooms.getRoom(id);
+  if (!room) return sendJson(res, 404, { error: 'unknown room' });
+  sendJson(res, 200, { plaques: room.plaques || {}, defaultPlaque: room.defaultPlaque || null });
+}
+
+function handlePlaquePost(req, res, id, query) {
+  const room = rooms.getRoom(id);
+  if (!room) return sendJson(res, 404, { error: 'unknown room' });
+  if (!rooms.allowRoll(room)) return sendJson(res, 429, { error: 'rate limited' });
+  const player = query.get('player');
+  if (!player) return sendJson(res, 400, { error: 'missing ?player=' });
+
+  readBody(req, PLAQUE_MAX_BODY, (err, buf) => {
+    if (err) return sendJson(res, 400, { error: 'bad body' });
+    let parsed;
+    try { parsed = JSON.parse(buf.toString('utf8')); }
+    catch { return sendJson(res, 400, { error: 'invalid json' }); }
+    const plaque = templates.validatePlaque(parsed && parsed.plaque != null ? parsed.plaque : parsed);
+    if (!plaque) return sendJson(res, 400, { error: 'invalid plaque' });
+
+    rooms.touch(room);
+    if (player === 'default') {
+      room.defaultPlaque = plaque;
+    } else {
+      if (!/^[\w-]{1,100}$/.test(player)) return sendJson(res, 400, { error: 'invalid player id' });
+      if (!room.plaques) room.plaques = {};
+      if (!room.plaques[player] && Object.keys(room.plaques).length >= STYLES_MAX) {
+        return sendJson(res, 507, { error: 'too many plaques' });
+      }
+      room.plaques[player] = plaque;
+      const userid = useridFor(room, player); // cross-campaign (keyed by stable account id)
+      if (userid) rooms.saveProfile(userid, { plaque });
+    }
+    rooms.persist(room);
+    sendJson(res, 200, { ok: true, plaque });
+  });
+}
+
+// Seeded plaque templates (frame art + default zone layout + editable color map). Lets
+// new frames ship server-side without a client redeploy. Room-id only.
+function handleTemplatesGet(req, res, id) {
+  const room = rooms.getRoom(id);
+  if (!room) return sendJson(res, 404, { error: 'unknown room' });
+  sendJson(res, 200, { templates: templates.TEMPLATES });
+}
+
+// Read a player's cross-room profile (dice style + plaque config). Lets the customize
+// page seed from what the player saved in any previous room. Room-id only, cosmetic.
+async function handleProfileGet(req, res, id, query) {
+  const room = rooms.getRoom(id);
+  if (!room) return sendJson(res, 404, { error: 'unknown room' });
+  // Accept either the per-campaign ?player= (resolved to a userid via the roster) or
+  // an explicit ?userid=. Profiles are keyed by the stable Roll20 account id.
+  const player = query.get('player');
+  let userid = query.get('userid') || '';
+  if (!userid && player && player !== 'default') userid = useridFor(room, player);
+  if (!userid) return sendJson(res, 200, { style: null, plaque: null });
+  const prof = await rooms.getProfile(userid);
+  sendJson(res, 200, { style: (prof && prof.style) || null, plaque: (prof && prof.plaque) || null });
+}
+
+// --- room settings ----------------------------------------------------------
+function validateSettings(obj) {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return null;
+  const out = {};
+  if (Number.isFinite(obj.displaySeconds)) out.displaySeconds = Math.max(1, Math.min(30, obj.displaySeconds));
+  if (typeof obj.system === 'string' && /^[\w-]{1,40}$/.test(obj.system)) out.system = obj.system;
+  for (const k of ['confetti', 'sound', 'hideGm']) {
+    if (typeof obj[k] === 'boolean') out[k] = obj[k];
+  }
+  return out;
+}
+function handleSettingsGet(req, res, id) {
+  const room = rooms.getRoom(id);
+  if (!room) return sendJson(res, 404, { error: 'unknown room' });
+  sendJson(res, 200, { settings: room.settings || null });
+}
+function handleSettingsPost(req, res, id) {
+  const room = rooms.getRoom(id);
+  if (!room) return sendJson(res, 404, { error: 'unknown room' });
+  if (!rooms.allowRoll(room)) return sendJson(res, 429, { error: 'rate limited' });
+  readBody(req, MAX_BODY, (err, buf) => {
+    if (err) return sendJson(res, 400, { error: 'bad body' });
+    let parsed;
+    try { parsed = JSON.parse(buf.toString('utf8')); }
+    catch { return sendJson(res, 400, { error: 'invalid json' }); }
+    const settings = validateSettings(parsed && parsed.settings != null ? parsed.settings : parsed);
+    if (!settings) return sendJson(res, 400, { error: 'invalid settings' });
+    rooms.touch(room);
+    room.settings = { ...(room.settings || {}), ...settings };
+    rooms.persist(room);
+    sendJson(res, 200, { ok: true, settings: room.settings });
   });
 }
 
@@ -477,7 +641,7 @@ const server = http.createServer((req, res) => {
   }
 
   // /room/:id/<action>
-  const m = pathname.match(/^\/room\/([^/]+)\/(roll|chat|events|overlay|setup|ping|players|styles|customize)$/);
+  const m = pathname.match(/^\/room\/([^/]+)\/(roll|chat|events|overlay|setup|ping|players|styles|customize|templates|plaque|profile|settings)$/);
   if (m) {
     const id = decodeURIComponent(m[1]);
     const action = m[2];
@@ -487,6 +651,12 @@ const server = http.createServer((req, res) => {
     if (action === 'players' && method === 'GET') return handlePlayersGet(req, res, id);
     if (action === 'styles' && method === 'POST') return handleStylesPost(req, res, id, url.searchParams);
     if (action === 'styles' && method === 'GET') return handleStylesGet(req, res, id);
+    if (action === 'templates' && method === 'GET') return handleTemplatesGet(req, res, id);
+    if (action === 'plaque' && method === 'POST') return handlePlaquePost(req, res, id, url.searchParams);
+    if (action === 'plaque' && method === 'GET') return handlePlaqueGet(req, res, id);
+    if (action === 'profile' && method === 'GET') return handleProfileGet(req, res, id, url.searchParams);
+    if (action === 'settings' && method === 'POST') return handleSettingsPost(req, res, id);
+    if (action === 'settings' && method === 'GET') return handleSettingsGet(req, res, id);
     if (action === 'events' && method === 'GET') return handleEvents(req, res, id);
     if (action === 'ping' && method === 'GET') {
       // Heartbeat: room-id-only liveness check (no token). 404 tells the userscript

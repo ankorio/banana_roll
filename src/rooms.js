@@ -26,6 +26,13 @@ const MAX_ROOMS = intEnv('MAX_ROOMS', 5000);                    // global room c
 const SEEN_MAX = intEnv('SEEN_MAX', 500);                       // bounded dedup set per room
 const CLIENTS_MAX = intEnv('CLIENTS_MAX', 50);                  // SSE clients per room
 
+// Global player profiles (keyed by Roll20 playerid, room-independent) let a player's
+// dice + plaque customization follow them into a new room/game. Read-on-demand only
+// (customize page + roster push), never on the hot per-roll path — so this does not
+// change the broker calculus noted in CLAUDE.md.
+const MAX_PROFILES = intEnv('MAX_PROFILES', 20000);             // soft cap on cached profiles
+const PROFILE_TTL = intEnv('PROFILE_TTL', 1000 * 60 * 60 * 24 * 90); // 90d (redis key expiry)
+
 const CREATE_RATE_WINDOW = intEnv('CREATE_RATE_WINDOW', 1000 * 60); // per-IP /rooms window
 const CREATE_RATE_MAX = intEnv('CREATE_RATE_MAX', 10);             // creates per window per IP
 
@@ -39,6 +46,7 @@ function intEnv(name, dflt) {
 
 // --- state ------------------------------------------------------------------
 const rooms = new Map();        // id -> room record
+const profiles = new Map();     // playerid -> { style, plaque, updatedAt } (cross-room)
 const createHits = new Map();   // ip -> [timestamps] (sliding window)
 const INSTANCE_ID = crypto.randomBytes(8).toString('hex'); // tags pub/sub msgs so we skip our own echo
 let remoteRollHandler = null;   // set by server.js: (room, roll) => broadcast to this instance's clients
@@ -54,6 +62,7 @@ function serializeRoom(r) {
   return {
     id: r.id, publishToken: r.publishToken, lastRoll: r.lastRoll,
     styles: r.styles, defaultStyle: r.defaultStyle, players: r.players,
+    plaques: r.plaques, defaultPlaque: r.defaultPlaque, settings: r.settings, charInfo: r.charInfo,
     seenOrder: r.seenOrder, createdAt: r.createdAt, lastActivity: r.lastActivity,
   };
 }
@@ -61,6 +70,8 @@ function hydrate(d) {
   return {
     id: d.id, publishToken: d.publishToken, lastRoll: d.lastRoll || null,
     players: d.players || [], styles: d.styles || {}, defaultStyle: d.defaultStyle || null,
+    plaques: d.plaques || {}, defaultPlaque: d.defaultPlaque || null, settings: d.settings || null,
+    charInfo: d.charInfo || {},
     clients: new Set(), seen: new Set(d.seenOrder || []), seenOrder: d.seenOrder || [],
     rollHits: [], createdAt: d.createdAt || Date.now(), lastActivity: d.lastActivity || Date.now(),
   };
@@ -83,6 +94,10 @@ async function createRoom() {
     players: [],              // roster pushed by the userscript (for per-player links)
     styles: {},               // playerid -> dice style (set via the customize page)
     defaultStyle: null,       // fallback style for players with no entry / all-players overlay
+    plaques: {},              // playerid -> plaque config (set via the customize page)
+    defaultPlaque: null,      // fallback plaque config for the all-players overlay
+    charInfo: {},             // playerid -> { who, avatar } from rolls (editor preview portrait/name)
+    settings: null,           // room settings (display time, system, confetti, sounds, hide-GM)
     clients: new Set(),       // Set<ServerResponse> (per-instance, never persisted)
     seen: new Set(),          // bounded set of message ids
     seenOrder: [],            // FIFO order for bounding `seen`
@@ -104,6 +119,31 @@ function getRoom(id) {
 function touch(room) {
   room.lastActivity = Date.now();
   backend.refreshTtl(room); // throttled inside the backend
+}
+
+// --- player profiles (cross-room) -------------------------------------------
+// The in-memory `profiles` Map is the live working set on this instance. The chosen
+// backend persists it (file: in STATE_FILE; redis: per-playerid key w/ TTL; null: none).
+// getProfile checks the cache first, then falls back to a backend read (redis only).
+async function getProfile(id) {
+  if (!id || id === 'default') return null;
+  if (profiles.has(id)) return profiles.get(id);
+  let p = null;
+  try { p = await backend.loadProfile(id); } catch { p = null; }
+  if (p && profiles.size < MAX_PROFILES) profiles.set(id, p);
+  return p || null;
+}
+// Merge a partial ({ style } and/or { plaque }) into the player's profile and persist.
+async function saveProfile(id, partial) {
+  if (!id || id === 'default' || !partial) return;
+  const cur = profiles.get(id) || {};
+  const next = { ...cur, ...partial, updatedAt: Date.now() };
+  if (!profiles.has(id) && profiles.size >= MAX_PROFILES) {
+    // Cache is full: still persist (redis), just don't grow the local Map unboundedly.
+  } else {
+    profiles.set(id, next);
+  }
+  try { await backend.persistProfile(id, next); } catch {}
 }
 
 // --- dedup ------------------------------------------------------------------
@@ -191,6 +231,10 @@ function upsertFromRemote(d) {
     if (d.lastRoll) existing.lastRoll = d.lastRoll;
     existing.styles = d.styles || {};
     existing.defaultStyle = d.defaultStyle || null;
+    existing.plaques = d.plaques || {};
+    existing.defaultPlaque = d.defaultPlaque || null;
+    if (d.charInfo) existing.charInfo = d.charInfo;
+    if (d.settings) existing.settings = d.settings;
     if (d.players) existing.players = d.players;
     existing.lastActivity = Date.now();
   } else {
@@ -207,6 +251,7 @@ function nullBackend() {
   return {
     async init() {},
     persistRoom() {}, persistRoll() {}, refreshTtl() {},
+    async loadProfile() { return null; }, persistProfile() {},
     flush() {}, async close() {},
   };
 }
@@ -219,7 +264,9 @@ function fileBackend(STATE_FILE) {
   function serialize() {
     const out = [];
     for (const r of rooms.values()) out.push(serializeRoom(r));
-    return JSON.stringify({ v: 1, rooms: out });
+    const prof = {};
+    for (const [id, p] of profiles) prof[id] = p;
+    return JSON.stringify({ v: 1, rooms: out, profiles: prof });
   }
   function save() {
     dirty = true;
@@ -240,7 +287,8 @@ function fileBackend(STATE_FILE) {
       try {
         const data = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
         for (const r of (data.rooms || [])) rooms.set(r.id, hydrate(r));
-        console.log(`[state] loaded ${rooms.size} room(s) from ${STATE_FILE}`);
+        for (const [id, p] of Object.entries(data.profiles || {})) profiles.set(id, p);
+        console.log(`[state] loaded ${rooms.size} room(s), ${profiles.size} profile(s) from ${STATE_FILE}`);
       } catch (e) {
         console.error('[state] load failed:', e.message);
       }
@@ -248,6 +296,8 @@ function fileBackend(STATE_FILE) {
     persistRoom() { save(); },
     persistRoll() { save(); },
     refreshTtl() { save(); },
+    async loadProfile() { return null; }, // profiles live in the in-memory Map (loaded at init)
+    persistProfile() { save(); },
     flush() {
       if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
       try { fs.writeFileSync(STATE_FILE, serialize()); }
@@ -267,7 +317,9 @@ function redisBackend(url) {
   const redis = new Redis(url, opts);     // commands
   const sub = new Redis(url, opts);       // dedicated subscriber connection
   const KEY = (id) => `br:room:${id}`;
+  const PKEY = (id) => `br:profile:${id}`;
   const TTL = Math.max(1, Math.round(ROOM_TTL / 1000)); // seconds
+  const PTTL = Math.max(1, Math.round(PROFILE_TTL / 1000)); // seconds
   const CH_ROLL = 'br:roll';
   const CH_ROOM = 'br:room';
 
@@ -340,6 +392,14 @@ function redisBackend(url) {
       room._ttlAt = now;
       redis.expire(KEY(room.id), TTL).catch(onErr);
     },
+    async loadProfile(id) {
+      const v = await redis.get(PKEY(id));
+      if (!v) return null;
+      try { return JSON.parse(v); } catch { return null; }
+    },
+    async persistProfile(id, profile) {
+      try { await redis.set(PKEY(id), JSON.stringify(profile), 'EX', PTTL); } catch (e) { onErr(e); }
+    },
     flush() {},
     async close() {
       try { await redis.quit(); } catch {}
@@ -372,6 +432,7 @@ module.exports = {
   addClient, removeClient,
   startSweeper, stopSweeper,
   persist, persistRoll, onRemoteRoll,
+  getProfile, saveProfile,
   init, flush, close,
   _rooms: rooms, // exposed for tests
   limits: { SEEN_MAX, CLIENTS_MAX, MAX_ROOMS, ROOM_TTL },

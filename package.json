@@ -6,10 +6,11 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
+    "dev": "node scripts/build-dice.mjs && node --env-file=.env src/server.js",
     "prestart": "node scripts/build-dice.mjs",
     "dice:build": "node scripts/build-dice.mjs",
-    "test": "node scripts/parser.test.cjs && node scripts/redis.test.mjs",
-    "smoke": "node scripts/parser.test.cjs && node scripts/redis.test.mjs && node scripts/smoke.mjs"
+    "test": "node scripts/parser.test.cjs && node scripts/templates.test.cjs && node scripts/redis.test.mjs",
+    "smoke": "node scripts/parser.test.cjs && node scripts/templates.test.cjs && node scripts/redis.test.mjs && node scripts/smoke.mjs"
   },
   "engines": {
     "node": ">=18"

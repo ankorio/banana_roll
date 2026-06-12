@@ -1,0 +1,51 @@
+/* ============================================================================
+   Banana Roll — shared plaque zone styles
+   The visual rendering of a plaque's zones, used by BOTH the customizer edit view
+   and the live overlay (so what you edit is what streams). Editor-only chrome
+   (resize handles, selection, snap guides, dice-mode, the editor's .plaque sizing)
+   lives in editor.css; the overlay's .plaque sizing / show transition / glow lives
+   in overlay.html. Keep this file free of context-specific layout.
+   --accent / --namecol / --badgecol are set per-render by BRPlaque.applyColors.
+   ========================================================================== */
+
+/* background art (template art or an uploaded background) */
+.plaque .bg-art { position: absolute; inset: 0; background-position: center; background-size: cover; background-repeat: no-repeat; pointer-events: none; }
+
+/* drawn fallback frames (when a config has no art) */
+.plaque.frame-blank, .plaque.frame-obsidian {
+  background-image:
+    radial-gradient(120% 90% at 50% 0%, rgba(255,210,74,.05), transparent 55%),
+    radial-gradient(circle at 50% 42%, #221f17, #14110c);
+  box-shadow: inset 0 0 0 2px rgba(199,154,75,.55), inset 0 0 0 8px rgba(199,154,75,.16);
+}
+.plaque.frame-obsidian {
+  background-image:
+    radial-gradient(120% 90% at 50% 0%, rgba(125,184,255,.06), transparent 55%),
+    radial-gradient(circle at 50% 42%, #1a1c26, #0d0e16);
+  box-shadow: inset 0 0 0 2px rgba(125,184,255,.5), inset 0 0 0 8px rgba(125,184,255,.12);
+}
+
+/* zones — positioned by BRPlaque.layout; font size by BRPlaque.recomputeFont */
+.zone { position: absolute; transform: translate(-50%, -50%); display: flex; align-items: center; justify-content: center; border-radius: 6px; }
+.zone .zc { width: 100%; text-align: center; pointer-events: none; }
+.zone[data-kind="text"] .zc { font-family: 'Cinzel', Georgia, serif; font-weight: 800; line-height: 1; white-space: nowrap; overflow: visible; }
+.zone[data-id="breakdown"] .zc { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-weight: 700; }
+.zone[data-id="rname"] .zc { font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.zone[data-id="name"] .zc { letter-spacing: .14em; text-transform: uppercase; font-weight: 600; }
+.zone[data-id="total"] .zc { font-weight: 900; text-shadow: 0 2px 0 rgba(0,0,0,.5), 0 0 18px color-mix(in srgb, var(--accent, #ffd24a) 55%, transparent); }
+.zone.pill .zc { display: inline-block; width: auto; padding: .4em 1.1em; border-radius: 999px; font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-weight: 800;
+  letter-spacing: .12em; text-transform: uppercase; }
+.zone[data-id="badge"] .zc { background: var(--badgecol, #2e7d32); color: #eafff0; }
+.zone[data-id="tag"] .zc { background: var(--accent, #ffd24a); color: #2a2000; box-shadow: 0 0 16px color-mix(in srgb, var(--accent, #ffd24a) 60%, transparent); }
+.zone.portrait { aspect-ratio: 1; border-radius: 50%; overflow: hidden;
+  background: radial-gradient(circle at 50% 35%, hsl(40,42%,46%), hsl(40,40%,30%));
+  box-shadow: 0 0 0 3px var(--namecol, #e6c87f), 0 0 0 5px rgba(0,0,0,.35), inset 0 0 30px rgba(0,0,0,.4); }
+.zone.portrait .zc { font-family: 'Cinzel', Georgia, serif; font-weight: 800; color: #2a1d08; }
+.zone.portrait img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* A loaded token image is shown as-is — drop the fallback disc, ring, and circle clip. */
+.zone.portrait.has-img { background: none; box-shadow: none; border-radius: 0; overflow: visible; }
+.zone.portrait.has-img img { object-fit: contain; }
+
+/* zone-level crit / fumble (whole-plaque glow/shake is per-context, not here) */
+.plaque.fumble .zone[data-id="total"] .zc { color: #ff7a7a !important; text-shadow: 0 0 18px rgba(255,60,40,.6); }
+.plaque.fumble .zone[data-id="tag"] .zc { background: #ff5050; color: #2a0000; }
