@@ -44,7 +44,7 @@ Roll20 tab (userscript: relay raw chat records) --HTTP POST--> Node server (pars
 | POST | `/rooms` | IP rate-limit | Create room → `{ room, publishToken, overlayUrl, setupUrl }` |
 | POST | `/room/:id/chat` | `?token=` | Ingest a raw Roll20 chat record `{ id, msg, ts? }`; server parses → roll; dedup by id; broadcast. Echoes the parsed `roll` (or `null`) |
 | POST | `/room/:id/roll` | `?token=` | Ingest one already-parsed roll; dedup by message id; broadcast |
-| POST | `/room/:id/players` | `?token=` | Userscript pushes the Roll20 roster `[{id,name,color,online}]`; stored on the room |
+| POST | `/room/:id/players` | `?token=` | Userscript pushes the Roll20 roster `[{id,name,color,online,userid}]`; stored on the room. `id` = per-campaign player id; `userid` = stable Roll20 account id (`d20userid`) used to key cross-campaign profiles |
 | GET  | `/room/:id/players` | room id | Read the roster (no token; same names/ids as the per-player overlay URLs) — drives the setup page's per-player links |
 | GET  | `/room/:id/events` | room id | SSE stream; replays retained last-roll on connect |
 | GET  | `/room/:id/ping` | room id | Heartbeat liveness; 200 if room exists, 404 if lost (drives userscript re-provision) |
@@ -65,11 +65,15 @@ Roll20 tab (userscript: relay raw chat records) --HTTP POST--> Node server (pars
 `public/assets/customizer/{data,editor}.js`, `editor.css`) is a three-pane editor that styles a
 player's **dice** (existing `/styles` shape) and their **plaque** (a `templateId` + editable
 `colors` + draggable `zones` + an optional inline base64-PNG `background`, validated in
-`src/templates.js`). Dice → `/styles`, plaque → `/plaque` (two stores). Saving for a real Roll20
-`playerid` also writes a **global profile keyed by that id** (`rooms.saveProfile`), so the player's
-look follows them into other rooms: when the userscript pushes the roster, the server seeds each
-player's `room.styles`/`room.plaques` from their profile if the room has nothing yet (read-on-demand,
-off the per-roll path). The live overlay does **not** yet render `plaqueConfig` (deferred — it keeps
+`src/templates.js`). Dice → `/styles`, plaque → `/plaque` (two stores). Saving for a real player also writes a
+**global profile keyed by the player's stable Roll20 account id** (`d20userid`, carried on the roster
+as `userid` — *not* the per-campaign player id, which changes every game), via `rooms.saveProfile`.
+So the look follows the **account** across campaigns: when the userscript pushes the roster, the
+server resolves each player's `userid` (`useridFor`) and seeds that campaign's `room.styles`/
+`room.plaques[playerid]` from the account profile if the room has nothing yet (read-on-demand, off the
+per-roll path). The per-campaign `playerid` still drives roll filtering, per-player overlay URLs, and
+display; only the **profile key** is the account id. Requires userscript ≥ 0.8.0 (older scripts omit
+`userid`, so customizations stay per-campaign). The live overlay does **not** yet render `plaqueConfig` (deferred — it keeps
 its fixed CSS plaque); plaque configs persist but don't drive the overlay yet.
 
 **Roll event shape:** (`id` is the Firebase chat push-id; `playerid` is optional)

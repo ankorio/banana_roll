@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Roll20 → OBS Overlay Capture
 // @namespace    roll20-obs-overlay
-// @version      0.7.0
+// @version      0.8.1
 // @description  Capture Roll20 dice rolls from the Firebase transport and POST them to your overlay relay.
 // @match        https://app.roll20.net/editor*
 // @match        https://app.roll20.net/campaigns/*
@@ -13,6 +13,7 @@
 // @grant        GM_openInTab
 // @connect      localhost
 // @connect      self
+// @connect      raw.githubusercontent.com
 // @run-at       document-start
 // @noframes
 // ==/UserScript==
@@ -37,10 +38,14 @@
   // the sandbox, so reach the real page globals via unsafeWindow.
   const PAGE = (typeof unsafeWindow !== 'undefined' && unsafeWindow) || window;
 
+  // Our own version, read from the userscript metadata (falls back to a literal if
+  // GM_info is unavailable). Used by the update check below.
+  const CURRENT_VERSION = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version) || '0.8.1';
+
   // Loud, first-thing-that-runs banner so you can confirm injection in DevTools.
   // If you DON'T see this in the Roll20 tab's console, the script isn't matching
   // this URL (check Tampermonkey is enabled + the script is on) — nothing below ran.
-  console.log('%c[overlay] userscript v0.7.0 loaded on ' + location.href,
+  console.log('%c[overlay] userscript v' + CURRENT_VERSION + ' loaded on ' + location.href,
     'background:#ffd24a;color:#000;padding:2px 6px;border-radius:3px;font-weight:700');
 
   // Only the editor page has live play; bail quietly on the campaign launch page.
@@ -53,6 +58,13 @@
   // Point this at your deployed relay. For local testing keep localhost.
   // Must match an @connect entry above (add your domain there for production).
   const SERVER = 'http://localhost:8765';
+
+  // Version manifest (source of truth on GitHub, independent of the relay). Drives the
+  // update check below. `latest` → an optional update notice; `minSupported` → a
+  // MANDATORY update (the script halts relaying) when this install is older. Bump
+  // `minSupported` in version.json when a release has breaking changes.
+  const VERSION_MANIFEST_URL = 'https://raw.githubusercontent.com/ankorio/banana_roll/master/version.json';
+  const UPDATE_CHECK_MS = 6 * 60 * 60 * 1000; // re-check long-lived tabs every 6h
 
   const DEBUG = (() => { try { return localStorage.getItem('roll20_overlay_debug') === '1'; } catch { return false; } })();
   const dbg = (...a) => { if (DEBUG) console.debug('[overlay]', ...a); };
@@ -243,6 +255,11 @@
   if (document.body) ui.status('starting…', null);
   else document.addEventListener('DOMContentLoaded', () => ui.status('starting…', null), { once: true });
 
+  // Set true when a MANDATORY update is detected: the script stops relaying to the
+  // relay (it may be sending data the server no longer understands) until the user
+  // updates. Set by the update check below; gates postChat + syncPlayers.
+  let updateHalt = false;
+
   // ── room provisioning (self-provision on first run) ────────────────────────
   let CREDS = null;
   const chatBuffer = []; // chat records captured before creds exist; flushed once provisioned
@@ -338,6 +355,7 @@
 
   // ── posting (raw chat record → server parses; dedup server-side by id) ──────────
   function postChat(creds, record) {
+    if (updateHalt) return; // mandatory update pending — don't relay possibly-incompatible data
     const sentAt = Date.now();
     GM_xmlhttpRequest({
       method: 'POST',
@@ -439,7 +457,12 @@
   }
 
   // ── players roster (online presence → per-player overlay links) ──────────────
-  const roster = new Map(); // playerid -> { id, name, color, online }
+  // We carry TWO ids per player: `id` is the per-CAMPAIGN player id (drives roll
+  // filtering, per-player overlay URLs, and display); `userid` is the player's
+  // stable Roll20 ACCOUNT id (`d20userid`), constant across all their campaigns, so
+  // the relay can key saved dice/plaque customizations to it and have them follow the
+  // player into any game.
+  const roster = new Map(); // playerid -> { id, name, color, online, userid }
 
   function playerFrom(pid, rec) {
     return {
@@ -447,6 +470,7 @@
       name: clean(rec.displayname) || clean(rec.who) || 'Player',
       color: typeof rec.color === 'string' ? rec.color : '#888',
       online: !!rec.online,
+      userid: clean(rec.d20userid) || clean(rec.userid) || '',
     };
   }
 
@@ -461,8 +485,8 @@
   // overlay links. Presence toggles can burst, so coalesce into one POST.
   let playersTimer = null, lastPlayersJson = '';
   function syncPlayers(list) {
-    if (!CREDS) return;
-    const payload = JSON.stringify(list.map((p) => ({ id: p.id, name: p.name, color: p.color, online: p.online })));
+    if (!CREDS || updateHalt) return;
+    const payload = JSON.stringify(list.map((p) => ({ id: p.id, name: p.name, color: p.color, online: p.online, userid: p.userid })));
     if (payload === lastPlayersJson) return; // nothing changed
     if (playersTimer) return;
     playersTimer = setTimeout(() => {
@@ -507,6 +531,7 @@
         if (segs[1] === 'online') cur.online = !!value;
         else if (segs[1] === 'displayname') cur.name = clean(value) || cur.name;
         else if (segs[1] === 'color' && typeof value === 'string') cur.color = value;
+        else if (segs[1] === 'd20userid' || segs[1] === 'userid') cur.userid = clean(value) || cur.userid;
         changed = true;
       }
     }
@@ -689,10 +714,121 @@
     }, 150);
   }
 
+  // ── update check (GitHub-hosted version manifest) ────────────────────────────
+  // Compares this install (CURRENT_VERSION) against version.json on GitHub:
+  //   current < minSupported  → MANDATORY: halt relaying + show a hard top bar.
+  //   current < latest         → optional, dismissible notice.
+  // Fails OPEN: any fetch/parse error leaves the script running normally (a GitHub
+  // outage must never take down everyone's capture).
+  function parseVer(s) {
+    return String(s || '0').split('.').map((n) => parseInt(n, 10) || 0);
+  }
+  function cmpVer(a, b) {
+    const pa = parseVer(a), pb = parseVer(b);
+    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+      const d = (pa[i] || 0) - (pb[i] || 0);
+      if (d) return d < 0 ? -1 : 1;
+    }
+    return 0;
+  }
+
+  function updateDownloadUrl() {
+    try {
+      const s = (typeof GM_info !== 'undefined' && GM_info.script) || {};
+      if (s.downloadURL && /\.user\.js(\?|$)/.test(s.downloadURL)) return s.downloadURL;
+    } catch {}
+    return SERVER + '/roll20-capture.user.js';
+  }
+
+  // A fixed top bar, independent of the OBS panel (so it shows even if the panel is
+  // closed/minimized). level: 'mandatory' (red, not dismissible) | 'optional' (amber).
+  function showUpdateBar(level, info) {
+    if (!document.body) {
+      document.addEventListener('DOMContentLoaded', () => showUpdateBar(level, info), { once: true });
+      return;
+    }
+    let bar = document.getElementById('ov-update-bar');
+    if (bar) bar.remove();
+    bar = document.createElement('div');
+    bar.id = 'ov-update-bar';
+    const bg = level === 'mandatory' ? '#7a1414' : '#5a4a14';
+    const accent = level === 'mandatory' ? '#ff8a8a' : '#ffd24a';
+    bar.style.cssText = [
+      'position:fixed', 'top:0', 'left:0', 'right:0', 'z-index:2147483647',
+      'display:flex', 'align-items:center', 'gap:12px', 'flex-wrap:wrap',
+      'padding:10px 16px', 'background:' + bg, 'color:#fff',
+      'font:13px/1.4 system-ui,sans-serif', 'box-shadow:0 2px 12px rgba(0,0,0,.5)',
+      'border-bottom:1px solid ' + accent,
+    ].join(';');
+
+    const msg = document.createElement('span');
+    msg.style.cssText = 'flex:1;min-width:220px';
+    const head = level === 'mandatory'
+      ? '⚠ <b>Banana Roll capture stopped — update required.</b>'
+      : '⬆ <b>A Banana Roll capture update is available.</b>';
+    msg.innerHTML = head + ' <span style="opacity:.85">v' + info.current + ' → v' + info.latest + '</span>' +
+      (info.notes ? '<br><span style="opacity:.8">' + String(info.notes).replace(/[<>&]/g, '') + '</span>' : '');
+
+    const upd = document.createElement('button');
+    upd.textContent = 'Update now';
+    upd.style.cssText = 'border:0;border-radius:6px;background:' + accent + ';color:#2a1400;font-weight:700;cursor:pointer;padding:6px 12px';
+    upd.onclick = () => { try { GM_openInTab(updateDownloadUrl(), { active: true }); } catch { location.href = updateDownloadUrl(); } };
+
+    bar.append(msg, upd);
+
+    if (info.url) {
+      const link = document.createElement('a');
+      link.href = info.url; link.target = '_blank'; link.rel = 'noopener';
+      link.textContent = 'What changed';
+      link.style.cssText = 'color:' + accent + ';text-decoration:underline;white-space:nowrap';
+      bar.append(link);
+    }
+    if (level !== 'mandatory') {
+      const x = document.createElement('span');
+      x.textContent = '✕'; x.title = 'dismiss';
+      x.style.cssText = 'cursor:pointer;opacity:.7;padding:0 4px;font-weight:700';
+      x.onclick = () => { try { GM_setValue('update_dismissed', info.latest); } catch {} bar.remove(); };
+      bar.append(x);
+    }
+    document.body.appendChild(bar);
+  }
+
+  function applyUpdateState(man) {
+    const latest = man.latest || CURRENT_VERSION;
+    const min = man.minSupported || man.min || '0';
+    const info = { current: CURRENT_VERSION, latest, min, notes: man.notes || '', url: man.url || 'https://github.com/ankorio/banana_roll' };
+    if (cmpVer(CURRENT_VERSION, min) < 0) {
+      updateHalt = true;
+      console.warn('[overlay] MANDATORY update: v' + CURRENT_VERSION + ' < minSupported v' + min + ' — relaying halted');
+      try { ui.status('update required', false); } catch {}
+      showUpdateBar('mandatory', info);
+    } else if (cmpVer(CURRENT_VERSION, latest) < 0) {
+      let dismissed = ''; try { dismissed = GM_getValue('update_dismissed', ''); } catch {}
+      if (dismissed === latest) return; // user already dismissed this version
+      console.log('[overlay] update available: v' + CURRENT_VERSION + ' → v' + latest);
+      showUpdateBar('optional', info);
+    }
+  }
+
+  function checkForUpdate() {
+    GM_xmlhttpRequest({
+      method: 'GET',
+      url: VERSION_MANIFEST_URL + '?t=' + Date.now(), // cache-bust GitHub raw
+      onload: (resp) => {
+        if (resp.status < 200 || resp.status >= 300) return; // fail open
+        const man = tryParse(resp.responseText);
+        if (man && typeof man === 'object') { try { applyUpdateState(man); } catch (e) { dbg('update apply failed', e); } }
+      },
+      onerror: () => { /* fail open: network/GitHub down → keep running */ },
+    });
+  }
+
   // ── boot ────────────────────────────────────────────────────────────────────
   try {
     installWebSocketHook();   // must win the race against Roll20 opening its socket
     startFirebaseSdkHooker(); // polls until window.firebase exists
+    checkForUpdate();         // GitHub version manifest → optional notice / mandatory halt
+    setInterval(checkForUpdate, UPDATE_CHECK_MS); // re-check long-lived tabs
   } catch (e) {
     console.error('[overlay] hook install failed', e);
   }

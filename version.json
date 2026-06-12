@@ -1,0 +1,6 @@
+{
+  "latest": "0.8.1",
+  "minSupported": "0.8.0",
+  "notes": "Cross-campaign player identity (d20userid) + built-in update checks. Older scripts can't carry customizations between games.",
+  "url": "https://github.com/ankorio/banana_roll/releases"
+}

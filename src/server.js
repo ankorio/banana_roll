@@ -195,10 +195,20 @@ function validateStyle(obj) {
 }
 
 // Resolve the style to stamp on a roll: the rolling player's style, else the room
-// default, else null (overlay falls back to its built-in CONFIG defaults).
+// default, else null (overlay falls back to its built-in CONFIG defaults). Keyed by
+// the per-campaign playerid (room.styles is seeded from the cross-campaign profile on
+// roster push — see seedProfiles).
 function styleForRoll(room, playerid) {
   if (playerid && room.styles && room.styles[playerid]) return room.styles[playerid];
   return room.defaultStyle || null;
+}
+
+// Map a per-campaign playerid → the player's stable Roll20 account id (d20userid),
+// looked up in the room roster. Cross-campaign profiles are keyed on this account id;
+// returns '' if the roster doesn't (yet) carry a userid for that player.
+function useridFor(room, playerid) {
+  const p = (room.players || []).find((x) => x.id === playerid);
+  return (p && p.userid) || '';
 }
 
 // --- SSE --------------------------------------------------------------------
@@ -330,6 +340,9 @@ function validatePlayers(arr) {
     name: typeof p.name === 'string' ? p.name.slice(0, 100) : 'Player',
     color: typeof p.color === 'string' ? p.color.slice(0, 32) : '#888',
     online: !!p.online,
+    // Stable Roll20 account id (d20userid): the cross-campaign key for saved
+    // customizations. Optional — older userscripts don't send it.
+    userid: typeof p.userid === 'string' && /^[\w-]{1,100}$/.test(p.userid) ? p.userid : '',
   })).filter((p) => p.id);
 }
 
@@ -356,17 +369,20 @@ function handlePlayersPost(req, res, id, query) {
   });
 }
 
-// Cross-room persistence: for each rostered player that hasn't customized in THIS room
-// yet, seed their dice style + plaque from their global profile. Fire-and-forget and
+// Cross-campaign persistence (auto-apply): for each rostered player that hasn't
+// customized in THIS room yet, seed their dice style + plaque from the profile keyed
+// by their stable Roll20 account id (p.userid). Maps the persistent id back onto the
+// per-campaign playerid (room.styles/room.plaques) so the rest of the pipeline — roll
+// filtering, per-player overlays — keeps using the campaign id. Fire-and-forget and
 // off the hot per-roll path, so styleForRoll stays a plain sync room.styles lookup.
 async function seedProfiles(room, players) {
   for (const p of players) {
-    if (!p.id) continue;
+    if (!p.id || !p.userid) continue;
     const haveStyle = room.styles && room.styles[p.id];
     const havePlaque = room.plaques && room.plaques[p.id];
     if (haveStyle && havePlaque) continue;
     let prof;
-    try { prof = await rooms.getProfile(p.id); } catch { prof = null; }
+    try { prof = await rooms.getProfile(p.userid); } catch { prof = null; }
     if (!prof) continue;
     let changed = false;
     if (!haveStyle && prof.style) { (room.styles || (room.styles = {}))[p.id] = prof.style; changed = true; }
@@ -422,8 +438,10 @@ function handleStylesPost(req, res, id, query) {
         return sendJson(res, 507, { error: 'too many styles' });
       }
       room.styles[player] = style;
-      // Mirror to the player's cross-room profile so their dice follow them elsewhere.
-      rooms.saveProfile(player, { style });
+      // Mirror to the player's cross-CAMPAIGN profile (keyed by stable account id) so
+      // their dice follow them into other games. No-op until the roster carries a userid.
+      const userid = useridFor(room, player);
+      if (userid) rooms.saveProfile(userid, { style });
     }
     rooms.persist(room);
     sendJson(res, 200, { ok: true, style });
@@ -465,7 +483,8 @@ function handlePlaquePost(req, res, id, query) {
         return sendJson(res, 507, { error: 'too many plaques' });
       }
       room.plaques[player] = plaque;
-      rooms.saveProfile(player, { plaque }); // cross-room
+      const userid = useridFor(room, player); // cross-campaign (keyed by stable account id)
+      if (userid) rooms.saveProfile(userid, { plaque });
     }
     rooms.persist(room);
     sendJson(res, 200, { ok: true, plaque });
@@ -485,9 +504,13 @@ function handleTemplatesGet(req, res, id) {
 async function handleProfileGet(req, res, id, query) {
   const room = rooms.getRoom(id);
   if (!room) return sendJson(res, 404, { error: 'unknown room' });
+  // Accept either the per-campaign ?player= (resolved to a userid via the roster) or
+  // an explicit ?userid=. Profiles are keyed by the stable Roll20 account id.
   const player = query.get('player');
-  if (!player || player === 'default') return sendJson(res, 200, { style: null, plaque: null });
-  const prof = await rooms.getProfile(player);
+  let userid = query.get('userid') || '';
+  if (!userid && player && player !== 'default') userid = useridFor(room, player);
+  if (!userid) return sendJson(res, 200, { style: null, plaque: null });
+  const prof = await rooms.getProfile(userid);
   sendJson(res, 200, { style: (prof && prof.style) || null, plaque: (prof && prof.plaque) || null });
 }
 
