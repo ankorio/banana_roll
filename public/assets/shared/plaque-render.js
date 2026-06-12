@@ -59,7 +59,10 @@
 
     // Font size = plaque width * coef * fs (so text scales with the plaque).
     recomputeFont(plaqueEl, zones) {
-      const plaqueW = plaqueEl.getBoundingClientRect().width || 1;
+      // offsetWidth = layout width, ignoring any CSS transform (e.g. the editor's zoom
+      // scale). Using getBoundingClientRect here would double-count the zoom: fonts sized
+      // from the scaled width AND then visually scaled again by the transform.
+      const plaqueW = plaqueEl.offsetWidth || plaqueEl.getBoundingClientRect().width || 1;
       zones.forEach((z) => {
         const el = q(plaqueEl, `.zone[data-id="${z.id}"]`);
         if (!el || z.kind === 'image') return;
@@ -99,21 +102,32 @@
       plaqueEl.classList.remove('crit', 'fumble');
       if (data.cls) plaqueEl.classList.add(data.cls);
       setText(plaqueEl, 'total', String(data.total));
-      setText(plaqueEl, 'breakdown', data.breakdown);
+      // breakdown may carry markup (overlay keep/dropped-die spans); it's numbers +
+      // fixed spans only (no user text), so innerHTML is safe. Plain editor text is fine too.
+      const bzc = q(plaqueEl, '.zone[data-id="breakdown"] .zc');
+      if (bzc && !bzc.querySelector('img')) bzc.innerHTML = data.breakdown == null ? '' : data.breakdown;
       setText(plaqueEl, 'rname', data.rname);
       setText(plaqueEl, 'name', data.name);
-      // portrait — image if provided, else coloured initial
+      // portrait — token image if it loads, else the coloured initials disc. The disc/ring
+      // is only a fallback: once a real image loads we add `has-img` so CSS drops the disc
+      // and shows the token as-is (a broken/blocked URL keeps the disc + initials).
       const pEl = q(plaqueEl, '.zone[data-id="portrait"]');
       const pz = pEl && pEl.querySelector('.zc');
       if (pEl && pz) {
+        const initial = (data.name || 'S').slice(0, 1).toUpperCase();
         if (data.portraitImg) {
           let im = pEl.querySelector('img');
           if (!im) { im = document.createElement('img'); im.referrerPolicy = 'no-referrer'; pEl.appendChild(im); }
-          im.onerror = () => { im.remove(); pz.textContent = (data.name || 'S').slice(0, 1).toUpperCase(); };
-          im.src = data.portraitImg; pz.textContent = '';
+          pz.textContent = '';
+          pEl.classList.remove('has-img');                     // keep the disc until the image loads
+          im.onload = () => { pEl.classList.add('has-img'); };  // image recovered → drop the fallback circle
+          im.onerror = () => { im.remove(); pEl.classList.remove('has-img'); pz.textContent = initial; };
+          im.src = data.portraitImg;
+          if (im.complete && im.naturalWidth) pEl.classList.add('has-img'); // already cached → no onload
         } else {
           const im = pEl.querySelector('img'); if (im) im.remove();
-          pz.textContent = (data.name || 'S').slice(0, 1).toUpperCase();
+          pEl.classList.remove('has-img');
+          pz.textContent = initial;
         }
       }
       const zoneVisible = (id) => { const z = zones.find((x) => x.id === id); return z && z.visible; };

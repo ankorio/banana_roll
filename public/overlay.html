@@ -7,6 +7,9 @@
        the Google Fonts link stays as a fallback. Either way it degrades to serif. -->
   <link href="/assets/fonts/cinzel.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Shared plaque zone styles + renderer (same code the customizer edits with → WYSIWYG). -->
+  <link href="/assets/shared/plaque.css" rel="stylesheet">
+  <script src="/assets/shared/plaque-render.js"></script>
   <style>
     :root {
       --gold: #c79a4b;
@@ -21,101 +24,32 @@
     #stage { position: fixed; inset: 0; z-index: 2; display: flex;
       align-items: center; justify-content: center; pointer-events: none; }
 
-    /* ── Arcane Plaque result card ──────────────────────────────────────────────
-       The square plaque art is the frame; absolutely-positioned zones (portrait,
-       big total, supporting boxes) map onto it. Sizes use cqw so every zone scales
-       with the plaque (container-type: inline-size). */
+    /* ── Result plaque ───────────────────────────────────────────────────────────
+       The plaque content (art/background + zones) is rendered from the player's saved
+       config by the shared BRPlaque renderer (zone visuals come from plaque.css).
+       Only the framing, entrance animation, and whole-plaque crit/fumble glow live here. */
     .plaque {
       position: relative;
-      width: min(80vh, 86vw, 560px);
-      aspect-ratio: 1 / 1;
+      height: min(80vh, 560px);
+      aspect-ratio: 398 / 440;
       container-type: inline-size;
-      background: url('/assets/arcane-plaque.png') center / contain no-repeat;
       filter: drop-shadow(0 12px 40px rgba(0, 0, 0, 0.55));
       transform: translateY(34px) scale(0.95); opacity: 0;
       transition: transform 0.4s cubic-bezier(.2,.9,.25,1.2), opacity 0.4s ease;
     }
     .plaque.show { transform: translateY(0) scale(1); opacity: 1; }
-
-    /* ZONE 1 — portrait, upper trefoil (center ≈ 50%, 22.5%). Token images already
-       carry their own border, so they render as-is (no imposed ring/clip); only the
-       initials fallback gets the round disc. */
-    .portrait {
-      position: absolute; left: 50%; top: 22.5%; width: 25%; height: 25%;
-      transform: translate(-50%, -50%);
-      display: grid; place-items: center;
-    }
-    .portrait img { width: 100%; height: 100%; object-fit: contain; display: block;
-      filter: drop-shadow(0 1cqw 2.5cqw rgba(0, 0, 0, 0.5)); }
-    .portrait.placeholder {
-      border-radius: 50%; overflow: hidden;
-      background: radial-gradient(circle at 50% 35%,
-        hsl(var(--hue, 40), 42%, 46%), hsl(var(--hue, 40), 40%, 30%));
-      color: var(--gold-light); font-weight: 800; font-size: 10cqw; letter-spacing: 0.02em;
-      box-shadow: 0 0 0 0.6cqw var(--gold), 0 0 0 1cqw var(--gold-deep),
-                  0 1.2cqw 4cqw rgba(0, 0, 0, 0.55);
-    }
-
-    /* Player / character name, just under the portrait */
-    .who {
-      position: absolute; left: 50%; top: 37.5%; transform: translate(-50%, -50%);
-      max-width: 76%; text-align: center;
-      font-size: 3cqw; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
-      color: var(--gold-light); text-shadow: 0 1px 5px rgba(0, 0, 0, 0.7);
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-
-    /* ZONE 2 — the lower panel: badge, big total, label, breakdown, tag stacked. */
-    .lower {
-      position: absolute; left: 13%; right: 13%; top: 42%; bottom: 8%;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 1.3cqw; text-align: center;
-    }
-    .total {
-      font-size: 19cqw; font-weight: 800; line-height: 0.88; color: var(--gold-light);
-      font-variant-numeric: tabular-nums; letter-spacing: 0.01em;
-      text-shadow: 0 2px 0 var(--gold-deep), 0 0 5cqw rgba(199, 154, 75, 0.45),
-                   0 6px 18px rgba(0, 0, 0, 0.6);
-    }
-    .rname {
-      font-size: 4cqw; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
-      color: var(--gold); max-width: 100%;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .expr { font-size: 2.6cqw; font-weight: 500; color: var(--gold-light); opacity: 0.6;
-      font-variant-numeric: tabular-nums; }
-    .breakdown { font-size: 3.2cqw; font-weight: 600; color: var(--gold-light); opacity: 0.92;
-      font-variant-numeric: tabular-nums; }
-    .breakdown .drop { opacity: 0.4; text-decoration: line-through; }
-    .breakdown .keep { font-weight: 800; color: #fff3d6; }
-    .breakdown .mod { opacity: 0.85; }
-    .badge {
-      padding: 0.5cqw 2.4cqw; border-radius: 999px; font-size: 2.4cqw; font-weight: 800;
-      letter-spacing: 0.18em; text-transform: uppercase;
-      background: rgba(199, 154, 75, 0.22); color: var(--gold-light);
-    }
-    .badge.adv { background: rgba(46, 125, 50, 0.85); color: #d7ffd9; }
-    .badge.dis { background: rgba(141, 47, 47, 0.9); color: #ffdada; }
-    .tag {
-      padding: 0.6cqw 2.8cqw; border-radius: 999px; font-size: 2.8cqw; font-weight: 800;
-      letter-spacing: 0.12em; text-transform: uppercase; background: var(--gold); color: #2a1c00;
-    }
-
-    /* Crit / fumble flavor on the whole plaque */
     .plaque.crit {
       filter: drop-shadow(0 0 7cqw rgba(255, 190, 0, 0.6)) drop-shadow(0 12px 40px rgba(0, 0, 0, 0.5));
     }
-    .plaque.crit .total { color: #ffe08a;
-      text-shadow: 0 2px 0 var(--gold-deep), 0 0 6cqw rgba(255, 200, 40, 0.9); }
-    .plaque.crit .tag { background: #ffd24a; color: #3a2c00; box-shadow: 0 0 4cqw rgba(255, 200, 40, 0.7); }
     .plaque.fumble {
       filter: drop-shadow(0 0 6cqw rgba(255, 60, 40, 0.45)) drop-shadow(0 12px 40px rgba(0, 0, 0, 0.5));
     }
-    .plaque.fumble .total { color: #ff7b6b; text-shadow: 0 0 6cqw rgba(255, 60, 40, 0.75); }
-    .plaque.fumble .tag { background: #ff5050; color: #2a0000; }
     .plaque.fumble.show { animation: shake 0.5s ease; }
     @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-10px)}
       40%{transform:translateX(9px)} 60%{transform:translateX(-6px)} 80%{transform:translateX(4px)} }
+    /* total "bump" when modifiers slam into the raw result */
+    @keyframes totalBump { 0%{transform:scale(1)} 35%{transform:scale(1.3)} 100%{transform:scale(1)} }
+    .zone[data-id="total"] .zc.bump { animation: totalBump .42s cubic-bezier(.2,.8,.2,1); }
 
     #status { position: fixed; top: 6px; left: 8px; z-index: 3; font-size: 11px; color: #888;
       font-family: monospace; opacity: 0.5; }
@@ -404,60 +338,144 @@
       const aCls = keptIndex === 0 ? 'keep' : 'drop';
       const bCls = keptIndex === 1 ? 'keep' : 'drop';
       const mod = roll.modifier ? ` <span class="mod">${fmtMod(roll.modifier)}</span>` : '';
-      return `🎲 <span class="${aCls}">${a}</span> · <span class="${bCls}">${b}</span>${mod}`;
+      return `<span class="${aCls}">${a}</span> · <span class="${bCls}">${b}</span>${mod}`;
     }
     const vals = (roll.dice || []).map((d) => d.value).filter((v) => Number.isFinite(Number(v)));
     if (!vals.length) return '';
     const dicePart = vals.join(' + ');
     const mod = roll.modifier ? ` <span class="mod">${fmtMod(roll.modifier)}</span>` : '';
-    return `🎲 ${dicePart}${mod}`;
+    return `${dicePart}${mod}`;
   }
 
+  // ── plaque config (per player) — fetched from the relay, cached + polled ────────
+  // The plaque is rendered by the shared BRPlaque renderer from the player's saved
+  // config (template/art, zones, colors, background), so it matches the customizer.
+  const templatesById = {};                     // templateId -> { id, art, colors, zones }
+  const plaqueCache = { plaques: {}, defaultPlaque: null };
+  let lastPlaqueJson = '';
+  // Hardcoded fallback so the plaque renders even with no relay (DEMO) or before fetch.
+  const BUILTIN_PLAQUE = {
+    templateId: 'arcane', art: '/assets/plaque_templates/arcane-plaque.png',
+    colors: { accent: '#ffd24a', badge: '#2e7d32', name: '#e6c87f' },
+    zones: [
+      { id: 'portrait',  kind: 'image', cx: 50, cy: 21.6, w: 21.5, coef: 0,     fs: 1, align: 'center', colorKey: null,     visible: true },
+      { id: 'name',      kind: 'text',  cx: 50, cy: 39.8, w: 70,   coef: 0.034, fs: 1, align: 'center', colorKey: 'name',   visible: true },
+      { id: 'badge',     kind: 'pill',  cx: 50, cy: 51.5, w: 0,    coef: 0.024, fs: 1, align: 'center', colorKey: 'badge',  visible: true },
+      { id: 'total',     kind: 'text',  cx: 50, cy: 62.8, w: 50,   coef: 0.205, fs: 1, align: 'center', colorKey: 'accent', visible: true },
+      { id: 'rname',     kind: 'text',  cx: 50, cy: 75.0, w: 82,   coef: 0.041, fs: 1, align: 'center', colorKey: 'accent', visible: true },
+      { id: 'breakdown', kind: 'text',  cx: 50, cy: 83.2, w: 60,   coef: 0.031, fs: 1, align: 'center', colorKey: 'name',   visible: true },
+      { id: 'tag',       kind: 'pill',  cx: 50, cy: 91.2, w: 0,    coef: 0.028, fs: 1, align: 'center', colorKey: 'accent', visible: true },
+    ],
+  };
+  async function loadTemplates() {
+    if (!room) return;
+    try { const r = await fetch('/room/' + room + '/templates'); if (!r.ok) return;
+      const d = await r.json(); (d.templates || []).forEach((tp) => { templatesById[tp.id] = tp; }); } catch {}
+  }
+  async function loadPlaques() {
+    if (!room) return;
+    try {
+      const r = await fetch('/room/' + room + '/plaque'); if (!r.ok) return;
+      const txt = await r.text(); if (txt === lastPlaqueJson) return; lastPlaqueJson = txt;
+      const d = JSON.parse(txt); plaqueCache.plaques = d.plaques || {}; plaqueCache.defaultPlaque = d.defaultPlaque || null;
+    } catch {}
+  }
+  function templateArt(id) { const tp = templatesById[id]; return tp ? tp.art : (id === BUILTIN_PLAQUE.templateId ? BUILTIN_PLAQUE.art : null); }
+  function plaqueConfigFor(roll) {
+    const id = roll && roll.playerid;
+    return (id && plaqueCache.plaques[id]) || plaqueCache.defaultPlaque ||
+      templatesById.arcane && { templateId: 'arcane', colors: templatesById.arcane.colors, zones: templatesById.arcane.zones, background: null } ||
+      BUILTIN_PLAQUE;
+  }
+  // roll → the data object BRPlaque.paint fills the zones with (same shape the editor uses).
+  function rollToData(roll, plan) {
+    const sf = splitFormula(roll.formula);
+    return {
+      total: (roll.total ?? '?'),
+      breakdown: buildBreakdown(roll, plan),   // HTML (keep/dropped-die spans) — paint uses innerHTML
+      name: roll.who || t('someone'),
+      rname: sf.name || sf.expr || '',
+      badge: roll.mode === 'advantage' ? 'advantage' : roll.mode === 'disadvantage' ? 'disadvantage' : null,
+      tag: roll.isCrit ? 'crit' : roll.isFumble ? 'fumble' : null,
+      cls: roll.isCrit ? 'crit' : roll.isFumble ? 'fumble' : '',
+      portraitImg: roll.avatar || null,
+    };
+  }
+  const paintDict = () => ({ adv: t('adv'), dis: t('dis'), crit_tag: t('crit'), fumble_tag: t('fumble') });
+
+  // ── room settings (display time, confetti) — fetched + polled; hideGm/sound TBD ──
+  let settings = null, lastSettingsJson = '';
+  async function loadSettings() {
+    if (!room) return;
+    try { const r = await fetch('/room/' + room + '/settings'); if (!r.ok) return;
+      const txt = await r.text(); if (txt === lastSettingsJson) return; lastSettingsJson = txt;
+      settings = (JSON.parse(txt).settings) || null; } catch {}
+  }
+  const displayMs = () => (settings && Number.isFinite(settings.displaySeconds)) ? settings.displaySeconds * 1000 : CONFIG.displayMs;
+
   function showCard(roll, plan) {
+    const cfg = plaqueConfigFor(roll);
+    const zones = (cfg && cfg.zones) || [];
     const el = document.createElement('div');
     el.className = 'plaque' + (roll.isCrit ? ' crit' : roll.isFumble ? ' fumble' : '');
-    const { name, expr } = splitFormula(roll.formula);
-    const badge = roll.mode === 'advantage' ? `<div class="badge adv">${t('adv')}</div>`
-                : roll.mode === 'disadvantage' ? `<div class="badge dis">${t('dis')}</div>` : '';
-    const tag = roll.isCrit ? `<div class="tag">${t('crit')}</div>`
-              : roll.isFumble ? `<div class="tag">${t('fumble')}</div>` : '';
-    el.innerHTML =
-      '<div class="portrait"></div>' +
-      '<div class="who"></div>' +
-      '<div class="lower">' +
-        badge +
-        '<div class="total"></div>' +
-        (name ? '<div class="rname"></div>' : '') +
-        (expr ? '<div class="expr"></div>' : '') +
-        '<div class="breakdown">' + buildBreakdown(roll, plan) + '</div>' +
-        tag +
-      '</div>';
-
-    // Portrait: the character's token image if present (loaded as a real <img> so a
-    // blocked/broken URL falls back to the coloured initials disc), else initials.
-    const portrait = el.querySelector('.portrait');
-    if (roll.avatar) {
-      const img = new Image();
-      img.referrerPolicy = 'no-referrer';
-      img.alt = '';
-      img.onerror = () => { portrait.textContent = ''; setInitials(portrait, roll.who); };
-      img.src = roll.avatar;
-      portrait.appendChild(img);
-    } else {
-      setInitials(portrait, roll.who);
+    el._zones = zones; // for resize recompute
+    if (window.BRPlaque && zones.length) {
+      BRPlaque.build(el, zones, { editable: false });
+      BRPlaque.layout(el, zones);
+      BRPlaque.applyArt(el, { art: templateArt(cfg.templateId), frame: cfg.frame, background: cfg.background });
+      BRPlaque.applyColors(el, cfg.colors || {}, zones);
+      BRPlaque.paint(el, zones, rollToData(roll, plan), paintDict());
     }
-    el.querySelector('.who').textContent = roll.who || t('someone');
-    el.querySelector('.total').textContent = (roll.total ?? '?');
-    if (name) el.querySelector('.rname').textContent = name;
-    if (expr) el.querySelector('.expr').textContent = expr;
-
     stage.appendChild(el);
+    if (window.BRPlaque && zones.length) BRPlaque.recomputeFont(el, zones); // el is in the DOM → has size
     requestAnimationFrame(() => el.classList.add('show'));
+    maybeBump(el, roll);
     return el;
+  }
+
+  // When a roll has a net modifier, the plaque first shows the RAW dice result, then the
+  // breakdown flies up into the total and the number bumps to the final value.
+  function countUp(node, from, to, dur, onDone) {
+    const start = performance.now(), diff = to - from;
+    const step = (now) => {
+      const k = Math.min(1, (now - start) / dur);
+      const e = 1 - Math.pow(1 - k, 3); // easeOutCubic
+      node.textContent = String(Math.round(from + diff * e));
+      if (k < 1) requestAnimationFrame(step); else { node.textContent = String(to); if (onDone) onDone(); }
+    };
+    requestAnimationFrame(step);
+  }
+  function maybeBump(el, roll) {
+    const mod = Number(roll.modifier) || 0;
+    const final = Number(roll.total);
+    if (!mod || !Number.isFinite(final)) return;     // nothing to bump
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const totalEl = el.querySelector('.zone[data-id="total"]');
+    const totalZc = totalEl && totalEl.querySelector('.zc');
+    if (!totalZc) return;
+    const base = final - mod;                          // raw dice sum (before modifiers)
+    totalZc.textContent = String(base);                // show the raw result first
+    const bd = el.querySelector('.zone[data-id="breakdown"]');
+    setTimeout(() => {
+      // fly the breakdown up into the total
+      if (bd && getComputedStyle(bd).display !== 'none') {
+        const tr = totalEl.getBoundingClientRect(), br = bd.getBoundingClientRect();
+        const dx = (tr.left + tr.width / 2) - (br.left + br.width / 2);
+        const dy = (tr.top + tr.height / 2) - (br.top + br.height / 2);
+        bd.style.transition = 'transform .5s cubic-bezier(.4,0,.2,1), opacity .5s ease';
+        bd.style.transform = `translate(-50%, -50%) translate(${dx}px, ${dy}px) scale(.55)`;
+        bd.style.opacity = '0';
+      }
+      // count up to the final value, then pop the number
+      countUp(totalZc, base, final, 480, () => {
+        totalZc.classList.remove('bump'); void totalZc.offsetWidth; totalZc.classList.add('bump');
+      });
+    }, 650);
   }
 
   function fireParticles(roll) {
     if (!confetti) return;
+    if (settings && settings.confetti === false) return; // room setting: critical celebration off
     if (roll.isCrit) {
       const gold = ['#ffd24a', '#ffb300', '#fff3c4', '#ffffff'];
       confetti({ particleCount: 120, spread: 80, startVelocity: 55, origin: { x: 0.5, y: 0.75 }, colors: gold });
@@ -489,7 +507,7 @@
       } catch (e) { console.warn('[overlay] dice roll failed', e); }
       const card = showCard(roll, plan);
       fireParticles(roll);
-      await sleep(CONFIG.displayMs);
+      await sleep(displayMs());
       card.classList.remove('show');
       await sleep(420);
       card.remove();
@@ -524,6 +542,17 @@
 
   // ── boot ────────────────────────────────────────────────────────────────────
   await Promise.allSettled([initDice(), initConfetti()]);
+
+  // Plaque configs + templates + room settings (cached; polled so edits land without a reload).
+  if (room) {
+    loadTemplates(); loadPlaques(); loadSettings();
+    setInterval(() => { loadPlaques(); loadSettings(); }, 15000);
+  }
+  // Keep zone fonts sized to the plaque if the OBS source / window is resized mid-display.
+  window.addEventListener('resize', () => {
+    const el = stage.querySelector('.plaque');
+    if (el && el._zones && window.BRPlaque) BRPlaque.recomputeFont(el, el._zones);
+  });
 
   if (DEMO) {
     // Embedded on the landing page: no room/SSE. The parent page sends rolls via

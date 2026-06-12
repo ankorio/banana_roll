@@ -56,7 +56,7 @@
     const trg = BR.TRIGGERS.find((t) => t.id === st.trigger) || BR.TRIGGERS[0];
     return {
       total: trg.total,
-      breakdown: '🎲 ' + trg.die + '  +  ' + trg.mod,
+      breakdown: trg.die + '  +  ' + trg.mod,
       name: st.charName || zone('name')?.sample || 'Seraphina',
       rname: zone('rname')?.sample || 'Longsword Attack',
       badge: trg.badge, tag: trg.tag, cls: trg.cls,
@@ -285,9 +285,10 @@
   function applyDicePreset(p) {
     st.dice.custom = { foreground: p.foreground, background: p.background, edge: p.edge };
     st.dice.material = p.material; st.dice.texture = p.texture;
-    $$('#dicePresets .preset').forEach((b, i) => b.classList.toggle('on', presetSubset[i] && presetActive(presetSubset[i])));
-    if (st.mode === 'dice') renderDiceProps();
-    diceChanged();
+    // Editing a dice attribute always swaps the canvas to the dice view.
+    if (st.mode !== 'dice') setMode('dice'); // renders the right panel + starts the spin
+    else { renderDiceProps(); diceChanged(); }
+    syncPresetSel();
   }
 
   // ---- texture grid (rendered in the right panel; labels outside the image; panel scrolls) ----
@@ -358,7 +359,13 @@
     $$('#dicePresets .preset').forEach((b, i) => b.classList.toggle('on', presetSubset && presetSubset[i] && presetActive(presetSubset[i])));
   }
   let diceT = null;
-  function diceChanged() { clearTimeout(diceT); diceT = setTimeout(() => { if (st.mode === 'dice' && BR.startDiceSpin) BR.startDiceSpin(); }, 220); }
+  function diceChanged() {
+    clearTimeout(diceT);
+    diceT = setTimeout(() => {
+      if (st.mode !== 'dice') { setMode('dice'); return; } // any dice edit → swap to the dice view (setMode starts the spin)
+      if (BR.startDiceSpin) BR.startDiceSpin();
+    }, 220);
+  }
   // Tear down Pickr instances (called before re-rendering the props panel).
   function closeColorPicker() { pickrs.forEach((p) => { try { p.destroyAndRemove(); } catch (e) {} }); pickrs = []; }
 
