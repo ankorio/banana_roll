@@ -99,6 +99,34 @@
     { id: 'cloudy', name: 'Cloudy' }, { id: 'stone', name: 'Stone' }, { id: 'none', name: 'Smooth' },
   ];
 
+  /* --- preconfigured dice presets (left flyout; a random subset shown per load) ----
+     texture ids are real engine textures that also have a /assets/textures/<id>.webp. */
+  BR.DICE_PRESETS = [
+    { name: 'Inferno',     foreground: '#ffd9a0', background: '#a01010', edge: '#2a0000', material: 'metal',   texture: 'fire' },
+    { name: 'Frost',       foreground: '#eaffff', background: '#2b6c88', edge: '#0a2330', material: 'glass',   texture: 'ice' },
+    { name: 'Marbled',     foreground: '#fff3d6', background: '#b41f2a', edge: '#2a0205', material: 'glass',   texture: 'marble' },
+    { name: 'Obsidian',    foreground: '#cfd6e6', background: '#15151c', edge: '#000000', material: 'metal',   texture: 'metal' },
+    { name: 'Starfall',    foreground: '#ffd24a', background: '#2a1d6e', edge: '#0a0626', material: 'glass',   texture: 'stars' },
+    { name: 'Bone',        foreground: '#3a2c10', background: '#e7e0cf', edge: '#b8a978', material: 'none',    texture: 'paper' },
+    { name: 'Abyss',       foreground: '#7db8ff', background: '#0d1b2a', edge: '#05101a', material: 'glass',   texture: 'astral' },
+    { name: 'Gilded',      foreground: '#fff8e1', background: '#b8860b', edge: '#3a2a00', material: 'metal',   texture: 'glitter' },
+    { name: 'Dragonscale', foreground: '#eafff0', background: '#1f6b3a', edge: '#06210f', material: 'glass',   texture: 'dragon' },
+    { name: 'Tideglass',   foreground: '#eaffff', background: '#0f5a7a', edge: '#042230', material: 'glass',   texture: 'water' },
+    { name: 'Leopard',     foreground: '#2a1a05', background: '#b07a2a', edge: '#5a3a10', material: 'none',    texture: 'leopard' },
+    { name: "Tiger's Eye", foreground: '#ffe9c0', background: '#8a4b1e', edge: '#2a1305', material: 'glass',   texture: 'tiger' },
+    { name: 'Amethyst',    foreground: '#f3e9ff', background: '#7b4bb0', edge: '#2a153f', material: 'glass',   texture: 'speckles' },
+    { name: 'Bronze',      foreground: '#fff1d6', background: '#b87333', edge: '#3a2208', material: 'metal',   texture: 'bronze01' },
+    { name: 'Reliquary',   foreground: '#e8e8ee', background: '#3a3a48', edge: '#14141a', material: 'none',    texture: 'skulls' },
+    { name: 'Cathedral',   foreground: '#ffffff', background: '#2b6c88', edge: '#0a2330', material: 'glass',   texture: 'stainedglass' },
+  ];
+
+  /* Per-channel example palettes for the right-panel color sections. */
+  BR.DICE_COLOR_PALETTES = {
+    foreground: ['#ffffff', '#ffd24a', '#eaffff', '#ffe9c0', '#f3e9ff', '#7db8ff', '#3a2c10', '#000000'],
+    background: ['#a01010', '#b41f2a', '#2b6c88', '#0f5a7a', '#15151c', '#1f6b3a', '#7b4bb0', '#b8860b', '#b87333', '#3a3a48', '#2a1d6e', '#e7e0cf'],
+    edge:       ['#000000', '#220000', '#2a0000', '#0a2330', '#06210f', '#2a153f', '#3a2a00', '#14141a', '#ffffff'],
+  };
+
   /* --- trigger states (preview events on the canvas) ----------------------- */
   BR.TRIGGERS = [
     { id: 'normal', die: 12, mod: 5,  total: 17, badge: null,           tag: null,  cls: '' },
@@ -123,6 +151,8 @@
       upload_btn: 'Upload image', upload_hint: 'PNG or JPG · transparent PNG recommended', replace: 'Replace', remove: 'Remove',
       using_custom: 'Using your uploaded art', using_template: 'Using template art',
       p_dice_h: 'The dice', p_dice_d: 'Color and material of the rolling dice. Pick a color to preview it on the canvas.',
+      p_dice_presets_d: 'Pick a starting look, then fine-tune it on the right.',
+      p_dice_tune_h: 'Fine-tune',
       dice_color: 'Color', dice_custom: 'Custom…', dice_material: 'Material', dice_texture: 'Texture',
       custom_fg: 'Numbers', custom_bg: 'Body', custom_edge: 'Edge',
       p_colors_h: 'Plaque colors', p_colors_d: 'Recolor the editable parts of this template.',
@@ -153,6 +183,8 @@
       upload_btn: 'Subir imagen', upload_hint: 'PNG o JPG · se recomienda PNG transparente', replace: 'Reemplazar', remove: 'Quitar',
       using_custom: 'Usando tu imagen subida', using_template: 'Usando el arte de la plantilla',
       p_dice_h: 'Los dados', p_dice_d: 'Color y material de los dados. Elige un color para verlo en el lienzo.',
+      p_dice_presets_d: 'Elige un estilo base y ajústalo en el panel derecho.',
+      p_dice_tune_h: 'Ajuste fino',
       dice_color: 'Color', dice_custom: 'Propio…', dice_material: 'Material', dice_texture: 'Textura',
       custom_fg: 'Números', custom_bg: 'Cuerpo', custom_edge: 'Borde',
       p_colors_h: 'Colores de la placa', p_colors_d: 'Recolorea las partes editables de esta plantilla.',

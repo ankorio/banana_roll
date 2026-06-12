@@ -227,7 +227,7 @@ input[type=color]::-webkit-color-swatch { border: 0; border-radius: 5px; }
   background: radial-gradient(circle at 50% 35%, hsl(40,42%,46%), hsl(40,40%,30%));
   box-shadow: 0 0 0 3px var(--namecol), 0 0 0 5px rgba(0,0,0,.35), inset 0 0 30px rgba(0,0,0,.4); }
 .zone.portrait .zc { font-family: var(--serif); font-weight: 800; color: #2a1d08; }
-.zone.portrait img { width: 100%; height: 100%; object-fit: cover; }
+.zone.portrait img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 /* crit / fumble */
 .plaque.fumble .zone[data-id="total"] .zc { color: var(--crit) !important; text-shadow: 0 0 18px rgba(255,60,40,.6); }
 .plaque.fumble .zone[data-id="tag"] .zc { background: #ff5050; color: #2a0000; }
@@ -322,6 +322,33 @@ input[type=range]::-moz-range-thumb { width: 15px; height: 15px; border-radius: 
 
 .linkbtn { background: transparent; border: 0; color: var(--blue); font-weight: 600; font-size: 12.5px; cursor: pointer; padding: 0; }
 .linkbtn:hover { color: #a6cfff; }
+
+/* ── dice presets (left flyout) ─────────────────────────── */
+.preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.preset { border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); cursor: pointer;
+  padding: 10px 8px 8px; display: flex; flex-direction: column; align-items: center; gap: 7px; color: inherit; transition: border-color .15s, transform .12s; }
+.preset:hover { transform: translateY(-2px); border-color: #43435a; }
+.preset.on { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold-soft); }
+.preset .pv { position: relative; width: 56px; height: 56px; border-radius: 50%; overflow: hidden; display: grid; place-items: center;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.5), inset 0 -10px 16px rgba(0,0,0,.4), inset 0 8px 12px rgba(255,255,255,.18); }
+.preset .pv-tex { position: absolute; inset: 0; background-size: cover; background-position: center; mix-blend-mode: overlay; opacity: .7; }
+.preset .pv-num { position: relative; font-family: var(--serif); font-weight: 900; font-size: 20px; line-height: 1; }
+.preset .pn { font-size: 11.5px; font-weight: 700; color: var(--ink-2); text-align: center; }
+
+/* ── dice textures (left flyout; fully expanded, scrolls with the flyout; captions outside) ── */
+.tex-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; margin-top: 8px; }
+.tex-tile { border: 0; background: transparent; cursor: pointer; padding: 0; display: flex; flex-direction: column; align-items: center; gap: 5px; color: var(--muted); }
+.tex-tile .tex-thumb { width: 100%; aspect-ratio: 1; border-radius: 9px; border: 2px solid transparent;
+  background: #0c0c14 center / cover no-repeat; box-shadow: inset 0 0 0 1px rgba(0,0,0,.4); transition: border-color .12s, transform .12s; }
+.tex-tile:hover .tex-thumb { transform: translateY(-2px); border-color: #43435a; }
+.tex-tile.on .tex-thumb { border-color: var(--gold); }
+.tex-tile.on { color: var(--gold); }
+.tex-tile .tex-cap { font-size: 10px; font-weight: 700; line-height: 1.1; text-align: center;
+  width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── dice colour sections (right panel) ─────────────────── */
+.dice-col .cur { width: 22px; height: 16px; border-radius: 5px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.5); }
+.sw.pick { display: grid; place-items: center; }
 
 /* ── crop modal ────────────────────────────────────────── */
 .modal-veil { position: fixed; inset: 0; background: rgba(6,6,10,.7); backdrop-filter: blur(4px); z-index: 80; display: none; place-items: center; }

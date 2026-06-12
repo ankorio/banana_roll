@@ -108,7 +108,8 @@
       if (pEl && pz) {
         if (data.portraitImg) {
           let im = pEl.querySelector('img');
-          if (!im) { im = document.createElement('img'); pEl.appendChild(im); }
+          if (!im) { im = document.createElement('img'); im.referrerPolicy = 'no-referrer'; pEl.appendChild(im); }
+          im.onerror = () => { im.remove(); pz.textContent = (data.name || 'S').slice(0, 1).toUpperCase(); };
           im.src = data.portraitImg; pz.textContent = '';
         } else {
           const im = pEl.querySelector('img'); if (im) im.remove();

@@ -7,9 +7,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/vendor/pickr/nano.min.css" />
   <link rel="stylesheet" href="/assets/customizer/editor.css" />
   <script src="/assets/customizer/data.js"></script>
   <script src="/assets/shared/plaque-render.js"></script>
+  <script src="/assets/vendor/pickr/pickr.min.js"></script>
 </head>
 <body>
   <div class="app">
@@ -64,21 +66,11 @@
           <p class="pd" style="margin-top:10px" data-i18n="upload_hint">PNG or JPG · transparent PNG recommended</p>
           <p class="pnote" id="uploadState" style="margin-top:6px"></p>
         </section>
-        <!-- Dice -->
+        <!-- Dice — presets + textures (material & colours live in the right panel) -->
         <section class="panel" data-panel="dice">
           <h2 data-i18n="p_dice_h">The dice</h2>
-          <p class="pd" data-i18n="p_dice_d">Color and material of the rolling dice.</p>
-          <label class="lbl" data-i18n="dice_color">Color</label>
-          <div class="cgrid" id="diceGrid"></div>
-          <div class="colors-row hide" id="customColors">
-            <div><div class="mini-lbl" data-i18n="custom_fg">Numbers</div><input type="color" id="cc_fg" value="#ffffff"></div>
-            <div><div class="mini-lbl" data-i18n="custom_bg">Body</div><input type="color" id="cc_bg" value="#a01010"></div>
-            <div><div class="mini-lbl" data-i18n="custom_edge">Edge</div><input type="color" id="cc_edge" value="#220000"></div>
-          </div>
-          <label class="lbl" data-i18n="dice_material">Material</label>
-          <select class="inp" id="matSel"></select>
-          <label class="lbl" data-i18n="dice_texture">Texture</label>
-          <select class="inp" id="texSel"></select>
+          <p class="pd" data-i18n="p_dice_presets_d">Pick a starting look, then fine-tune it on the right.</p>
+          <div class="preset-grid" id="dicePresets"></div>
         </section>
         <!-- Colors -->
         <section class="panel" data-panel="colors">
@@ -205,41 +197,55 @@
     };
     BR.clearDice = function () { try { if (Box) Box.clearDice(); } catch (e) {} };
 
-    // Floating, slowly-spinning single die for Dice mode. Always shows the themed die
-    // (a settled roll → correct colors/material/texture); a gentle spin is layered on
-    // best-effort since the engine internals are minified. Re-called (debounced) on
-    // each color/material/texture change to re-theme live.
-    let spinRAF = null;
+    // Dice-mode preview: a single d20 mesh created DIRECTLY (no roll(), no physics, no
+    // throw) and animated (gentle float + spin) in our own loop. Centered. Changing the
+    // colour/material/texture rebuilds the mesh from the new theme → instant update.
+    let spinRAF = null, floatDie = null;
+    function removeFloatDie() {
+      if (floatDie) { try { Box.scene.remove(floatDie); } catch (e) {} floatDie = null; } // never dispose: geometry/materials are cached + reused by the engine
+    }
     BR.stopDiceSpin = function () {
       if (spinRAF) { cancelAnimationFrame(spinRAF); spinRAF = null; }
+      removeFloatDie();
+      // Restore shadows, the table, + the engine's own loop for Play test roll (keeps all).
+      try { if (Box && Box.renderer && Box.renderer.shadowMap) { Box.renderer.shadowMap.enabled = (Box.shadows !== false); Box.renderer.shadowMap.needsUpdate = true; } } catch (e) {}
+      try { if (Box && Box.desk) Box.desk.visible = true; } catch (e) {}
       try { if (Box && typeof Box.start === 'function') Box.start(); } catch (e) {}
-      BR.clearDice();
       const dl = document.getElementById('diceLayer'); if (dl) dl.classList.remove('on');
     };
     BR.startDiceSpin = async function () {
-      if (!Box) return;
+      if (!Box || !Box.DiceFactory || !Box.scene || !Box.renderer || !Box.camera) return;
       BR.stopDiceSpin();
-      document.getElementById('diceLayer').classList.add('on');
-      try { await BR.playRoll(20); } catch (e) { return; } // themed die shown (guaranteed)
-      try {                                                  // gentle spin (best-effort)
-        const cam = Box.camera, scene = Box.scene, renderer = Box.renderer;
-        if (!cam || !scene || !renderer || !renderer.render) return;
-        if (typeof Box.stop === 'function') Box.stop();
-        const die = (Box.diceList && Box.diceList[0]) || null;
-        const mesh = die && (die.rotation ? die : (die.model || die.mesh || null));
-        const r0 = Math.hypot(cam.position.x, cam.position.z) || 0, y0 = cam.position.y;
-        let a = 0;
-        const loop = () => {
-          a += 0.012;
+      try {
+        // Apply the chosen theme to the dice factory, then build a fresh themed die mesh.
+        try { if (Box.DiceColors) Box.DiceColors.colorsets = {}; } catch (e) {}
+        await Box.updateConfig(BR.getDiceConfig());
+        try { Box.DiceFactory.materials_cache = {}; } catch (e) {} // force fresh materials for the new theme
+        try { if (typeof Box.stop === 'function') Box.stop(); } catch (e) {} // we drive our own render loop
+        try { if (Box.renderer.shadowMap) Box.renderer.shadowMap.enabled = false; } catch (e) {} // no shadow on a floating die
+        try { if (Box.desk) Box.desk.visible = false; } catch (e) {} // hide the table → clean float on transparent canvas
+        const die = Box.DiceFactory.create('d20');
+        if (!die) return;
+        die.castShadow = false;
+        const lift = (Box.baseScale || 75) * 0.6, amp = (Box.baseScale || 75) * 0.06;
+        if (die.position && die.position.set) die.position.set(0, 0, lift); // centered (x=0, y=0)
+        if (die.rotation && die.rotation.set) die.rotation.set(-0.6, 0.35, 0.2);
+        Box.scene.add(die);
+        floatDie = die;
+        document.getElementById('diceLayer').classList.add('on');
+        const t0 = performance.now();
+        const loop = (now) => {
+          const t = (now - t0) * 0.001;
           try {
-            if (mesh && mesh.rotation) { mesh.rotation.y += 0.013; mesh.rotation.x += 0.005; }
-            else if (r0) { cam.position.x = Math.sin(a) * r0; cam.position.z = Math.cos(a) * r0; cam.position.y = y0; if (cam.lookAt) cam.lookAt(0, 0, 0); }
-            renderer.render(scene, cam);
+            die.rotation.x += 0.008; die.rotation.y += 0.012; die.rotation.z += 0.004;
+            die.position.y = Math.sin(t * 1.2) * amp;            // gentle float
+            die.position.z = lift + Math.sin(t * 2.0) * amp;
+            Box.renderer.render(Box.scene, Box.camera);
             spinRAF = requestAnimationFrame(loop);
-          } catch (e) { spinRAF = null; try { if (typeof Box.start === 'function') Box.start(); } catch (e2) {} }
+          } catch (e) { spinRAF = null; }
         };
         spinRAF = requestAnimationFrame(loop);
-      } catch (e) { try { if (typeof Box.start === 'function') Box.start(); } catch (e2) {} }
+      } catch (e) { /* never break the editor */ }
     };
 
     // canvas-confetti (vendored ES module, local-first) → window.confetti for Play test roll.

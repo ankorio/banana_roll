@@ -203,6 +203,16 @@ function styleForRoll(room, playerid) {
   return room.defaultStyle || null;
 }
 
+// Remember the character identity (name + token image) from a player's most recent
+// roll, so the customize editor can preview the real portrait/name when editing for
+// that player. The roster only carries the player account name + no image; the roll
+// (msg.who / msg.avatar) is the only place character info appears server-side.
+function rememberChar(room, roll) {
+  if (!roll || !roll.playerid) return;
+  if (!room.charInfo) room.charInfo = {};
+  room.charInfo[roll.playerid] = { who: roll.who || null, avatar: roll.avatar || null };
+}
+
 // Map a per-campaign playerid → the player's stable Roll20 account id (d20userid),
 // looked up in the room roster. Cross-campaign profiles are keyed on this account id;
 // returns '' if the roster doesn't (yet) carry a userid for that player.
@@ -270,6 +280,7 @@ function handleRoll(req, res, id, query) {
     if (isNew) {
       const style = styleForRoll(room, roll.playerid);
       if (style) roll.style = style;
+      rememberChar(room, roll);
       room.lastRoll = roll;
       broadcast(room, roll);
       rooms.persistRoll(room, roll); // persist retained roll + fan out to other instances
@@ -323,6 +334,7 @@ function handleChat(req, res, id, query) {
 
     const style = styleForRoll(room, roll.playerid);
     if (style) roll.style = style;
+    rememberChar(room, roll);
     room.lastRoll = roll;
     broadcast(room, roll);
     rooms.persistRoll(room, roll);
@@ -396,7 +408,15 @@ async function seedProfiles(room, players) {
 function handlePlayersGet(req, res, id) {
   const room = rooms.getRoom(id);
   if (!room) return sendJson(res, 404, { error: 'unknown room' });
-  sendJson(res, 200, { players: room.players || [] });
+  // Enrich the roster with the character name/portrait captured from each player's
+  // last roll (used by the customize editor's preview; absent until they've rolled).
+  const ci = room.charInfo || {};
+  const players = (room.players || []).map((p) => {
+    const c = ci[p.id];
+    if (!c) return p;
+    return { ...p, charName: c.who || undefined, avatar: c.avatar || undefined };
+  });
+  sendJson(res, 200, { players });
 }
 
 // Room-id-only read of the dice styles map (no token; cosmetic, bearer-capability

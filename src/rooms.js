@@ -62,7 +62,7 @@ function serializeRoom(r) {
   return {
     id: r.id, publishToken: r.publishToken, lastRoll: r.lastRoll,
     styles: r.styles, defaultStyle: r.defaultStyle, players: r.players,
-    plaques: r.plaques, defaultPlaque: r.defaultPlaque, settings: r.settings,
+    plaques: r.plaques, defaultPlaque: r.defaultPlaque, settings: r.settings, charInfo: r.charInfo,
     seenOrder: r.seenOrder, createdAt: r.createdAt, lastActivity: r.lastActivity,
   };
 }
@@ -71,6 +71,7 @@ function hydrate(d) {
     id: d.id, publishToken: d.publishToken, lastRoll: d.lastRoll || null,
     players: d.players || [], styles: d.styles || {}, defaultStyle: d.defaultStyle || null,
     plaques: d.plaques || {}, defaultPlaque: d.defaultPlaque || null, settings: d.settings || null,
+    charInfo: d.charInfo || {},
     clients: new Set(), seen: new Set(d.seenOrder || []), seenOrder: d.seenOrder || [],
     rollHits: [], createdAt: d.createdAt || Date.now(), lastActivity: d.lastActivity || Date.now(),
   };
@@ -95,6 +96,7 @@ async function createRoom() {
     defaultStyle: null,       // fallback style for players with no entry / all-players overlay
     plaques: {},              // playerid -> plaque config (set via the customize page)
     defaultPlaque: null,      // fallback plaque config for the all-players overlay
+    charInfo: {},             // playerid -> { who, avatar } from rolls (editor preview portrait/name)
     settings: null,           // room settings (display time, system, confetti, sounds, hide-GM)
     clients: new Set(),       // Set<ServerResponse> (per-instance, never persisted)
     seen: new Set(),          // bounded set of message ids
@@ -231,6 +233,7 @@ function upsertFromRemote(d) {
     existing.defaultStyle = d.defaultStyle || null;
     existing.plaques = d.plaques || {};
     existing.defaultPlaque = d.defaultPlaque || null;
+    if (d.charInfo) existing.charInfo = d.charInfo;
     if (d.settings) existing.settings = d.settings;
     if (d.players) existing.players = d.players;
     existing.lastActivity = Date.now();

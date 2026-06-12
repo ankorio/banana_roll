@@ -25,13 +25,14 @@
     art: BR.TEMPLATES[0].art,
     frame: BR.TEMPLATES[0].frame || null,
     customBg: null,           // dataURL of uploaded+cropped art
-    dice: { colorset: 'white', material: 'glass', texture: 'marble', custom: null },
+    dice: { material: 'glass', texture: 'marble', custom: { foreground: '#ffffff', background: '#a01010', edge: '#220000' } },
     trigger: 'crit',
     tool: 'templates',
     mode: 'plaque',           // plaque | dice (canvas emphasis)
     selected: null,           // zone id | 'bg' | null
     zoom: 1,
     portraitImg: null,
+    charName: null,           // character name for the preview (from the player's roll); survives template reloads
   };
 
   const tpl = () => BR.TEMPLATES.find((t) => t.id === st.templateId);
@@ -56,7 +57,7 @@
     return {
       total: trg.total,
       breakdown: '🎲 ' + trg.die + '  +  ' + trg.mod,
-      name: zone('name')?.sample || 'Seraphina',
+      name: st.charName || zone('name')?.sample || 'Seraphina',
       rname: zone('rname')?.sample || 'Longsword Attack',
       badge: trg.badge, tag: trg.tag, cls: trg.cls,
       portraitImg: st.portraitImg,
@@ -207,8 +208,9 @@
     $$('#modeSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
     if (mode === 'dice') {
       // Dice editor: plaque steps back, a single themed die floats + slowly spins.
+      // The dice layer is revealed by startDiceSpin AFTER the (hidden) toss settles,
+      // so the throw animation is never seen — just the spinning die.
       plaqueEl.classList.add('dice-mode');
-      $('#diceLayer').classList.add('on');
       if (BR.startDiceSpin) BR.startDiceSpin();
     } else {
       // Plaque editor: pure zone editing, no dice on the canvas.
@@ -216,6 +218,7 @@
       plaqueEl.classList.remove('dice-mode');
       $('#diceLayer').classList.remove('on');
     }
+    renderProps(); // swap the right panel: dice tuning ↔ zone props/empty
   }
 
   // ============================================================ PANELS
@@ -247,47 +250,117 @@
     applyArt(); buildZones(); buildTemplatesPanel(); buildColorsPanel(); updateUploadState(); renderProps();
   }
 
-  function buildDicePanel() {
-    const grid = $('#diceGrid'); grid.innerHTML = '';
-    // The real dice engine ships its own colorsets/textures/materials (vendored
-    // dice-manifest.json). When the manifest is loaded, only advertise curated swatch
-    // tiles whose colorset id actually exists, and source the dropdowns from it.
-    const man = BR.MANIFEST;
-    const manCS = man && man.colorsets ? new Set(man.colorsets.map((c) => c.id)) : null;
-    BR.DICE_COLORSETS.filter((c) => !manCS || manCS.has(c.id)).forEach((c) => {
-      const t = document.createElement('button'); t.className = 'ctile'; t.dataset.cs = c.id; t.title = c.name;
-      t.style.background = c.rep;
-      t.setAttribute('aria-pressed', String(c.id === st.dice.colorset && !st.dice.custom));
-      t.addEventListener('click', () => { st.dice.colorset = c.id; st.dice.custom = null; syncDiceGrid(); diceChanged(); });
-      grid.appendChild(t);
-    });
-    const cust = document.createElement('button'); cust.className = 'ctile custom'; cust.dataset.cs = 'custom'; cust.title = D().dice_custom;
-    cust.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
-    cust.setAttribute('aria-pressed', String(!!st.dice.custom));
-    cust.addEventListener('click', () => { st.dice.custom = st.dice.custom || { foreground: '#ffffff', background: '#a01010', edge: '#220000' }; $('#customColors').classList.remove('hide'); syncDiceGrid(); diceChanged(); });
-    grid.appendChild(cust);
+  // texture image preview (served per-id; falls back to a blank tile when no file exists)
+  const texImg = (id) => `/assets/textures/${id}.webp`;
+  // is the active dice look this preset? (compare the channels + material + texture)
+  function presetActive(p) {
+    const c = st.dice.custom || {};
+    return c.foreground === p.foreground && c.background === p.background && c.edge === p.edge &&
+      st.dice.material === p.material && st.dice.texture === p.texture;
+  }
 
-    const mats = (man && man.materials && man.materials.length) ? man.materials : BR.MATERIALS;
+  // ---- LEFT FLYOUT: preconfigured dice presets (random subset, chosen once per load) ----
+  let presetSubset = null;
+  function buildDicePresets() {
+    const wrap = $('#dicePresets'); if (!wrap) return;
+    if (!presetSubset) {
+      const pool = (BR.DICE_PRESETS || []).slice();
+      for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+      presetSubset = pool.slice(0, 8);
+    }
+    wrap.innerHTML = '';
+    presetSubset.forEach((p) => {
+      const t = document.createElement('button'); t.className = 'preset' + (presetActive(p) ? ' on' : '');
+      t.title = p.name;
+      t.innerHTML =
+        `<span class="pv" style="background:${p.background}">` +
+          `<span class="pv-tex" style="background-image:url('${texImg(p.texture)}')"></span>` +
+          `<span class="pv-num" style="color:${p.foreground};-webkit-text-stroke:1px ${p.edge}">20</span>` +
+        `</span>` +
+        `<span class="pn">${p.name}</span>`;
+      t.addEventListener('click', () => applyDicePreset(p));
+      wrap.appendChild(t);
+    });
+  }
+  function applyDicePreset(p) {
+    st.dice.custom = { foreground: p.foreground, background: p.background, edge: p.edge };
+    st.dice.material = p.material; st.dice.texture = p.texture;
+    $$('#dicePresets .preset').forEach((b, i) => b.classList.toggle('on', presetSubset[i] && presetActive(presetSubset[i])));
+    if (st.mode === 'dice') renderDiceProps();
+    diceChanged();
+  }
+
+  // ---- texture grid (rendered in the right panel; labels outside the image; panel scrolls) ----
+  function buildDiceTextures() {
+    const wrap = $('#diceTextures'); if (!wrap) return;
+    const man = BR.MANIFEST;
     const texs = (man && man.textures && man.textures.length) ? man.textures : BR.TEXTURES;
+    wrap.innerHTML = '';
+    texs.forEach((tx) => {
+      const id = tx.id || tx;
+      const b = document.createElement('button'); b.className = 'tex-tile' + (id === st.dice.texture ? ' on' : '');
+      b.dataset.tex = id; b.title = tx.name || id;
+      b.innerHTML = `<span class="tex-thumb" style="background-image:url('${texImg(id)}')"></span><span class="tex-cap">${tx.name || id}</span>`;
+      b.addEventListener('click', () => { st.dice.texture = id; $$('#diceTextures .tex-tile').forEach((x) => x.classList.toggle('on', x.dataset.tex === id)); syncPresetSel(); diceChanged(); });
+      wrap.appendChild(b);
+    });
+  }
+
+  // ---- RIGHT PANEL: dice tuning (material · Numbers/Body/Edge colours · texture) ----
+  function renderDiceProps() {
+    closeColorPicker();
+    const man = BR.MANIFEST;
+    const mats = (man && man.materials && man.materials.length) ? man.materials : BR.MATERIALS;
+    const c = st.dice.custom;
+    propsEl.innerHTML =
+      `<h2>${D().p_dice_tune_h}</h2>` +
+      `<div class="pgroup"><div class="pg-head"><b>${D().dice_material}</b></div><select class="inp" id="matSel"></select></div>` +
+      colorSection('foreground', D().custom_fg, c.foreground) +
+      colorSection('background', D().custom_bg, c.background) +
+      colorSection('edge', D().custom_edge, c.edge) +
+      `<div class="pgroup"><div class="pg-head"><b>${D().dice_texture}</b></div><div class="tex-grid" id="diceTextures"></div></div>`;
     const mat = $('#matSel'); mat.innerHTML = '';
     mats.forEach((m2) => { const o = document.createElement('option'); o.value = m2; o.textContent = m2; mat.appendChild(o); });
     mat.value = st.dice.material;
-    const tex = $('#texSel'); tex.innerHTML = '';
-    texs.forEach((tx) => { const o = document.createElement('option'); o.value = tx.id; o.textContent = tx.name; tex.appendChild(o); });
-    tex.value = st.dice.texture;
-    mat.onchange = () => { st.dice.material = mat.value; diceChanged(); };
-    tex.onchange = () => { st.dice.texture = tex.value; diceChanged(); };
-    $('#cc_fg').oninput = () => { st.dice.custom.foreground = $('#cc_fg').value; diceChanged(); };
-    $('#cc_bg').oninput = () => { st.dice.custom.background = $('#cc_bg').value; diceChanged(); };
-    $('#cc_edge').oninput = () => { st.dice.custom.edge = $('#cc_edge').value; diceChanged(); };
-    $('#customColors').classList.toggle('hide', !st.dice.custom);
+    mat.onchange = () => { st.dice.material = mat.value; syncPresetSel(); diceChanged(); };
+    ['foreground', 'background', 'edge'].forEach((ch) => wireColorSection(ch));
+    buildDiceTextures();
   }
-  function syncDiceGrid() {
-    $$('#diceGrid .ctile').forEach((t) => t.setAttribute('aria-pressed', String((t.dataset.cs === st.dice.colorset && !st.dice.custom) || (t.dataset.cs === 'custom' && !!st.dice.custom))));
-    $('#customColors').classList.toggle('hide', !st.dice.custom);
+  function colorSection(ch, label, hex) {
+    const palette = (BR.DICE_COLOR_PALETTES && BR.DICE_COLOR_PALETTES[ch]) || [];
+    const sw = palette.map((h) => `<button class="sw" data-ch="${ch}" data-hex="${h}" style="background:${h}" aria-pressed="${h.toLowerCase() === (hex || '').toLowerCase()}"></button>`).join('');
+    return `<div class="pgroup dice-col"><div class="pg-head"><b>${label}</b><span class="cur" id="cur_${ch}" style="background:${hex}"></span></div>` +
+      `<div class="swatches">${sw}<button class="sw pick" data-ch="${ch}" title="${D().dice_custom}" style="background:${hex}"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#fff" stroke-width="2" style="filter:drop-shadow(0 1px 2px #0008)"><path d="M12 5v14M5 12h14"/></svg></button></div></div>`;
+  }
+  // Palette swatches set the channel directly; the "pick" swatch hosts a Pickr instance.
+  let pickrs = [];
+  function wireColorSection(ch) {
+    $$(`.sw[data-ch="${ch}"]:not(.pick)`).forEach((b) => b.addEventListener('click', () => setDiceColor(ch, b.dataset.hex)));
+    const pickEl = $(`.sw.pick[data-ch="${ch}"]`);
+    if (pickEl && window.Pickr) {
+      const inst = window.Pickr.create({
+        el: pickEl, theme: 'nano', default: st.dice.custom[ch] || '#ffffff', useAsButton: true, position: 'left-start',
+        components: { preview: true, hue: true, interaction: { hex: true, input: true, save: false, clear: false } },
+      });
+      inst.on('change', (color) => { if (color) setDiceColor(ch, color.toHEXA().toString().slice(0, 7)); });
+      pickrs.push(inst);
+    }
+  }
+  function setDiceColor(ch, hex) {
+    hex = String(hex || '').toLowerCase();
+    st.dice.custom[ch] = hex;
+    const cur = $('#cur_' + ch); if (cur) cur.style.background = hex;
+    const pick = $(`.sw.pick[data-ch="${ch}"]`); if (pick) pick.style.background = hex;
+    $$(`.sw[data-ch="${ch}"]:not(.pick)`).forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.hex || '').toLowerCase() === hex)));
+    syncPresetSel(); diceChanged();
+  }
+  function syncPresetSel() {
+    $$('#dicePresets .preset').forEach((b, i) => b.classList.toggle('on', presetSubset && presetSubset[i] && presetActive(presetSubset[i])));
   }
   let diceT = null;
   function diceChanged() { clearTimeout(diceT); diceT = setTimeout(() => { if (st.mode === 'dice' && BR.startDiceSpin) BR.startDiceSpin(); }, 220); }
+  // Tear down Pickr instances (called before re-rendering the props panel).
+  function closeColorPicker() { pickrs.forEach((p) => { try { p.destroyAndRemove(); } catch (e) {} }); pickrs = []; }
 
   function buildColorsPanel() {
     const wrap = $('#colorBlocks'); wrap.innerHTML = '';
@@ -337,6 +410,8 @@
 
   // ============================================================ PROPERTIES
   function renderProps() {
+    closeColorPicker();
+    if (st.mode === 'dice') { renderDiceProps(); return; } // dice tuning owns the right panel in dice mode
     const id = st.selected;
     if (!id) { propsEl.innerHTML = `<h2 data-i18n="props">${D().props}</h2><div class="empty-props"><div class="ed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21 8 14 2 9.4h7.6z"/></svg></div><b>${D().no_sel_h}</b><p>${D().no_sel_d}</p></div>`; return; }
     if (id === 'bg') { renderBgProps(); return; }
@@ -528,7 +603,7 @@
   }
   function dicePayload() {
     const s = { texture: st.dice.texture, material: st.dice.material };
-    if (st.dice.custom) Object.assign(s, st.dice.custom); else s.colorset = st.dice.colorset;
+    Object.assign(s, st.dice.custom); // dice colour is always per-channel custom (foreground/background/edge)
     return s;
   }
   $('#saveBtn').addEventListener('click', async () => {
@@ -555,9 +630,10 @@
     if (!ds) return;
     if (ds.texture) st.dice.texture = ds.texture;
     if (ds.material) st.dice.material = ds.material;
-    if (ds.colorset) { st.dice.colorset = ds.colorset; st.dice.custom = null; }
-    if (ds.foreground || ds.background) st.dice.custom = { foreground: ds.foreground || '#fff', background: ds.background || '#a01010', edge: ds.edge || '#220000' };
-    buildDicePanel();
+    // Per-channel custom colours; a legacy colorset-only save keeps the default custom colours.
+    if (ds.foreground || ds.background || ds.edge) st.dice.custom = { foreground: ds.foreground || '#ffffff', background: ds.background || '#a01010', edge: ds.edge || '#220000' };
+    buildDicePresets();
+    if (st.mode === 'dice') renderDiceProps();
   }
   function applyPlaqueCfg(pl) {
     if (!pl || !pl.templateId) return;
@@ -593,13 +669,23 @@
   async function fetchWho() {
     if (PLAYER === 'default') { $('#whoName').textContent = D().allPlayers; return; }
     $('#whoName').textContent = PLAYER;
-    try { const r = await fetch(`/room/${ROOM}/players`); if (!r.ok) return; const d = await r.json(); const p = (d.players || []).find((x) => x.id === PLAYER); if (p) { $('#whoName').textContent = p.name; $('#whoDot').style.background = p.color || 'var(--gold)'; if (p.name) { zone('name').sample = p.name; paintZoneContent(); } } } catch (e) {}
+    try {
+      const r = await fetch(`/room/${ROOM}/players`); if (!r.ok) return;
+      const d = await r.json();
+      const p = (d.players || []).find((x) => x.id === PLAYER); if (!p) return;
+      const charName = p.charName || p.name; // character name from their last roll, else account name
+      $('#whoName').textContent = charName;
+      $('#whoDot').style.background = p.color || 'var(--gold)';
+      if (charName) st.charName = charName;     // state → survives template/plaque reloads (zone.sample gets clobbered)
+      if (p.avatar) st.portraitImg = p.avatar;  // real character token image as the preview portrait
+      paintZoneContent();
+    } catch (e) {}
   }
   function applyLang() {
     document.documentElement.lang = lang; document.title = D().doc;
     $$('[data-i18n]').forEach((el) => { const v = D()[el.getAttribute('data-i18n')]; if (v != null) el.innerHTML = v; });
     $$('[data-lang]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.lang === lang)));
-    buildRail(); buildTriggers(); buildTemplatesPanel(); buildDicePanel(); buildColorsPanel(); renderZonesList();
+    buildRail(); buildTriggers(); buildTemplatesPanel(); buildDicePresets(); buildColorsPanel(); renderZonesList();
     paintZoneContent(); renderProps();
     if (PLAYER === 'default') $('#whoName').textContent = D().allPlayers;
   }
@@ -615,7 +701,7 @@
   async function loadManifest() {
     try {
       const r = await fetch('/assets/dice-manifest.json');
-      if (r.ok) { BR.MANIFEST = await r.json(); if (st.tool === 'dice') buildDicePanel(); else buildDicePanel(); }
+      if (r.ok) { BR.MANIFEST = await r.json(); if (st.mode === 'dice') renderDiceProps(); } // texture grid + material use the manifest
     } catch (e) {}
   }
   async function loadTemplates() {
