@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FX Playground — Banana Roll</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;800&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet" />
+  <!-- one import-map entry resolves the bare `three` specifier for fx-layer.js, effects.js + LightningStrike (CDN; esm.sh bundles the core) -->
+  <script type="importmap">
+    { "imports": { "three": "https://esm.sh/three@0.182.0" } }
+  </script>
+  <style>
+    :root { --bg:#0b0b12; --panel:#14141e; --line:#2a2a3a; --gold:#ffd24a; --ink:#f1f1f7; --muted:#9a9ab2; --blue:#7db8ff;
+      --sans:'Manrope',system-ui,sans-serif; --serif:'Cinzel',Georgia,serif; }
+    * { box-sizing:border-box; }
+    body { margin:0; height:100vh; display:grid; grid-template-columns:1fr 320px; background:var(--bg); color:var(--ink); font-family:var(--sans); overflow:hidden; }
+    /* stage */
+    .stage-wrap { position:relative; display:grid; place-items:center; overflow:hidden;
+      background: radial-gradient(900px 600px at 50% 30%, rgba(255,210,74,.05), transparent 60%), #07070c; }
+    #plaque { height:min(78vh,560px); aspect-ratio:398/440; background:url('/assets/plaque_templates/arcane-plaque.png') center/contain no-repeat;
+      filter:drop-shadow(0 12px 40px rgba(0,0,0,.6)); }
+    #fx { position:absolute; inset:0; pointer-events:none; }   /* the FX canvas lives here */
+    .hint { position:absolute; left:14px; bottom:12px; font-size:12px; color:var(--muted); font-family:ui-monospace,monospace; }
+    /* panel */
+    .panel { border-left:1px solid var(--line); background:var(--panel); padding:18px 16px; overflow-y:auto; }
+    h1 { font-family:var(--serif); font-size:18px; margin:0 0 2px; }
+    .sub { color:var(--muted); font-size:12px; margin:0 0 16px; }
+    h2 { font-family:ui-monospace,monospace; font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin:18px 0 8px; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+    .fxbtn, .simbtn { border:1px solid var(--line); background:#1a1a26; color:var(--ink); border-radius:9px; padding:9px 8px; font-weight:700; font-size:12.5px; cursor:pointer; transition:border-color .12s, transform .1s; }
+    .fxbtn:hover, .simbtn:hover { border-color:var(--gold); transform:translateY(-1px); }
+    .ctl { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:10px 0; font-size:13px; }
+    .ctl input[type=range] { flex:1; }
+    .ctl output { font-family:ui-monospace,monospace; color:var(--gold); min-width:34px; text-align:right; }
+    select { width:100%; padding:7px 9px; border-radius:8px; border:1px solid var(--line); background:#0a0a12; color:var(--ink); font-family:var(--sans); font-weight:600; font-size:12.5px; }
+    .trow { display:grid; grid-template-columns:84px 1fr auto; gap:7px; align-items:center; margin-bottom:7px; }
+    .trow span { font-size:12px; font-weight:700; }
+    .simbtn { padding:7px 10px; }
+    .bind-out { margin-top:10px; font-family:ui-monospace,monospace; font-size:10.5px; color:var(--muted); white-space:pre-wrap; word-break:break-word; background:#0a0a12; border:1px solid var(--line); border-radius:8px; padding:8px; }
+    .err { color:#ff7a7a; font-size:12px; margin-top:8px; }
+    label.chk { display:flex; align-items:center; gap:7px; font-size:13px; }
+  </style>
+</head>
+<body>
+  <div class="stage-wrap" id="stageWrap">
+    <div id="plaque"></div>
+    <div id="fx"></div>
+    <div class="hint">click the stage to aim burst effects · default = center</div>
+  </div>
+
+  <aside class="panel">
+    <h1>FX Playground</h1>
+    <p class="sub">Test fantasy effects, then bind them to roll outcomes. The binding map is what the overlay would consume.</p>
+
+    <h2>Controls</h2>
+    <div class="ctl"><span>Intensity</span><input type="range" id="intensity" min="0.3" max="2" step="0.1" value="1"><output id="intOut">1.0</output></div>
+    <label class="chk"><input type="checkbox" id="tintOn"> Tint colour <input type="color" id="tint" value="#ffd24a" style="margin-left:auto"></label>
+
+    <h2>Effects</h2>
+    <div class="grid" id="fxGrid"></div>
+
+    <h2>Bind to roll outcomes</h2>
+    <div id="binds"></div>
+    <button class="simbtn" id="simRoll" style="width:100%;margin-top:8px">🎲 Simulate a random roll</button>
+    <div class="bind-out" id="bindOut"></div>
+
+    <div class="err" id="err"></div>
+  </aside>
+
+  <script type="module">
+    import BRFX from '/assets/fx/fx-layer.js';
+    const $ = (s) => document.querySelector(s);
+    let origin = { x: 0.5, y: 0.45 };
+
+    try { BRFX.init($('#fx')); } catch (e) { $('#err').textContent = 'FX init failed: ' + e.message; }
+
+    const intensity = () => parseFloat($('#intensity').value);
+    const color = () => $('#tintOn').checked ? $('#tint').value : null;
+    const fire = (name, ori) => BRFX.play(name, { origin: ori || origin, color: color(), intensity: intensity() });
+
+    $('#intensity').addEventListener('input', () => $('#intOut').textContent = intensity().toFixed(1));
+
+    // aim burst effects by clicking the stage
+    $('#stageWrap').addEventListener('click', (e) => {
+      const r = $('#fx').getBoundingClientRect();
+      origin = { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height };
+    });
+
+    // effect buttons
+    const names = BRFX.names();
+    const grid = $('#fxGrid');
+    names.forEach((n) => { const b = document.createElement('button'); b.className = 'fxbtn'; b.textContent = BRFX.label(n);
+      b.onclick = () => fire(n); grid.appendChild(b); });
+
+    // trigger binding
+    const outcomes = [['normal', 'Normal'], ['advantage', 'Advantage'], ['disadvantage', 'Disadvant.'], ['crit', 'Critical'], ['fumble', 'Fumble']];
+    const defaults = { normal: '', advantage: 'sparkles', disadvantage: 'smoke', crit: 'fireworks', fumble: 'lightning' };
+    const binds = {};
+    const optsHtml = '<option value="">(none)</option>' + names.map((n) => `<option value="${n}">${BRFX.label(n)}</option>`).join('');
+    const wrap = $('#binds');
+    outcomes.forEach(([id, label]) => {
+      binds[id] = defaults[id] || '';
+      const row = document.createElement('div'); row.className = 'trow';
+      row.innerHTML = `<span>${label}</span><select data-o="${id}">${optsHtml}</select><button class="simbtn" data-sim="${id}">▶</button>`;
+      wrap.appendChild(row);
+      row.querySelector('select').value = binds[id];
+      row.querySelector('select').onchange = (e) => { binds[id] = e.target.value; renderBind(); };
+      row.querySelector('button').onclick = () => { if (binds[id]) fire(binds[id], id === 'normal' ? origin : { x: 0.5, y: 0.45 }); };
+    });
+    function renderBind() { $('#bindOut').textContent = 'effectByOutcome = ' + JSON.stringify(binds, null, 2); }
+    renderBind();
+    $('#simRoll').onclick = () => {
+      const pick = outcomes[Math.floor(Math.random() * outcomes.length)][0];
+      const fx = binds[pick];
+      $('#bindOut').textContent = '→ rolled: ' + pick + (fx ? ('  · fx: ' + fx) : '  · (no fx)') + '\n\neffectByOutcome = ' + JSON.stringify(binds, null, 2);
+      if (fx) fire(fx, { x: 0.5, y: 0.45 });
+    };
+  </script>
+</body>
+</html>
