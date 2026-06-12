@@ -9,6 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/assets/customizer/editor.css" />
   <script src="/assets/customizer/data.js"></script>
+  <script src="/assets/shared/plaque-render.js"></script>
 </head>
 <body>
   <div class="app">
@@ -97,6 +98,10 @@
       <div class="stage-wrap">
         <div class="canvas-top">
           <div class="triggers" id="triggers"></div>
+          <button class="btn btn-gold btn-sm" id="playBtn" title="Play a test roll">
+            <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5v14l11-7z"/></svg>
+            <span data-i18n="play_test">Play test roll</span>
+          </button>
           <div class="spacer"></div>
           <div class="modeseg" id="modeSeg">
             <button data-mode="plaque" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="3"/><circle cx="12" cy="8" r="2"/><path d="M8.5 16h7"/></svg><span data-i18n="mode_plaque">Plaque</span></button>
@@ -198,12 +203,51 @@
       } catch (e) { /* ignore engine hiccups */ }
       finally { rolling = false; }
     };
-    // quick preview roll for the Dice tool (random value)
-    BR.previewDice = async function () {
-      if (!Box) return;
-      document.getElementById('diceLayer').classList.add('on');
-      try { await BR.playRoll(Math.ceil(Math.random() * 20)); } catch (e) {}
+    BR.clearDice = function () { try { if (Box) Box.clearDice(); } catch (e) {} };
+
+    // Floating, slowly-spinning single die for Dice mode. Always shows the themed die
+    // (a settled roll → correct colors/material/texture); a gentle spin is layered on
+    // best-effort since the engine internals are minified. Re-called (debounced) on
+    // each color/material/texture change to re-theme live.
+    let spinRAF = null;
+    BR.stopDiceSpin = function () {
+      if (spinRAF) { cancelAnimationFrame(spinRAF); spinRAF = null; }
+      try { if (Box && typeof Box.start === 'function') Box.start(); } catch (e) {}
+      BR.clearDice();
+      const dl = document.getElementById('diceLayer'); if (dl) dl.classList.remove('on');
     };
+    BR.startDiceSpin = async function () {
+      if (!Box) return;
+      BR.stopDiceSpin();
+      document.getElementById('diceLayer').classList.add('on');
+      try { await BR.playRoll(20); } catch (e) { return; } // themed die shown (guaranteed)
+      try {                                                  // gentle spin (best-effort)
+        const cam = Box.camera, scene = Box.scene, renderer = Box.renderer;
+        if (!cam || !scene || !renderer || !renderer.render) return;
+        if (typeof Box.stop === 'function') Box.stop();
+        const die = (Box.diceList && Box.diceList[0]) || null;
+        const mesh = die && (die.rotation ? die : (die.model || die.mesh || null));
+        const r0 = Math.hypot(cam.position.x, cam.position.z) || 0, y0 = cam.position.y;
+        let a = 0;
+        const loop = () => {
+          a += 0.012;
+          try {
+            if (mesh && mesh.rotation) { mesh.rotation.y += 0.013; mesh.rotation.x += 0.005; }
+            else if (r0) { cam.position.x = Math.sin(a) * r0; cam.position.z = Math.cos(a) * r0; cam.position.y = y0; if (cam.lookAt) cam.lookAt(0, 0, 0); }
+            renderer.render(scene, cam);
+            spinRAF = requestAnimationFrame(loop);
+          } catch (e) { spinRAF = null; try { if (typeof Box.start === 'function') Box.start(); } catch (e2) {} }
+        };
+        spinRAF = requestAnimationFrame(loop);
+      } catch (e) { try { if (typeof Box.start === 'function') Box.start(); } catch (e2) {} }
+    };
+
+    // canvas-confetti (vendored ES module, local-first) → window.confetti for Play test roll.
+    (async () => {
+      try { const m = await import('/assets/vendor/canvas-confetti.js'); window.confetti = m.default; }
+      catch { try { const m = await import('https://esm.sh/canvas-confetti@1.9.3'); window.confetti = m.default; } catch (e) {} }
+    })();
+
     init();
   </script>
 </body>

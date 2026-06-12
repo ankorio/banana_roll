@@ -44,103 +44,37 @@
   const propsEl = $('#props');
 
   // ============================================================ RENDER PLAQUE
-  let plaqueW = 1;
-  function recomputeFont() {
-    plaqueW = plaqueEl.getBoundingClientRect().width || 1;
-    st.zones.forEach((z) => {
-      const el = $(`.zone[data-id="${z.id}"]`);
-      if (!el || z.kind === 'image') return;
-      const px = plaqueW * z.coef * z.fs;
-      const zc = el.querySelector('.zc'); if (zc) zc.style.fontSize = px + 'px';
-    });
+  // Rendering is delegated to the shared renderer (window.BRPlaque) so the edit
+  // view, "Play test roll", and (later) the live overlay all draw identically.
+  // Editor-only chrome (resize handles + drag/select events) is layered on after build.
+  function recomputeFont() { BRPlaque.recomputeFont(plaqueEl, st.zones); }
+
+  // The data the plaque shows = the selected trigger's example (name / roll name come
+  // from the editable zone samples or the fetched player). Same shape a real roll uses.
+  function triggerData() {
+    const trg = BR.TRIGGERS.find((t) => t.id === st.trigger) || BR.TRIGGERS[0];
+    return {
+      total: trg.total,
+      breakdown: '🎲 ' + trg.die + '  +  ' + trg.mod,
+      name: zone('name')?.sample || 'Seraphina',
+      rname: zone('rname')?.sample || 'Longsword Attack',
+      badge: trg.badge, tag: trg.tag, cls: trg.cls,
+      portraitImg: st.portraitImg,
+    };
   }
 
   function buildZones() {
-    // remove old
-    $$('.zone', plaqueEl).forEach((e) => e.remove());
-    st.zones.forEach((z) => {
-      const el = document.createElement('div');
-      el.className = 'zone' + (z.kind === 'pill' ? ' pill' : '') + (z.kind === 'image' ? ' portrait' : '');
-      el.dataset.id = z.id; el.dataset.kind = z.kind;
-      const zc = document.createElement(z.kind === 'image' ? 'div' : 'div');
-      zc.className = 'zc';
-      el.appendChild(zc);
-      ['tl', 'tr', 'bl', 'br'].forEach((h) => { const hd = document.createElement('span'); hd.className = 'h ' + h; hd.dataset.h = h; el.appendChild(hd); });
-      plaqueEl.appendChild(el);
-      attachZoneEvents(el, z);
-    });
+    BRPlaque.build(plaqueEl, st.zones, { editable: true });
+    st.zones.forEach((z) => { const el = $(`.zone[data-id="${z.id}"]`); if (el) attachZoneEvents(el, z); });
     layoutZones();
     paintZoneContent();
     applyColors();
     requestAnimationFrame(recomputeFont);
   }
-
-  function layoutZones() {
-    st.zones.forEach((z) => {
-      const el = $(`.zone[data-id="${z.id}"]`); if (!el) return;
-      el.style.left = z.cx + '%'; el.style.top = z.cy + '%';
-      if (z.kind === 'image') { el.style.width = z.w + '%'; el.style.height = ''; } /* height from aspect-ratio:1 → perfect circle */
-      else if (z.kind === 'pill') { el.style.width = 'auto'; }
-      else { el.style.width = z.w + '%'; }
-      el.style.display = z.visible ? '' : 'none';
-      const zc = el.querySelector('.zc'); if (zc && z.align) zc.style.textAlign = z.align;
-    });
-  }
-
-  function paintZoneContent() {
-    const trg = BR.TRIGGERS.find((t) => t.id === st.trigger) || BR.TRIGGERS[0];
-    plaqueEl.classList.remove('crit', 'fumble');
-    if (trg.cls) plaqueEl.classList.add(trg.cls);
-    setZoneText('total', String(trg.total));
-    setZoneText('breakdown', '🎲 ' + trg.die + '  +  ' + trg.mod);
-    setZoneText('rname', zone('rname')?.sample || 'Longsword Attack');
-    setZoneText('name', zone('name')?.sample || 'Seraphina');
-    // portrait
-    const pz = $('.zone[data-id="portrait"] .zc');
-    if (pz) {
-      if (st.portraitImg) { pz.innerHTML = ''; const im = $('.zone[data-id="portrait"] img'); if (!im) { const img = document.createElement('img'); img.src = st.portraitImg; $('.zone[data-id="portrait"]').appendChild(img); } }
-      else { const im = $('.zone[data-id="portrait"] img'); if (im) im.remove(); pz.textContent = (zone('name')?.sample || 'S').slice(0, 1).toUpperCase(); }
-    }
-    // badge
-    const bz = $('.zone[data-id="badge"]');
-    if (bz) {
-      const show = !!trg.badge && zone('badge').visible;
-      bz.style.display = show ? '' : 'none';
-      setZoneText('badge', trg.badge === 'disadvantage' ? D().dis : D().adv);
-    }
-    // tag
-    const tz = $('.zone[data-id="tag"]');
-    if (tz) {
-      const show = !!trg.tag && zone('tag').visible;
-      tz.style.display = show ? '' : 'none';
-      setZoneText('tag', trg.tag === 'fumble' ? D().fumble_tag : D().crit_tag);
-    }
-  }
-  function setZoneText(id, txt) { const zc = $(`.zone[data-id="${id}"] .zc`); if (zc && !zc.querySelector('img')) zc.textContent = txt; }
-
-  function applyColors() {
-    plaqueEl.style.setProperty('--accent', st.colors.accent);
-    plaqueEl.style.setProperty('--namecol', st.colors.name);
-    plaqueEl.style.setProperty('--badgecol', st.colors.badge);
-    st.zones.forEach((z) => {
-      const zc = $(`.zone[data-id="${z.id}"] .zc`); if (!zc) return;
-      if (z.kind === 'text') { zc.style.color = z.colorKey ? st.colors[z.colorKey] : ''; }
-    });
-  }
-
-  function applyArt() {
-    plaqueEl.classList.remove('frame-blank', 'frame-obsidian');
-    const art = st.customBg || st.art;
-    let bg = $('.bg-art', plaqueEl);
-    if (art) {
-      if (!bg) { bg = document.createElement('div'); bg.className = 'bg-art'; plaqueEl.insertBefore(bg, plaqueEl.firstChild); }
-      bg.style.backgroundImage = `url("${art}")`;
-      bg.style.backgroundSize = st.customBg ? 'cover' : '100% 100%';
-    } else {
-      if (bg) bg.remove();
-      plaqueEl.classList.add('frame-' + (st.frame || 'blank'));
-    }
-  }
+  function layoutZones() { BRPlaque.layout(plaqueEl, st.zones); }
+  function paintZoneContent() { BRPlaque.paint(plaqueEl, st.zones, triggerData(), D()); }
+  function applyColors() { BRPlaque.applyColors(plaqueEl, st.colors, st.zones); }
+  function applyArt() { BRPlaque.applyArt(plaqueEl, { art: st.art, frame: st.frame, background: st.customBg }); }
 
   // ============================================================ ZONE INTERACT
   function attachZoneEvents(el, z) {
@@ -271,8 +205,17 @@
   function setMode(mode) {
     st.mode = mode;
     $$('#modeSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
-    if (mode === 'dice') { plaqueEl.classList.add('dimmed'); if (BR.previewDice) BR.previewDice(); }
-    else { plaqueEl.classList.remove('dimmed'); $('#diceLayer').classList.remove('on'); }
+    if (mode === 'dice') {
+      // Dice editor: plaque steps back, a single themed die floats + slowly spins.
+      plaqueEl.classList.add('dice-mode');
+      $('#diceLayer').classList.add('on');
+      if (BR.startDiceSpin) BR.startDiceSpin();
+    } else {
+      // Plaque editor: pure zone editing, no dice on the canvas.
+      if (BR.stopDiceSpin) BR.stopDiceSpin();
+      plaqueEl.classList.remove('dice-mode');
+      $('#diceLayer').classList.remove('on');
+    }
   }
 
   // ============================================================ PANELS
@@ -344,7 +287,7 @@
     $('#customColors').classList.toggle('hide', !st.dice.custom);
   }
   let diceT = null;
-  function diceChanged() { clearTimeout(diceT); diceT = setTimeout(() => { if (st.mode === 'dice' && BR.previewDice) BR.previewDice(); }, 200); }
+  function diceChanged() { clearTimeout(diceT); diceT = setTimeout(() => { if (st.mode === 'dice' && BR.startDiceSpin) BR.startDiceSpin(); }, 220); }
 
   function buildColorsPanel() {
     const wrap = $('#colorBlocks'); wrap.innerHTML = '';
@@ -465,18 +408,60 @@
       wrap.appendChild(b);
     });
   }
+  // Selecting a trigger just sets the plaque's sample state (totals, badge, tag,
+  // crit/fumble styling). No dice — the live roll is the "Play test roll" button.
   function fireTrigger(id) {
     st.trigger = id;
     $$('#triggers button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.trig === id)));
-    const trg = BR.TRIGGERS.find((t) => t.id === id);
-    paintZoneContent(); // always set correct plaque state immediately
-    // dice roll is a visual flourish layered on top; never let it block the plaque
-    if (BR.playRoll && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      setMode('plaque');
-      $('#diceLayer').classList.add('on'); // dice roll over the plaque — no dimming overlay
-      const restore = () => { $('#diceLayer').classList.remove('on'); };
-      const timeout = new Promise((r) => setTimeout(r, 2600));
-      Promise.race([Promise.resolve(BR.playRoll(trg.die)).catch(() => {}), timeout]).then(restore);
+    paintZoneContent();
+  }
+
+  // Crit/fumble confetti, mirroring the overlay's fireParticles (uses vendored canvas-confetti).
+  function fireParticles(trg) {
+    const confetti = window.confetti; if (!confetti) return;
+    if (trg.cls === 'crit') {
+      const gold = ['#ffd24a', '#ffb300', '#fff3c4', '#ffffff'];
+      confetti({ particleCount: 120, spread: 80, startVelocity: 55, origin: { x: 0.5, y: 0.75 }, colors: gold });
+      setTimeout(() => confetti({ particleCount: 60, angle: 60, spread: 70, origin: { x: 0, y: 0.9 }, colors: gold }), 120);
+      setTimeout(() => confetti({ particleCount: 60, angle: 120, spread: 70, origin: { x: 1, y: 0.9 }, colors: gold }), 120);
+    } else if (trg.cls === 'fumble') {
+      confetti({ particleCount: 40, spread: 100, startVelocity: 18, gravity: 1.6, ticks: 120, origin: { x: 0.5, y: 0.4 }, colors: ['#ff5050', '#7a0000', '#2a0000'], scalar: 0.9 });
+    }
+  }
+
+  // WYSIWYG preview: mirror the overlay's roll sequence (drain()) against the editor's
+  // own live plaque — hide plaque → real 3D roll lands on the trigger value → reveal
+  // plaque with the example result + confetti → hold → hide. Reflects unsaved edits.
+  let playing = false;
+  async function playTestRoll() {
+    if (playing) return; playing = true;
+    const btn = $('#playBtn'); if (btn) btn.disabled = true;
+    const trg = BR.TRIGGERS.find((t) => t.id === st.trigger) || BR.TRIGGERS[0];
+    try {
+      if (BR.stopDiceSpin) BR.stopDiceSpin();
+      st.mode = 'plaque'; plaqueEl.classList.remove('dice-mode');
+      $$('#modeSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === 'plaque')));
+      paintZoneContent();
+      const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (BR.playRoll && !reduce) {
+        plaqueEl.classList.add('play-hide');
+        $('#diceLayer').classList.add('on');
+        const timeout = new Promise((r) => setTimeout(r, 2600));
+        await Promise.race([Promise.resolve(BR.playRoll(trg.die)).catch(() => {}), timeout]);
+        $('#diceLayer').classList.remove('on');
+        plaqueEl.classList.remove('play-hide');
+      }
+      plaqueEl.classList.add('play-show');
+      fireParticles(trg);
+      await new Promise((r) => setTimeout(r, 4200));
+      plaqueEl.classList.remove('play-show');
+    } catch (e) { /* never get stuck */ }
+    finally {
+      plaqueEl.classList.remove('play-hide', 'play-show');
+      $('#diceLayer').classList.remove('on');
+      if (BR.clearDice) BR.clearDice();
+      if (btn) btn.disabled = false;
+      playing = false;
     }
   }
 
@@ -621,6 +606,7 @@
   $$('[data-lang]').forEach((b) => b.addEventListener('click', () => { lang = b.dataset.lang; try { localStorage.setItem('ovr_lang', lang); } catch (e) {} applyLang(); }));
 
   $('#modeSeg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setMode(b.dataset.mode); });
+  $('#playBtn') && $('#playBtn').addEventListener('click', playTestRoll);
   $('#backBtn').href = `/room/${ROOM}/setup`;
 
   // Load the real dice engine manifest (textures/materials/colorsets) + seeded

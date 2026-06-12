@@ -36,37 +36,41 @@
   };
 
   /* --- templates ----------------------------------------------------------
-     Each ships fixed art and declares which color keys are editable.
-     `art:null` → the editor draws an ornate fallback frame.
+     Offline fallback list (the editor replaces this with GET /room/:id/templates
+     at boot). Image templates all share the Arcane zone layout; keep in sync with
+     ART_TEMPLATES in src/templates.js.
   --------------------------------------------------------------------------- */
+  const TPL_DEFAULT_COLORS = { accent: '#ffd24a', badge: '#2e7d32', name: '#e6c87f' };
+  const TPL_ALL_EDITABLE = { accent: true, badge: true, name: true };
   BR.TEMPLATES = [
-    {
-      id: 'arcane',
-      name: 'Arcane Plaque',
-      art: '/assets/plaque_templates/arcane-plaque.png',
-      colors:   { accent: '#ffd24a', badge: '#2e7d32', name: '#e6c87f' },
-      editable: { accent: true, badge: true, name: false },
-      zones: zonesArcane(),
-    },
-    {
-      id: 'obsidian',
-      name: 'Obsidian',
-      art: null,
-      frame: 'obsidian',
-      colors:   { accent: '#7db8ff', badge: '#2e7d32', name: '#cfd6e6' },
-      editable: { accent: true, badge: true, name: true },
-      zones: zonesArcane(),
-    },
-    {
-      id: 'blank',
-      name: 'Blank canvas',
-      art: null,
-      frame: 'blank',
-      colors:   { accent: '#ffd24a', badge: '#3a3a48', name: '#e6c87f' },
-      editable: { accent: true, badge: true, name: true },
-      zones: zonesArcane(),
-    },
-  ];
+    ['arcane',        'Arcane Plaque', 'arcane-plaque.png', { accent: true, badge: true, name: false }],
+    ['generic',       'Generic',       'generic.png'],
+    ['artificer',     'Artificer',     'artificer.png'],
+    ['barbarian',     'Barbarian',     'barbarian.png'],
+    ['bard',          'Bard',          'bard.png'],
+    ['cleric',        'Cleric',        'cleric.png'],
+    ['druid',         'Druid',         'druid.png'],
+    ['fighter',       'Fighter',       'fighter.png'],
+    ['monk',          'Monk',          'monk.png'],
+    ['paladin',       'Paladin',       'paladin.png'],
+    ['ranger',        'Ranger',        'ranger.png'],
+    ['rogue',         'Rogue',         'rogue.png'],
+    ['sorcerer',      'Sorcerer',      'sorcerer.png'],
+    ['warlock',       'Warlock',       'warlock.png'],
+    ['wizard',        'Wizard',        'wizard.png'],
+    ['reymys',        'Reymys',        'reymys.png'],
+    ['tiron',         'Tiron',         'tiron.png'],
+    ['rafi',          'Rafi',          'rafi.png'],
+    ['huesped',       'Huesped',       'huesped.png'],
+    ['jenny',         'Jenny',         'jenny.png'],
+    ['luna',          'Luna',          'luna.png'],
+  ].map(([id, name, file, editable]) => ({
+    id, name,
+    art: '/assets/plaque_templates/' + file,
+    colors: { ...TPL_DEFAULT_COLORS },
+    editable: editable || { ...TPL_ALL_EDITABLE },
+    zones: zonesArcane(),
+  }));
 
   /* Accent swatch palette (plaque). */
   BR.ACCENTS = ['#ffd24a', '#ff7a7a', '#5fd08a', '#7db8ff', '#c08bff', '#ff8fbf', '#ffae57', '#e8e8ee'];
@@ -126,7 +130,7 @@
       p_zones_h: 'Zones', p_zones_d: 'Click a zone on the canvas to move, resize or hide it.',
       // canvas
       trig_normal: 'Normal', trig_adv: 'Advantage', trig_dis: 'Disadvant.', trig_crit: 'Critical', trig_fumble: 'Fumble',
-      fit: 'Fit', mode_dice: 'Dice', mode_plaque: 'Plaque',
+      fit: 'Fit', mode_dice: 'Dice', mode_plaque: 'Plaque', play_test: 'Play test roll',
       // properties
       props: 'Properties', no_sel_h: 'Nothing selected', no_sel_d: 'Click a zone on the canvas, or pick a tool on the left.',
       pr_visible: 'Visible', pr_pos: 'Position', pr_size: 'Size', pr_font: 'Font size', pr_align: 'Align', pr_color: 'Color',
@@ -155,7 +159,7 @@
       c_accent: 'Acento', c_badge: 'Distintivo', c_name: 'Nombre', locked: 'Bloqueado',
       p_zones_h: 'Zonas', p_zones_d: 'Haz clic en una zona del lienzo para moverla, redimensionarla u ocultarla.',
       trig_normal: 'Normal', trig_adv: 'Ventaja', trig_dis: 'Desventaja', trig_crit: 'Crítico', trig_fumble: 'Pifia',
-      fit: 'Ajustar', mode_dice: 'Dados', mode_plaque: 'Placa',
+      fit: 'Ajustar', mode_dice: 'Dados', mode_plaque: 'Placa', play_test: 'Tirada de prueba',
       props: 'Propiedades', no_sel_h: 'Nada seleccionado', no_sel_d: 'Haz clic en una zona del lienzo o elige una herramienta a la izquierda.',
       pr_visible: 'Visible', pr_pos: 'Posición', pr_size: 'Tamaño', pr_font: 'Tamaño de fuente', pr_align: 'Alinear', pr_color: 'Color',
       pr_x: 'X', pr_y: 'Y', pr_w: 'Ancho', pr_bg_h: 'Imagen de fondo', pr_scale: 'Escala', pr_reset: 'Restablecer zona',

@@ -36,35 +36,41 @@ function zonesArcane() {
   ];
 }
 
-// Seeded templates. `art:null` → the editor draws an ornate fallback frame (frame key).
-const TEMPLATES = [
-  {
-    id: 'arcane',
-    name: 'Arcane Plaque',
-    art: '/assets/plaque_templates/arcane-plaque.png',
-    colors:   { accent: '#ffd24a', badge: '#2e7d32', name: '#e6c87f' },
-    editable: { accent: true, badge: true, name: false },
-    zones: zonesArcane(),
-  },
-  {
-    id: 'obsidian',
-    name: 'Obsidian',
-    art: null,
-    frame: 'obsidian',
-    colors:   { accent: '#7db8ff', badge: '#2e7d32', name: '#cfd6e6' },
-    editable: { accent: true, badge: true, name: true },
-    zones: zonesArcane(),
-  },
-  {
-    id: 'blank',
-    name: 'Blank canvas',
-    art: null,
-    frame: 'blank',
-    colors:   { accent: '#ffd24a', badge: '#3a3a48', name: '#e6c87f' },
-    editable: { accent: true, badge: true, name: true },
-    zones: zonesArcane(),
-  },
+// Seeded templates. Image templates share the Arcane zone layout; their art is a full
+// background under /assets/plaque_templates/, so all color keys are editable by default.
+// To add a template: drop a PNG in that folder and add one `[id, name, file]` line here.
+const DEFAULT_COLORS = { accent: '#ffd24a', badge: '#2e7d32', name: '#e6c87f' };
+const ALL_EDITABLE = { accent: true, badge: true, name: true };
+const ART_TEMPLATES = [
+  ['arcane',        'Arcane Plaque', 'arcane-plaque.png', { accent: true, badge: true, name: false }],
+  ['generic',       'Generic',       'generic.png'],
+  ['artificer',     'Artificer',     'artificer.png'],
+  ['barbarian',     'Barbarian',     'barbarian.png'],
+  ['bard',          'Bard',          'bard.png'],
+  ['cleric',        'Cleric',        'cleric.png'],
+  ['druid',         'Druid',         'druid.png'],
+  ['fighter',       'Fighter',       'fighter.png'],
+  ['monk',          'Monk',          'monk.png'],
+  ['paladin',       'Paladin',       'paladin.png'],
+  ['ranger',        'Ranger',        'ranger.png'],
+  ['rogue',         'Rogue',         'rogue.png'],
+  ['sorcerer',      'Sorcerer',      'sorcerer.png'],
+  ['warlock',       'Warlock',       'warlock.png'],
+  ['wizard',        'Wizard',        'wizard.png'],
+  ['reymys',        'Reymys',        'reymys.png'],
+  ['tiron',         'Tiron',         'tiron.png'],
+  ['rafi',          'Rafi',          'rafi.png'],
+  ['huesped',       'Huesped',       'huesped.png'],
+  ['jenny',         'Jenny',         'jenny.png'],
+  ['luna',          'Luna',          'luna.png'],
 ];
+const TEMPLATES = ART_TEMPLATES.map(([id, name, file, editable]) => ({
+  id, name,
+  art: '/assets/plaque_templates/' + file,
+  colors: { ...DEFAULT_COLORS },
+  editable: editable || { ...ALL_EDITABLE },
+  zones: zonesArcane(),
+}));
 const TEMPLATE_IDS = new Set(TEMPLATES.map((t) => t.id));
 function getTemplate(id) { return TEMPLATES.find((t) => t.id === id) || null; }
 

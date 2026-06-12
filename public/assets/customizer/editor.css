@@ -250,7 +250,16 @@ input[type=color]::-webkit-color-swatch { border: 0; border-radius: 5px; }
 .dice-layer { position: absolute; inset: 0; pointer-events: none; z-index: 4; opacity: 0; transition: opacity .2s; }
 .dice-layer.on { opacity: 1; }
 .dice-layer canvas { width: 100% !important; height: 100% !important; }
-.plaque.dimmed { opacity: .12; filter: blur(2px) drop-shadow(0 24px 50px rgba(0,0,0,.6)); transition: opacity .25s, filter .25s; }
+
+/* Dice mode: the plaque steps back so the floating, spinning die is the focus.
+   (The #diceLayer is a separate child, unaffected — it's toggled via .on.) */
+.plaque .bg-art, .plaque .zone { transition: opacity .25s; }
+.plaque.dice-mode { outline-color: rgba(125,184,255,.3); }
+.plaque.dice-mode .bg-art { opacity: .1; }
+.plaque.dice-mode .zone { opacity: 0; pointer-events: none; }
+/* Play test roll: hide the plaque while the dice toss plays, reveal it after. */
+.plaque.play-hide .bg-art, .plaque.play-hide .zone { opacity: 0; }
+.plaque.play-show .bg-art, .plaque.play-show .zone { opacity: 1; }
 
 .engine-note { position: absolute; left: 16px; bottom: 12px; font-family: var(--mono); font-size: 10.5px; letter-spacing: .3px; color: var(--muted-2); }
 .nudge-note { position: absolute; right: 16px; bottom: 12px; font-family: var(--mono); font-size: 10.5px; color: var(--muted-2); opacity: 0; transition: opacity .2s; }
