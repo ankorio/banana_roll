@@ -369,29 +369,47 @@
   // Tear down Pickr instances (called before re-rendering the props panel).
   function closeColorPicker() { pickrs.forEach((p) => { try { p.destroyAndRemove(); } catch (e) {} }); pickrs = []; }
 
+  // Plaque-colour Pickr instances (one per editable key); torn down on each rebuild.
+  let platePickrs = [];
+  function destroyPlatePickrs() { platePickrs.forEach((p) => { try { p.destroyAndRemove(); } catch (e) {} }); platePickrs = []; }
+  function setPlateColor(key, hex) {
+    hex = String(hex || '').toLowerCase();
+    st.colors[key] = hex; applyColors();
+    const block = $(`#colorBlocks .color-block[data-key="${key}"]`);
+    if (block) {
+      $$('.sw[data-hex]', block).forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.hex || '').toLowerCase() === hex)));
+      const p = block.querySelector('.sw.pick'); if (p) p.style.background = hex;
+    }
+  }
   function buildColorsPanel() {
+    destroyPlatePickrs();
     const wrap = $('#colorBlocks'); wrap.innerHTML = '';
     const keys = [['accent', D().c_accent, BR.ACCENTS], ['badge', D().c_badge, BR.BADGE_COLORS], ['name', D().c_name, BR.ACCENTS]];
     keys.forEach(([key, label, palette]) => {
       const editable = st.editable[key];
-      const block = document.createElement('div'); block.className = 'color-block' + (editable ? '' : ' locked');
+      const block = document.createElement('div'); block.className = 'color-block' + (editable ? '' : ' locked'); block.dataset.key = key;
       const head = document.createElement('div'); head.className = 'cbh';
       head.innerHTML = `<b>${label}</b>` + (editable ? '' : `<span class="lockchip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>${D().locked}</span>`);
       block.appendChild(head);
       const sw = document.createElement('div'); sw.className = 'swatches';
       palette.forEach((hex) => {
-        const b = document.createElement('button'); b.className = 'sw'; b.style.background = hex; b.title = hex;
+        const b = document.createElement('button'); b.className = 'sw'; b.style.background = hex; b.title = hex; b.dataset.hex = hex;
         b.setAttribute('aria-pressed', String(hex.toLowerCase() === (st.colors[key] || '').toLowerCase()));
-        b.addEventListener('click', () => { st.colors[key] = hex; applyColors(); buildColorsPanel(); });
+        b.addEventListener('click', () => setPlateColor(key, hex));
         sw.appendChild(b);
       });
-      // custom picker
-      const pick = document.createElement('label'); pick.className = 'sw'; pick.style.background = st.colors[key]; pick.style.display = 'grid'; pick.style.placeItems = 'center';
-      pick.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#fff" stroke-width="2" style="filter:drop-shadow(0 1px 2px #0008)"><path d="M12 5v14M5 12h14"/></svg><input type="color" value="' + st.colors[key] + '" style="position:absolute;opacity:0;width:1px;height:1px">';
-      pick.querySelector('input').addEventListener('input', (e) => { st.colors[key] = e.target.value; applyColors(); buildColorsPanel(); });
+      // custom picker — Pickr on the swatch (same component as the dice colours)
+      const pick = document.createElement('button'); pick.className = 'sw pick'; pick.style.background = st.colors[key]; pick.title = D().dice_custom;
+      pick.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#fff" stroke-width="2" style="filter:drop-shadow(0 1px 2px #0008)"><path d="M12 5v14M5 12h14"/></svg>';
       sw.appendChild(pick);
       block.appendChild(sw);
       wrap.appendChild(block);
+      if (editable && window.Pickr) {
+        const inst = window.Pickr.create({ el: pick, theme: 'nano', default: st.colors[key] || '#ffffff', useAsButton: true, position: 'right-start',
+          components: { preview: true, hue: true, interaction: { hex: true, input: true, save: false, clear: false } } });
+        inst.on('change', (c) => { if (c) setPlateColor(key, c.toHEXA().toString().slice(0, 7)); });
+        platePickrs.push(inst);
+      }
     });
   }
 
@@ -440,7 +458,7 @@
       // align
       if (z.kind === 'text') html += `<div class="pgroup"><div class="pg-head"><b>${D().pr_align}</b><div class="alignseg" id="pp_align">${alignBtn('left', z.align)}${alignBtn('center', z.align)}${alignBtn('right', z.align)}</div></div></div>`;
       // color
-      if (z.colorKey) html += `<div class="pgroup"><div class="pg-head"><b>${D().pr_color}</b>${colorEditable ? `<input type="color" id="pp_color" value="${st.colors[z.colorKey]}" style="width:46px;height:30px">` : `<span class="lockchip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>${D().locked}</span>`}</div></div>`;
+      if (z.colorKey) html += `<div class="pgroup"><div class="pg-head"><b>${D().pr_color}</b>${colorEditable ? `<button class="sw pick" id="pp_color" style="background:${st.colors[z.colorKey]}"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#fff" stroke-width="2" style="filter:drop-shadow(0 1px 2px #0008)"><path d="M12 5v14M5 12h14"/></svg></button>` : `<span class="lockchip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>${D().locked}</span>`}</div></div>`;
       html += `<div class="pgroup"><button class="linkbtn" id="pp_reset">↺ ${D().pr_reset}</button></div>`;
     } else {
       html += `<div class="pgroup"><span class="lockchip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>${D().locked}</span></div>`;
@@ -460,7 +478,13 @@
     const w = $('#pp_w'); if (w) { setFill(w); w.oninput = () => { z.w = parseFloat(w.value); $('#pp_w_out').textContent = Math.round(z.w) + '%'; setFill(w); layoutZones(); recomputeFont(); }; }
     const fs = $('#pp_fs'); if (fs) { setFill(fs); fs.oninput = () => { z.fs = parseFloat(fs.value); $('#pp_fs_out').textContent = z.fs.toFixed(2) + '×'; setFill(fs); recomputeFont(); }; }
     const al = $('#pp_align'); if (al) $$('button', al).forEach((b) => b.onclick = () => { z.align = b.dataset.align; $$('button', al).forEach((x2) => x2.setAttribute('aria-pressed', String(x2 === b))); layoutZones(); });
-    const col = $('#pp_color'); if (col) col.oninput = () => { st.colors[z.colorKey] = col.value; applyColors(); buildColorsPanel(); };
+    const col = $('#pp_color');
+    if (col && window.Pickr) {
+      const inst = window.Pickr.create({ el: col, theme: 'nano', default: st.colors[z.colorKey] || '#ffffff', useAsButton: true, position: 'left-start',
+        components: { preview: true, hue: true, interaction: { hex: true, input: true, save: false, clear: false } } });
+      inst.on('change', (c) => { if (!c) return; const hex = c.toHEXA().toString().slice(0, 7).toLowerCase(); st.colors[z.colorKey] = hex; col.style.background = hex; applyColors(); buildColorsPanel(); });
+      pickrs.push(inst); // torn down by closeColorPicker() on the next renderProps
+    }
     const rst = $('#pp_reset'); if (rst) rst.onclick = () => { const orig = tpl().zones.find((o) => o.id === z.id); Object.assign(z, BR.clone(orig)); layoutZones(); recomputeFont(); paintZoneContent(); renderProps(); };
   }
   function setFill(r) { const pct = ((r.value - r.min) / (r.max - r.min)) * 100; r.style.setProperty('--fill', pct + '%'); }
