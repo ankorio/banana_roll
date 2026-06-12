@@ -7,12 +7,12 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/assets/vendor/pickr/nano.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@simonwep/pickr@1.9.1/dist/themes/nano.min.css" />
   <link rel="stylesheet" href="/assets/shared/plaque.css" />
   <link rel="stylesheet" href="/assets/customizer/editor.css" />
   <script src="/assets/customizer/data.js"></script>
   <script src="/assets/shared/plaque-render.js"></script>
-  <script src="/assets/vendor/pickr/pickr.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@simonwep/pickr@1.9.1/dist/pickr.min.js"></script>
 </head>
 <body>
   <div class="app">
@@ -249,10 +249,9 @@
       } catch (e) { /* never break the editor */ }
     };
 
-    // canvas-confetti (vendored ES module, local-first) → window.confetti for Play test roll.
+    // canvas-confetti (CDN) → window.confetti for Play test roll.
     (async () => {
-      try { const m = await import('/assets/vendor/canvas-confetti.js'); window.confetti = m.default; }
-      catch { try { const m = await import('https://esm.sh/canvas-confetti@1.9.3'); window.confetti = m.default; } catch (e) {} }
+      try { const m = await import('https://esm.sh/canvas-confetti@1.9.3'); window.confetti = m.default; } catch (e) {}
     })();
 
     init();

@@ -174,11 +174,7 @@
     }
   }
   async function initConfetti() {
-    try {
-      const { mod } = await importLocalFirst('/assets/vendor/canvas-confetti.js',
-        'https://esm.sh/canvas-confetti@1.9.3', 'confetti');
-      confetti = mod.default;
-    } catch {}
+    try { const mod = await import('https://esm.sh/canvas-confetti@1.9.3'); confetti = mod.default; } catch {}
   }
 
   // Map a per-player style (from roll.style) onto dice-box-threejs config. With custom
