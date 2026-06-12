@@ -120,6 +120,52 @@ async function main() {
   const rpBad = await fetch(`${BASE}/room/${room}/players?token=wrong`, { method: 'POST', body: '[]' });
   check('players post bad token -> 403', rpBad.status === 403);
 
+  // 5e. plaque config round-trip + background validation (a valid 1x1 PNG passes,
+  //     a non-PNG dataURL is dropped to null — cosmetic, never a hard error).
+  const PNG_1x1 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+  const plaqueCfg = { templateId: 'arcane', colors: { accent: '#ffd24a', badge: '#2e7d32', name: '#e6c87f' },
+    zones: [{ id: 'total', kind: 'text', cx: 50, cy: 62.8, w: 50, fs: 1, coef: 0.2, align: 'center', colorKey: 'accent', visible: true, locked: false }],
+    background: PNG_1x1 };
+  const rpl = await fetch(`${BASE}/room/${room}/plaque?player=p-1`, { method: 'POST', body: JSON.stringify(plaqueCfg) });
+  const jpl = await rpl.json();
+  check('plaque post -> 200 with templateId', rpl.status === 200 && jpl.plaque && jpl.plaque.templateId === 'arcane');
+  check('plaque keeps valid PNG background', !!jpl.plaque && jpl.plaque.background === PNG_1x1);
+  const gpl = await (await fetch(`${BASE}/room/${room}/plaque`)).json();
+  check('plaque get returns the saved config', !!gpl.plaques && gpl.plaques['p-1'] && gpl.plaques['p-1'].templateId === 'arcane');
+  const rplBad = await fetch(`${BASE}/room/${room}/plaque?player=p-1`,
+    { method: 'POST', body: JSON.stringify({ ...plaqueCfg, background: 'https://evil.example/x.png' }) });
+  const jplBad = await rplBad.json();
+  check('non-PNG background dropped to null', rplBad.status === 200 && jplBad.plaque.background === null);
+
+  // 5f. seeded templates are readable for the editor
+  const gtpl = await (await fetch(`${BASE}/room/${room}/templates`)).json();
+  check('templates get returns seeded list', Array.isArray(gtpl.templates) && gtpl.templates.some((t) => t.id === 'arcane'));
+
+  // 5g. room settings round-trip + drive the parser system
+  const rset = await fetch(`${BASE}/room/${room}/settings`,
+    { method: 'POST', body: JSON.stringify({ settings: { system: 'generic', displaySeconds: 6, confetti: false } }) });
+  check('settings post -> 200', rset.status === 200);
+  const gset = await (await fetch(`${BASE}/room/${room}/settings`)).json();
+  check('settings get returns saved values', gset.settings && gset.settings.system === 'generic' && gset.settings.displaySeconds === 6);
+
+  // 5h. CROSS-ROOM persistence: a player's saved look follows them into a NEW room.
+  //     p-1 saved a dice style (via profile mirror) + plaque above. In a fresh room,
+  //     pushing the roster seeds room.styles/plaques from the global profile.
+  const rsty = await fetch(`${BASE}/room/${room}/styles?player=p-1`,
+    { method: 'POST', body: JSON.stringify({ style: { colorset: 'fire', material: 'metal', texture: 'fire' } }) });
+  check('dice style post -> 200 (mirrors to profile)', rsty.status === 200);
+  const gprof = await (await fetch(`${BASE}/room/${room}/profile?player=p-1`)).json();
+  check('profile carries style + plaque', gprof.style && gprof.style.colorset === 'fire' && gprof.plaque && gprof.plaque.templateId === 'arcane');
+
+  const room2 = (await (await fetch(`${BASE}/rooms`, { method: 'POST' })).json());
+  await fetch(`${BASE}/room/${room2.room}/players?token=${room2.publishToken}`,
+    { method: 'POST', body: JSON.stringify([{ id: 'p-1', name: 'Blaze', color: '#e74c3c', online: true }]) });
+  await sleep(250); // seedProfiles runs async off the roster push
+  const g2sty = await (await fetch(`${BASE}/room/${room2.room}/styles`)).json();
+  check('new room seeds dice style from profile', !!g2sty.styles && g2sty.styles['p-1'] && g2sty.styles['p-1'].colorset === 'fire');
+  const g2pl = await (await fetch(`${BASE}/room/${room2.room}/plaque`)).json();
+  check('new room seeds plaque from profile', !!g2pl.plaques && g2pl.plaques['p-1'] && g2pl.plaques['p-1'].templateId === 'arcane');
+
   // 6. late subscriber gets retained last roll immediately
   const lateEvents = [];
   const closeLate = await sseClient(`${BASE}/room/${room}/events`, (e) => lateEvents.push(e));

@@ -5,10 +5,14 @@ const fs = require('fs');
 const path = require('path');
 const rooms = require('./rooms');
 const parser = require('./parser');
+const templates = require('./templates');
 
 const PORT = parseInt(process.env.PORT, 10) || 8765;
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 const MAX_BODY = 16 * 1024; // 16KB cap on POST bodies
+// Plaque configs can carry an inline base64 PNG background, so they need a bigger cap
+// than other endpoints. Kept just above templates.PLAQUE_BG_MAX (base64 + JSON overhead).
+const PLAQUE_MAX_BODY = 600 * 1024;
 
 // BASE_URL is used to build absolute links handed to users. Falls back per-request.
 function baseUrl(req) {
@@ -298,7 +302,7 @@ function handleChat(req, res, id, query) {
     }
 
     const raw = parser.parseChatRecord(parsed.id, parsed.msg, {
-      system: room.system || parser.DEFAULT_SYSTEM,
+      system: (room.settings && room.settings.system) || room.system || parser.DEFAULT_SYSTEM,
       ts: Number(parsed.ts),
     });
     const roll = validateRoll(raw); // null if not a roll, or normalize/cap a parsed roll
@@ -347,8 +351,28 @@ function handlePlayersPost(req, res, id, query) {
     rooms.touch(room);
     room.players = players;
     rooms.persist(room); // sync roster to other instances / durable store
+    seedProfiles(room, players); // cross-room: pull each player's saved look into this room
     sendJson(res, 200, { ok: true, count: players.length });
   });
+}
+
+// Cross-room persistence: for each rostered player that hasn't customized in THIS room
+// yet, seed their dice style + plaque from their global profile. Fire-and-forget and
+// off the hot per-roll path, so styleForRoll stays a plain sync room.styles lookup.
+async function seedProfiles(room, players) {
+  for (const p of players) {
+    if (!p.id) continue;
+    const haveStyle = room.styles && room.styles[p.id];
+    const havePlaque = room.plaques && room.plaques[p.id];
+    if (haveStyle && havePlaque) continue;
+    let prof;
+    try { prof = await rooms.getProfile(p.id); } catch { prof = null; }
+    if (!prof) continue;
+    let changed = false;
+    if (!haveStyle && prof.style) { (room.styles || (room.styles = {}))[p.id] = prof.style; changed = true; }
+    if (!havePlaque && prof.plaque) { (room.plaques || (room.plaques = {}))[p.id] = prof.plaque; changed = true; }
+    if (changed) rooms.persist(room);
+  }
 }
 
 // Room-id-only read for the setup page. Returns the roster (no token); these are the
@@ -398,9 +422,106 @@ function handleStylesPost(req, res, id, query) {
         return sendJson(res, 507, { error: 'too many styles' });
       }
       room.styles[player] = style;
+      // Mirror to the player's cross-room profile so their dice follow them elsewhere.
+      rooms.saveProfile(player, { style });
     }
     rooms.persist(room);
     sendJson(res, 200, { ok: true, style });
+  });
+}
+
+// --- plaque config (per player / room default) ------------------------------
+// Room-id capability (no publish token), validated, size-capped, rate-limited — same
+// model as dice styles. Backgrounds are inline base64 PNGs (validated in templates.js),
+// so the body cap is larger than the global MAX_BODY.
+function handlePlaqueGet(req, res, id) {
+  const room = rooms.getRoom(id);
+  if (!room) return sendJson(res, 404, { error: 'unknown room' });
+  sendJson(res, 200, { plaques: room.plaques || {}, defaultPlaque: room.defaultPlaque || null });
+}
+
+function handlePlaquePost(req, res, id, query) {
+  const room = rooms.getRoom(id);
+  if (!room) return sendJson(res, 404, { error: 'unknown room' });
+  if (!rooms.allowRoll(room)) return sendJson(res, 429, { error: 'rate limited' });
+  const player = query.get('player');
+  if (!player) return sendJson(res, 400, { error: 'missing ?player=' });
+
+  readBody(req, PLAQUE_MAX_BODY, (err, buf) => {
+    if (err) return sendJson(res, 400, { error: 'bad body' });
+    let parsed;
+    try { parsed = JSON.parse(buf.toString('utf8')); }
+    catch { return sendJson(res, 400, { error: 'invalid json' }); }
+    const plaque = templates.validatePlaque(parsed && parsed.plaque != null ? parsed.plaque : parsed);
+    if (!plaque) return sendJson(res, 400, { error: 'invalid plaque' });
+
+    rooms.touch(room);
+    if (player === 'default') {
+      room.defaultPlaque = plaque;
+    } else {
+      if (!/^[\w-]{1,100}$/.test(player)) return sendJson(res, 400, { error: 'invalid player id' });
+      if (!room.plaques) room.plaques = {};
+      if (!room.plaques[player] && Object.keys(room.plaques).length >= STYLES_MAX) {
+        return sendJson(res, 507, { error: 'too many plaques' });
+      }
+      room.plaques[player] = plaque;
+      rooms.saveProfile(player, { plaque }); // cross-room
+    }
+    rooms.persist(room);
+    sendJson(res, 200, { ok: true, plaque });
+  });
+}
+
+// Seeded plaque templates (frame art + default zone layout + editable color map). Lets
+// new frames ship server-side without a client redeploy. Room-id only.
+function handleTemplatesGet(req, res, id) {
+  const room = rooms.getRoom(id);
+  if (!room) return sendJson(res, 404, { error: 'unknown room' });
+  sendJson(res, 200, { templates: templates.TEMPLATES });
+}
+
+// Read a player's cross-room profile (dice style + plaque config). Lets the customize
+// page seed from what the player saved in any previous room. Room-id only, cosmetic.
+async function handleProfileGet(req, res, id, query) {
+  const room = rooms.getRoom(id);
+  if (!room) return sendJson(res, 404, { error: 'unknown room' });
+  const player = query.get('player');
+  if (!player || player === 'default') return sendJson(res, 200, { style: null, plaque: null });
+  const prof = await rooms.getProfile(player);
+  sendJson(res, 200, { style: (prof && prof.style) || null, plaque: (prof && prof.plaque) || null });
+}
+
+// --- room settings ----------------------------------------------------------
+function validateSettings(obj) {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return null;
+  const out = {};
+  if (Number.isFinite(obj.displaySeconds)) out.displaySeconds = Math.max(1, Math.min(30, obj.displaySeconds));
+  if (typeof obj.system === 'string' && /^[\w-]{1,40}$/.test(obj.system)) out.system = obj.system;
+  for (const k of ['confetti', 'sound', 'hideGm']) {
+    if (typeof obj[k] === 'boolean') out[k] = obj[k];
+  }
+  return out;
+}
+function handleSettingsGet(req, res, id) {
+  const room = rooms.getRoom(id);
+  if (!room) return sendJson(res, 404, { error: 'unknown room' });
+  sendJson(res, 200, { settings: room.settings || null });
+}
+function handleSettingsPost(req, res, id) {
+  const room = rooms.getRoom(id);
+  if (!room) return sendJson(res, 404, { error: 'unknown room' });
+  if (!rooms.allowRoll(room)) return sendJson(res, 429, { error: 'rate limited' });
+  readBody(req, MAX_BODY, (err, buf) => {
+    if (err) return sendJson(res, 400, { error: 'bad body' });
+    let parsed;
+    try { parsed = JSON.parse(buf.toString('utf8')); }
+    catch { return sendJson(res, 400, { error: 'invalid json' }); }
+    const settings = validateSettings(parsed && parsed.settings != null ? parsed.settings : parsed);
+    if (!settings) return sendJson(res, 400, { error: 'invalid settings' });
+    rooms.touch(room);
+    room.settings = { ...(room.settings || {}), ...settings };
+    rooms.persist(room);
+    sendJson(res, 200, { ok: true, settings: room.settings });
   });
 }
 
@@ -477,7 +598,7 @@ const server = http.createServer((req, res) => {
   }
 
   // /room/:id/<action>
-  const m = pathname.match(/^\/room\/([^/]+)\/(roll|chat|events|overlay|setup|ping|players|styles|customize)$/);
+  const m = pathname.match(/^\/room\/([^/]+)\/(roll|chat|events|overlay|setup|ping|players|styles|customize|templates|plaque|profile|settings)$/);
   if (m) {
     const id = decodeURIComponent(m[1]);
     const action = m[2];
@@ -487,6 +608,12 @@ const server = http.createServer((req, res) => {
     if (action === 'players' && method === 'GET') return handlePlayersGet(req, res, id);
     if (action === 'styles' && method === 'POST') return handleStylesPost(req, res, id, url.searchParams);
     if (action === 'styles' && method === 'GET') return handleStylesGet(req, res, id);
+    if (action === 'templates' && method === 'GET') return handleTemplatesGet(req, res, id);
+    if (action === 'plaque' && method === 'POST') return handlePlaquePost(req, res, id, url.searchParams);
+    if (action === 'plaque' && method === 'GET') return handlePlaqueGet(req, res, id);
+    if (action === 'profile' && method === 'GET') return handleProfileGet(req, res, id, url.searchParams);
+    if (action === 'settings' && method === 'POST') return handleSettingsPost(req, res, id);
+    if (action === 'settings' && method === 'GET') return handleSettingsGet(req, res, id);
     if (action === 'events' && method === 'GET') return handleEvents(req, res, id);
     if (action === 'ping' && method === 'GET') {
       // Heartbeat: room-id-only liveness check (no token). 404 tells the userscript

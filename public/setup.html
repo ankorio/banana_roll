@@ -3,107 +3,441 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Overlay setup</title>
+  <title>Room control panel — Banana Roll</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <style>
-    body { margin: 0; background: #14141c; color: #e8e8ee; font-family: system-ui, sans-serif;
-           line-height: 1.55; }
-    main { max-width: 720px; margin: 0 auto; padding: 32px 20px 80px; }
-    h1 { font-size: 28px; } h2 { margin-top: 32px; font-size: 19px; color: #ffd24a; }
-    code, .url, .mono { font-family: ui-monospace, Menlo, monospace; }
-    .url { display: flex; gap: 8px; align-items: center; margin: 10px 0; }
-    .url input { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 8px; border: 1px solid #333;
-                 background: #0c0c12; color: #ffd24a; font-size: 14px; }
-    button { padding: 10px 14px; border-radius: 8px; border: 0; background: #ffd24a;
-             color: #2a2000; font-weight: 700; cursor: pointer; white-space: nowrap; }
-    .note { color: #9a9aa6; font-size: 14px; }
-    a { color: #7db8ff; }
-    /* per-player rows */
-    #players { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
-    .prow { display: flex; gap: 8px; align-items: center; }
-    .pdot { flex: 0 0 auto; width: 10px; height: 10px; border-radius: 50%; background: #888; }
-    .pname { flex: 0 0 130px; max-width: 130px; overflow: hidden; text-overflow: ellipsis;
-             white-space: nowrap; font-weight: 600; }
-    .prow input { flex: 1; min-width: 0; padding: 9px 11px; border-radius: 8px; border: 1px solid #333;
-                  background: #0c0c12; color: #ffd24a; font-size: 13px; }
-    .prow .open { flex: 0 0 auto; }
-    .empty { color: #9a9aa6; font-size: 14px; padding: 6px 0; }
-    .lang { position: fixed; top: 14px; right: 16px; display: flex; gap: 4px; }
-    .lang button { background: #16161f; color: #9a9aa6; border: 1px solid #2a2a38;
-      border-radius: 8px; padding: 5px 10px; cursor: pointer; font-weight: 700; font-size: 13px; }
-    .lang button[aria-pressed="true"] { background: #ffd24a; color: #2a2000; border-color: #ffd24a; }
+    :root {
+      --bg: #0b0b12; --bg-2: #10101a; --card: #15151f; --card-2: #1a1a26;
+      --line: #2a2a3a; --line-soft: #20202e;
+      --gold: #ffd24a; --gold-deep: #c79a2e; --gold-soft: rgba(255,210,74,.22);
+      --blue: #7db8ff; --green: #6bd28a; --crit: #ff7a7a;
+      --ink: #f1f1f7; --ink-2: #d6d6e2; --muted: #9a9ab2; --muted-2: #71718c;
+      --r: 14px;
+      --serif: 'Cinzel', Georgia, serif;
+      --sans: 'Manrope', system-ui, -apple-system, sans-serif;
+      --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0; color: var(--ink); font-family: var(--sans); font-size: 15.5px; line-height: 1.6;
+      background:
+        radial-gradient(900px 500px at 12% -8%, rgba(255,210,74,.06), transparent 60%),
+        radial-gradient(800px 500px at 100% 0%, rgba(125,184,255,.05), transparent 55%),
+        var(--bg);
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--blue); text-decoration: none; }
+    h1,h2,h3 { font-family: var(--serif); margin: 0; line-height: 1.15; letter-spacing: .3px; }
+    ::selection { background: var(--gold-soft); color: #fff; }
+
+    /* ── app shell ──────────────────────────────────── */
+    .shell { display: grid; grid-template-columns: 264px 1fr; min-height: 100vh; }
+
+    /* sidebar */
+    .side {
+      position: sticky; top: 0; align-self: start; height: 100vh;
+      border-right: 1px solid var(--line-soft); background: rgba(16,16,26,.6);
+      backdrop-filter: blur(10px); display: flex; flex-direction: column; padding: 22px 18px;
+    }
+    .brand { display: flex; align-items: center; gap: 11px; padding: 4px 6px 0; }
+    .brand .die {
+      width: 32px; height: 32px; display: grid; place-items: center; flex: 0 0 auto;
+      background: linear-gradient(180deg, #ffdf72, var(--gold)); color: #2a2000;
+      border-radius: 8px; transform: rotate(45deg); box-shadow: 0 4px 14px -4px var(--gold-soft);
+    }
+    .brand .die span { transform: rotate(-45deg); font-family: var(--mono); font-weight: 800; font-size: 13px; }
+    .brand .bt { display: flex; flex-direction: column; }
+    .brand .bn { font-family: var(--serif); font-weight: 800; font-size: 17px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--ink); }
+    .brand .bs { font-family: var(--mono); font-size: 10px; letter-spacing: 2.5px; text-transform: uppercase; color: var(--gold-deep); margin-top: 1px; }
+
+    .side-nav { display: flex; flex-direction: column; gap: 3px; margin-top: 30px; }
+    .side-nav .lab { font-family: var(--mono); font-size: 10px; letter-spacing: 2.5px; text-transform: uppercase; color: var(--muted-2); padding: 0 12px 8px; }
+    .side-nav a {
+      display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px;
+      color: var(--muted); font-weight: 600; font-size: 14.5px; transition: background .15s, color .15s;
+    }
+    .side-nav a:hover { color: var(--ink); background: rgba(255,255,255,.03); }
+    .side-nav a.active { color: var(--gold); background: rgba(255,210,74,.08); }
+    .side-nav a svg { width: 18px; height: 18px; flex: 0 0 auto; opacity: .85; }
+    .side-nav a.active svg { opacity: 1; }
+
+    .side-foot { margin-top: auto; padding-top: 18px; display: flex; flex-direction: column; gap: 14px; }
+    .lang { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; width: fit-content; }
+    .lang button { background: transparent; color: var(--muted); border: 0; padding: 6px 13px; cursor: pointer;
+      font-family: var(--mono); font-weight: 700; font-size: 12px; letter-spacing: .5px; }
+    .lang button[aria-pressed="true"] { background: var(--gold); color: #2a2000; }
+    .side-links { display: flex; gap: 8px; }
+    .side-links a {
+      display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px;
+      border: 1px solid var(--line); border-radius: 9px; color: var(--ink-2); transition: border-color .15s, background .15s, color .15s;
+    }
+    .side-links a:hover { border-color: #43435a; background: rgba(255,255,255,.05); color: var(--gold); }
+    .side-links a svg { width: 17px; height: 17px; }
+
+    /* main */
+    .main { min-width: 0; padding: 0; }
+    .main-inner { max-width: 840px; margin: 0 auto; padding: 40px 40px 80px; }
+
+    .topline { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 8px; }
+    .eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: var(--gold); }
+    .roomchip {
+      display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12px;
+      color: var(--ink-2); background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px;
+    }
+    .roomchip b { color: var(--gold); font-weight: 700; }
+    h1.page-h { font-size: clamp(26px, 3.4vw, 34px); font-weight: 800; margin: 6px 0 0; }
+    .page-sub { color: var(--muted); margin: 12px 0 0; max-width: 60ch; }
+
+    /* secret callout */
+    .callout {
+      display: flex; gap: 13px; align-items: flex-start; margin: 28px 0 0;
+      border: 1px solid rgba(255,210,74,.22); background: rgba(255,210,74,.04);
+      border-radius: var(--r); padding: 16px 18px;
+    }
+    .callout svg { flex: 0 0 auto; width: 20px; height: 20px; color: var(--gold); margin-top: 2px; }
+    .callout p { margin: 0; font-size: 14px; color: var(--ink-2); }
+    .callout b { color: var(--gold); }
+
+    /* section + card */
+    .section { margin-top: 46px; scroll-margin-top: 28px; }
+    .section-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .section-head .ix {
+      width: 30px; height: 30px; flex: 0 0 auto; border-radius: 9px; transform: rotate(45deg);
+      border: 1.5px solid var(--gold-deep); background: rgba(255,210,74,.08); display: grid; place-items: center;
+    }
+    .section-head .ix svg { transform: rotate(-45deg); width: 15px; height: 15px; color: var(--gold); }
+    .section-head h2 { font-size: 20px; font-weight: 700; }
+    .section-head .desc { color: var(--muted); font-size: 13.5px; margin: 2px 0 0; font-family: var(--sans); font-weight: 500; letter-spacing: 0; }
+
+    .card { background: var(--card); border: 1px solid var(--line-soft); border-radius: var(--r); padding: 22px; }
+    .card + .card { margin-top: 14px; }
+    .field-label { font-size: 13px; font-weight: 700; color: var(--ink-2); margin-bottom: 9px; display: flex; align-items: center; gap: 8px; }
+    .field-label .tagpill { font-family: var(--mono); font-size: 10px; letter-spacing: .5px; text-transform: uppercase;
+      color: var(--blue); border: 1px solid rgba(125,184,255,.35); border-radius: 5px; padding: 1px 7px; font-weight: 700; }
+
+    /* url row */
+    .url { display: flex; gap: 9px; align-items: center; }
+    .url input {
+      flex: 1; min-width: 0; padding: 11px 13px; border-radius: 10px; border: 1px solid var(--line);
+      background: #0a0a12; color: var(--gold); font-family: var(--mono); font-size: 13px;
+    }
+    .url input:focus { outline: none; border-color: var(--gold-deep); }
+    .btn {
+      display: inline-flex; align-items: center; gap: 7px; font-family: var(--sans); font-weight: 700; font-size: 14px;
+      padding: 11px 16px; border-radius: 10px; border: 1px solid transparent; cursor: pointer; white-space: nowrap;
+      transition: transform .12s, filter .12s, border-color .15s, background .15s; text-decoration: none;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn svg { width: 15px; height: 15px; }
+    .btn-gold { background: linear-gradient(180deg, #ffdf72, var(--gold)); color: #2a2000; }
+    .btn-gold:hover { filter: brightness(1.04); }
+    .btn-ghost { background: rgba(255,255,255,.02); color: var(--ink); border-color: var(--line); }
+    .btn-ghost:hover { border-color: #43435a; background: rgba(255,255,255,.05); }
+    .hintline { color: var(--muted); font-size: 13px; margin: 12px 0 0; }
+    .hintline code, .mono { font-family: var(--mono); }
+    .kbd { font-family: var(--mono); font-size: 12px; background: #0a0a12; border: 1px solid var(--line);
+      border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; color: var(--gold); }
+
+    /* players table */
+    .roster { display: flex; flex-direction: column; }
+    .prow {
+      display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center;
+      padding: 13px 4px; border-bottom: 1px solid var(--line-soft);
+    }
+    .prow:last-child { border-bottom: 0; }
+    .pwho { display: flex; align-items: center; gap: 11px; min-width: 0; }
+    .pdot { flex: 0 0 auto; width: 9px; height: 9px; border-radius: 50%; background: #888; box-shadow: 0 0 0 3px rgba(255,255,255,.04); }
+    .pname { font-weight: 700; font-size: 14.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pstatus { font-family: var(--mono); font-size: 10.5px; letter-spacing: .5px; text-transform: uppercase; color: var(--muted-2); }
+    .purl {
+      min-width: 0; padding: 8px 11px; border-radius: 8px; border: 1px solid var(--line);
+      background: #0a0a12; color: var(--gold); font-family: var(--mono); font-size: 12px; width: 100%;
+    }
+    .pacts { display: flex; gap: 7px; align-items: center; }
+    .ibtn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 34px; padding: 0 11px;
+      border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,.02); color: var(--ink-2);
+      cursor: pointer; font-family: var(--sans); font-weight: 700; font-size: 12.5px; transition: border-color .15s, background .15s, color .15s; text-decoration: none;
+    }
+    .ibtn:hover { border-color: #43435a; background: rgba(255,255,255,.05); color: var(--ink); }
+    .ibtn.gold { color: var(--gold); border-color: var(--gold-soft); }
+    .ibtn.gold:hover { border-color: var(--gold); background: rgba(255,210,74,.06); }
+    .ibtn svg { width: 14px; height: 14px; }
+    .empty {
+      display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center;
+      padding: 36px 20px; color: var(--muted);
+    }
+    .empty .ed { width: 42px; height: 42px; border-radius: 12px; background: rgba(255,255,255,.03);
+      border: 1px solid var(--line); display: grid; place-items: center; color: var(--muted-2); }
+    .empty .ed svg { width: 20px; height: 20px; }
+    .empty p { margin: 0; font-size: 14px; max-width: 38ch; }
+    .pulse { animation: pulse 1.8s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
+
+    .defaultrow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 14px;
+      padding-top: 16px; border-top: 1px solid var(--line-soft); }
+    .defaultrow .dtxt { flex: 1; min-width: 200px; }
+    .defaultrow .dtxt b { font-size: 14px; }
+    .defaultrow .dtxt p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+
+    /* room settings */
+    .setrow { display: flex; align-items: center; justify-content: space-between; gap: 18px;
+      padding: 16px 2px; border-bottom: 1px solid var(--line-soft); }
+    .setrow:last-of-type { border-bottom: 0; }
+    .setrow .st { min-width: 0; }
+    .setrow .st b { font-size: 14.5px; font-weight: 700; }
+    .setrow .st p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+    .setctl { flex: 0 0 auto; }
+    select.inp {
+      padding: 9px 32px 9px 12px; border-radius: 9px; border: 1px solid var(--line); background: #0a0a12; color: var(--ink);
+      font-family: var(--sans); font-weight: 600; font-size: 13.5px; cursor: pointer; -webkit-appearance: none; appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239a9ab2' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 11px center;
+    }
+    select.inp:focus { outline: none; border-color: var(--gold-deep); }
+    /* toggle */
+    .switch { position: relative; width: 46px; height: 26px; flex: 0 0 auto; }
+    .switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+    .switch .track { position: absolute; inset: 0; border-radius: 999px; background: #2a2a38; border: 1px solid var(--line); transition: background .18s; }
+    .switch .knob { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%;
+      background: var(--muted); transition: transform .18s, background .18s; }
+    .switch input:checked + .track { background: rgba(255,210,74,.25); border-color: var(--gold-soft); }
+    .switch input:checked + .track + .knob { transform: translateX(20px); background: var(--gold); }
+    /* range */
+    .rangewrap { display: flex; align-items: center; gap: 12px; }
+    .rangewrap output { font-family: var(--mono); font-size: 13px; color: var(--gold); min-width: 44px; text-align: right; }
+    input[type=range] { -webkit-appearance: none; appearance: none; width: 150px; height: 4px; border-radius: 999px;
+      background: linear-gradient(90deg, var(--gold) var(--fill,50%), #2a2a38 var(--fill,50%)); cursor: pointer; }
+    input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%;
+      background: var(--gold); border: 2px solid #2a2000; box-shadow: 0 1px 4px rgba(0,0,0,.5); }
+    input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--gold); border: 2px solid #2a2000; }
+
+    .savebar { display: flex; align-items: center; gap: 14px; margin-top: 20px; }
+    .saved { color: var(--green); font-size: 13.5px; font-weight: 600; opacity: 0; transition: opacity .2s; display: inline-flex; align-items: center; gap: 6px; }
+    .saved.show { opacity: 1; }
+    .soon { font-family: var(--mono); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted-2); }
+
+    /* mobile */
+    .side-toggle { display: none; }
+    @media (max-width: 880px) {
+      .shell { grid-template-columns: 1fr; }
+      .side {
+        position: sticky; top: 0; z-index: 40; height: auto; flex-direction: row; align-items: center;
+        padding: 12px 16px; gap: 14px; border-right: 0; border-bottom: 1px solid var(--line-soft);
+      }
+      .side-nav { display: none; }
+      .side-foot { margin: 0 0 0 auto; padding: 0; flex-direction: row; align-items: center; gap: 12px; }
+      .main-inner { padding: 28px 20px 70px; }
+    }
+    @media (max-width: 560px) {
+      .prow { grid-template-columns: 1fr; gap: 9px; }
+      .pacts { justify-content: flex-start; }
+      .setrow { flex-direction: column; align-items: flex-start; gap: 10px; }
+      .brand .bs { display: none; }
+    }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .pulse { animation: none; } }
   </style>
 </head>
 <body>
-<div class="lang">
-  <button data-lang="en" type="button">EN</button>
-  <button data-lang="es" type="button">ES</button>
+<div class="shell">
+  <!-- ── SIDEBAR ── -->
+  <aside class="side">
+    <div class="brand">
+      <span class="die"><span>20</span></span>
+      <span class="bt"><span class="bn">Banana&nbsp;Roll</span><span class="bs" data-i18n="console">Control Panel</span></span>
+    </div>
+    <nav class="side-nav">
+      <span class="lab" data-i18n="nav_lab">Room</span>
+      <a href="#links" class="active" data-nav="links">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.8 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.8-1.7"/></svg>
+        <span data-i18n="nav_links">Overlay links</span>
+      </a>
+      <a href="#players" data-nav="players">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span data-i18n="nav_players">Players</span>
+      </a>
+      <a href="#settings" data-nav="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span data-i18n="nav_settings">Room settings</span>
+      </a>
+    </nav>
+    <div class="side-foot">
+      <div class="lang" role="group" aria-label="Language">
+        <button data-lang="en" type="button">EN</button>
+        <button data-lang="es" type="button">ES</button>
+      </div>
+      <div class="side-links">
+        <a href="/" title="Banana Roll site" aria-label="Site">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        </a>
+        <a href="https://github.com/ankorio/banana_roll" target="_blank" rel="noopener" title="GitHub" aria-label="GitHub">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.5-1.4-1.3-1.8-1.3-1.8-1.1-.7 0-.7 0-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .5Z"/></svg>
+        </a>
+        <a href="https://buymeacoffee.com/ankorio" target="_blank" rel="noopener" title="Buy me a coffee" aria-label="Buy me a coffee">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4Z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg>
+        </a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── MAIN ── -->
+  <main class="main">
+    <div class="main-inner">
+      <div class="topline">
+        <span class="eyebrow" data-i18n="eyebrow">Room control panel</span>
+        <span class="roomchip"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> <span data-i18n="room">Room</span> <b id="roomName">—</b></span>
+      </div>
+      <h1 class="page-h" data-i18n="h1">Your overlay is ready</h1>
+      <p class="page-sub" data-i18n="intro">Drop these sources into OBS and your table's rolls go live. Everything here is scoped to this one room.</p>
+
+      <div class="callout">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <p data-i18n="secret"><b>Keep these links private.</b> Anyone with a URL below can view or feed your overlay. Don't put them in your stream description or chat.</p>
+      </div>
+
+      <!-- ░░ OVERLAY LINKS ░░ -->
+      <section class="section" id="links">
+        <div class="section-head">
+          <span class="ix"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.8 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.8-1.7"/></svg></span>
+          <div><h2 data-i18n="s1_h">All-players overlay</h2><p class="desc" data-i18n="s1_desc">One source showing every player's rolls</p></div>
+        </div>
+        <div class="card">
+          <div class="field-label" data-i18n="s1_label">Overlay URL</div>
+          <div class="url">
+            <input id="overlayUrl" readonly />
+            <button class="btn btn-gold" id="copyBtn" data-copy="overlayUrl" data-i18n="copy">Copy</button>
+            <a class="btn btn-ghost" id="overlayOpen" href="#" target="_blank" rel="noopener" data-i18n="open">Open</a>
+          </div>
+          <p class="hintline" data-i18n="s1_note">In OBS: <span class="mono">Sources → + → Browser</span>, paste this URL, and set the size to your canvas (e.g. <span class="mono">1920 × 1080</span>). The background is transparent. Open it in a tab and press <span class="kbd">T</span> for a test roll.</p>
+        </div>
+      </section>
+
+      <!-- ░░ PLAYERS ░░ -->
+      <section class="section" id="players-sec">
+        <div class="section-head">
+          <span class="ix"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+          <div><h2 data-i18n="s2_h">Per-player overlays</h2><p class="desc" data-i18n="s2_desc">A separate source for each player — place them anywhere</p></div>
+        </div>
+        <div class="card">
+          <div id="players" class="roster"></div>
+          <div class="defaultrow">
+            <div class="dtxt">
+              <b data-i18n="default_h">Default dice style</b>
+              <p data-i18n="default_p">The look used for anyone without their own saved style.</p>
+            </div>
+            <a class="ibtn gold" id="defaultCustomize" href="#" target="_blank" rel="noopener">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21 8 14 2 9.4h7.6z"/></svg>
+              <span data-i18n="customize">Customize</span>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ░░ ROOM SETTINGS ░░ -->
+      <section class="section" id="settings">
+        <div class="section-head">
+          <span class="ix"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+          <div><h2 data-i18n="s3_h">Room settings</h2><p class="desc" data-i18n="s3_desc">Tune how rolls behave on this overlay</p></div>
+        </div>
+        <div class="card">
+          <div class="setrow">
+            <div class="st"><b data-i18n="set_dur_h">Result display time</b><p data-i18n="set_dur_p">How long the Arcane Plaque stays on screen after a roll.</p></div>
+            <div class="setctl rangewrap">
+              <input type="range" id="set_duration" min="2" max="10" step="0.5" value="4" />
+              <output id="set_duration_out">4.0s</output>
+            </div>
+          </div>
+          <div class="setrow">
+            <div class="st"><b data-i18n="set_sys_h">Game system</b><p data-i18n="set_sys_p">Sets the crit / fumble rules applied to incoming rolls.</p></div>
+            <div class="setctl">
+              <select class="inp" id="set_system">
+                <option value="dnd5e">D&amp;D 5e</option>
+                <option value="generic" data-i18n="set_sys_generic">Generic d20</option>
+              </select>
+            </div>
+          </div>
+          <div class="setrow">
+            <div class="st"><b data-i18n="set_conf_h">Critical celebration</b><p data-i18n="set_conf_p">Burst of confetti and a glow on natural 20s.</p></div>
+            <div class="setctl"><label class="switch"><input type="checkbox" id="set_confetti" checked /><span class="track"></span><span class="knob"></span></label></div>
+          </div>
+          <div class="setrow">
+            <div class="st"><b data-i18n="set_snd_h">Dice sounds</b><p data-i18n="set_snd_p">Play a tumble sound when the dice land.</p></div>
+            <div class="setctl"><label class="switch"><input type="checkbox" id="set_sound" /><span class="track"></span><span class="knob"></span></label></div>
+          </div>
+          <div class="setrow">
+            <div class="st"><b data-i18n="set_gm_h">Hide GM rolls</b><p data-i18n="set_gm_p">Keep the Game Master's rolls off the overlay.</p></div>
+            <div class="setctl"><label class="switch"><input type="checkbox" id="set_hidegm" checked /><span class="track"></span><span class="knob"></span></label></div>
+          </div>
+          <div class="savebar">
+            <button class="btn btn-gold" id="saveSettings" data-i18n="save">Save settings</button>
+            <span class="saved" id="settingsSaved"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-i18n="saved">Saved</span></span>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
 </div>
-<main>
-  <h1 data-i18n="h1">🎲 Your overlay is ready</h1>
-  <p class="note" data-i18n="intro">This is your room's control panel. The links below are secret:
-     anyone who has them can view your overlay or send rolls to it. Don't share them publicly.</p>
 
-  <h2 data-i18n="s1_h">1. All-players overlay</h2>
-  <p data-i18n="s1_p">In OBS, go to <strong>Sources → + → Browser</strong> and paste this URL. It shows every
-     player's rolls in a single source.</p>
-  <div class="url">
-    <input id="overlayUrl" readonly />
-    <button id="copyBtn" onclick="copyEl('overlayUrl', this)" data-i18n="copy">Copy</button>
-  </div>
-  <p class="note" data-i18n="s1_note">Set the width and height to match your canvas (for example 1920 × 1080). The background is transparent.
-     <a id="overlayOpen" href="#" target="_blank" data-i18n="s1_preview">Open the overlay in a tab</a> to preview it
-     (press <code>T</code> there to trigger a test roll).</p>
-
-  <h2 data-i18n="s2_h">2. Per-player overlays</h2>
-  <p data-i18n="s2_p">Add one Browser source per player if you want to place them independently. This list updates
-     as players come online in Roll20.</p>
-  <p class="note"><a id="defaultCustomize" href="#" target="_blank" data-i18n="default_dice">🎲 Customize the default dice style</a></p>
-  <div id="players"></div>
-</main>
 <script>
   const m = location.pathname.match(/\/room\/([^/]+)\//);
-  const room = m ? m[1] : '';
+  const room = m ? m[1] : 'demo';
   const origin = location.origin;
   const overlayUrl = `${origin}/room/${room}/overlay`;
   const playerUrl = (id) => `${origin}/room/${room}/overlay?player=${encodeURIComponent(id)}`;
   const customizeUrl = (id) => `${origin}/room/${room}/customize?player=${encodeURIComponent(id)}`;
   document.getElementById('overlayUrl').value = overlayUrl;
+  document.getElementById('overlayOpen').href = overlayUrl;
   document.getElementById('defaultCustomize').href = customizeUrl('default');
+  document.getElementById('roomName').textContent = room;
 
-  // ── i18n (EN/ES) ────────────────────────────────────────────────────────────
+  // ── i18n (EN/ES) ──────────────────────────────────────────────
   const I18N = {
     en: {
-      doc_title: 'Overlay Setup',
-      h1: '🎲 Your overlay is ready',
-      intro: "This is your room's control panel. The links below are secret: anyone who has them can view your overlay or send rolls to it. Don't share them publicly.",
-      s1_h: '1. All-players overlay',
-      s1_p: "In OBS, go to <strong>Sources → + → Browser</strong> and paste this URL. It shows every player's rolls in a single source.",
-      s1_note: 'Set the width and height to match your canvas (for example 1920 × 1080). The background is transparent. <a id="overlayOpen" href="#" target="_blank" data-i18n="s1_preview">Open the overlay in a tab</a> to preview it (press <code>T</code> there to trigger a test roll).',
-      s1_preview: 'Open the overlay in a tab',
-      s2_h: '2. Per-player overlays',
-      s2_p: 'Add one Browser source per player if you want to place them independently. This list updates as players come online in Roll20.',
-      empty: 'No players have been seen yet — open your Roll20 game and they will appear here.',
-      open: 'Open', copy: 'Copy', copied: 'Copied!', customize: "Customize this player's dice",
-      default_dice: '🎲 Customize the default dice style',
-      offline: ' (offline)',
+      doc_title: 'Room control panel — Banana Roll',
+      console: 'Control Panel', nav_lab: 'Room', nav_links: 'Overlay links', nav_players: 'Players', nav_settings: 'Room settings',
+      eyebrow: 'Room control panel', room: 'Room',
+      h1: 'Your overlay is ready',
+      intro: "Drop these sources into OBS and your table's rolls go live. Everything here is scoped to this one room.",
+      secret: "<b>Keep these links private.</b> Anyone with a URL below can view or feed your overlay. Don't put them in your stream description or chat.",
+      s1_h: 'All-players overlay', s1_desc: "One source showing every player's rolls", s1_label: 'Overlay URL',
+      s1_note: 'In OBS: <span class="mono">Sources → + → Browser</span>, paste this URL, and set the size to your canvas (e.g. <span class="mono">1920 × 1080</span>). The background is transparent. Open it in a tab and press <span class="kbd">T</span> for a test roll.',
+      s2_h: 'Per-player overlays', s2_desc: 'A separate source for each player — place them anywhere',
+      default_h: 'Default look', default_p: 'The dice + plaque used for anyone without their own saved style.',
+      s3_h: 'Room settings', s3_desc: 'Tune how rolls behave on this overlay',
+      set_dur_h: 'Result display time', set_dur_p: 'How long the Arcane Plaque stays on screen after a roll.',
+      set_sys_h: 'Game system', set_sys_p: 'Sets the crit / fumble rules applied to incoming rolls.', set_sys_generic: 'Generic d20',
+      set_conf_h: 'Critical celebration', set_conf_p: 'Burst of confetti and a glow on natural 20s.',
+      set_snd_h: 'Dice sounds', set_snd_p: 'Play a tumble sound when the dice land.',
+      set_gm_h: 'Hide GM rolls', set_gm_p: "Keep the Game Master's rolls off the overlay.",
+      empty: "No players yet — open your Roll20 game and they'll appear here.",
+      open: 'Open', copy: 'Copy', copied: 'Copied!', customize: 'Customize', save: 'Save settings', saved: 'Saved',
+      online: 'Online', offline: 'Offline',
     },
     es: {
-      doc_title: 'Configuración del overlay',
-      h1: '🎲 Tu overlay está listo',
-      intro: 'Este es el panel de control de tu sala. Los enlaces de abajo son secretos: cualquiera que los tenga puede ver tu overlay o enviarle tiradas. No los compartas en público.',
-      s1_h: '1. Overlay de todos los jugadores',
-      s1_p: 'En OBS, ve a <strong>Fuentes → + → Navegador</strong> y pega esta URL. Muestra las tiradas de toda la mesa en una sola fuente.',
-      s1_note: 'Ajusta el ancho y el alto para que coincidan con tu lienzo (por ejemplo 1920 × 1080). El fondo es transparente. <a id="overlayOpen" href="#" target="_blank" data-i18n="s1_preview">Abre el overlay en una pestaña</a> para previsualizarlo (pulsa <code>T</code> allí para lanzar una tirada de prueba).',
-      s1_preview: 'Abre el overlay en una pestaña',
-      s2_h: '2. Overlays por jugador',
-      s2_p: 'Añade una fuente de Navegador por jugador si quieres colocarlas por separado. Esta lista se actualiza conforme la gente va entrando en tu partida de Roll20.',
-      empty: 'Todavía no aparece ningún jugador: abre tu partida de Roll20 y se listarán aquí.',
-      open: 'Abrir', copy: 'Copiar', copied: '¡Copiado!', customize: 'Personalizar los dados de este jugador',
-      default_dice: '🎲 Personalizar el estilo de dados por defecto',
-      offline: ' (desconectado)',
+      doc_title: 'Panel de control de sala — Banana Roll',
+      console: 'Panel', nav_lab: 'Sala', nav_links: 'Enlaces del overlay', nav_players: 'Jugadores', nav_settings: 'Ajustes de sala',
+      eyebrow: 'Panel de control de sala', room: 'Sala',
+      h1: 'Tu overlay está listo',
+      intro: 'Pon estas fuentes en OBS y las tiradas de tu mesa salen en directo. Todo aquí pertenece solo a esta sala.',
+      secret: '<b>Mantén estos enlaces en privado.</b> Cualquiera con una URL de abajo puede ver o alimentar tu overlay. No los pongas en la descripción de tu stream ni en el chat.',
+      s1_h: 'Overlay de todos', s1_desc: 'Una fuente con las tiradas de todos los jugadores', s1_label: 'URL del overlay',
+      s1_note: 'En OBS: <span class="mono">Fuentes → + → Navegador</span>, pega esta URL y ajusta el tamaño a tu lienzo (p. ej. <span class="mono">1920 × 1080</span>). El fondo es transparente. Ábrela en una pestaña y pulsa <span class="kbd">T</span> para una tirada de prueba.',
+      s2_h: 'Overlays por jugador', s2_desc: 'Una fuente separada para cada jugador — colócalas donde quieras',
+      default_h: 'Aspecto por defecto', default_p: 'Los dados + placa que se usan para quien no tenga su propio estilo guardado.',
+      s3_h: 'Ajustes de sala', s3_desc: 'Ajusta cómo se comportan las tiradas en el overlay',
+      set_dur_h: 'Tiempo en pantalla', set_dur_p: 'Cuánto se queda la Placa Arcana tras una tirada.',
+      set_sys_h: 'Sistema de juego', set_sys_p: 'Define las reglas de crítico / pifia para las tiradas.', set_sys_generic: 'd20 genérico',
+      set_conf_h: 'Celebración de crítico', set_conf_p: 'Lluvia de confeti y un brillo en los 20 naturales.',
+      set_snd_h: 'Sonidos de dados', set_snd_p: 'Reproduce un sonido cuando los dados caen.',
+      set_gm_h: 'Ocultar tiradas del DM', set_gm_p: 'Mantén las tiradas del Director de Juego fuera del overlay.',
+      empty: 'Aún no hay jugadores — abre tu partida de Roll20 y aparecerán aquí.',
+      open: 'Abrir', copy: 'Copiar', copied: '¡Copiado!', customize: 'Personalizar', save: 'Guardar ajustes', saved: 'Guardado',
+      online: 'En línea', offline: 'Desconectado',
     },
   };
-
   function detectLang() {
     const saved = localStorage.getItem('ovr_lang');
     if (saved === 'en' || saved === 'es') return saved;
@@ -112,17 +446,19 @@
   let lang = detectLang();
   function dict() { return I18N[lang] || I18N.en; }
 
-  let players = []; // last roster fetched from the relay
+  let players = [];
 
   function copyText(text, btn) {
-    try { navigator.clipboard.writeText(text); } catch {}
-    if (btn) { btn.textContent = dict().copied; setTimeout(() => { btn.textContent = dict().copy; }, 1200); }
+    try { navigator.clipboard.writeText(text); } catch (e) {}
+    if (btn) {
+      const old = btn.dataset.label || btn.textContent;
+      btn.dataset.label = btn.dataset.i18n ? null : old;
+      btn.textContent = dict().copied;
+      setTimeout(() => { btn.textContent = dict().copy; }, 1200);
+    }
   }
-  function copyEl(id, btn) {
-    const el = document.getElementById(id);
-    el.select();
-    try { document.execCommand('copy'); } catch {}
-    copyText(el.value, btn);
+  function svgIcon(paths) {
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + paths + '</svg>';
   }
 
   function renderPlayers() {
@@ -130,40 +466,39 @@
     wrap.textContent = '';
     if (!players.length) {
       const e = document.createElement('div');
-      e.className = 'empty'; e.textContent = dict().empty;
-      wrap.appendChild(e);
+      e.className = 'empty';
+      const d = document.createElement('div'); d.className = 'ed pulse';
+      d.innerHTML = svgIcon('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>');
+      const p = document.createElement('p'); p.textContent = dict().empty;
+      e.append(d, p); wrap.appendChild(e);
       return;
     }
     for (const p of players) {
       const url = playerUrl(p.id);
-      const row = document.createElement('div');
-      row.className = 'prow';
+      const row = document.createElement('div'); row.className = 'prow';
 
-      const dot = document.createElement('span');
-      dot.className = 'pdot';
-      dot.style.background = p.color || '#888';
-      dot.style.opacity = p.online ? '1' : '.4';
+      const who = document.createElement('div'); who.className = 'pwho';
+      const dot = document.createElement('span'); dot.className = 'pdot';
+      dot.style.background = p.color || '#888'; dot.style.opacity = p.online ? '1' : '.4';
+      const nb = document.createElement('div'); nb.style.minWidth = '0';
+      const name = document.createElement('div'); name.className = 'pname'; name.textContent = p.name; name.title = p.name;
+      const st = document.createElement('div'); st.className = 'pstatus'; st.textContent = p.online ? dict().online : dict().offline;
+      nb.append(name, st);
+      who.append(dot, nb);
 
-      const name = document.createElement('span');
-      name.className = 'pname';
-      name.textContent = p.name;
-      name.title = p.name + (p.online ? '' : dict().offline);
+      const input = document.createElement('input'); input.className = 'purl'; input.readOnly = true; input.value = url;
 
-      const input = document.createElement('input');
-      input.readOnly = true; input.value = url;
+      const acts = document.createElement('div'); acts.className = 'pacts';
+      const copyBtn = document.createElement('button'); copyBtn.className = 'ibtn';
+      copyBtn.innerHTML = svgIcon('<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>') + '<span>' + dict().copy + '</span>';
+      copyBtn.onclick = () => { input.select(); copyText(url, copyBtn.querySelector('span')); };
+      const open = document.createElement('a'); open.className = 'ibtn'; open.href = url; open.target = '_blank'; open.rel = 'noopener';
+      open.innerHTML = svgIcon('<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>') + '<span>' + dict().open + '</span>';
+      const custom = document.createElement('a'); custom.className = 'ibtn gold'; custom.href = customizeUrl(p.id); custom.target = '_blank'; custom.rel = 'noopener'; custom.title = dict().customize;
+      custom.innerHTML = svgIcon('<path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21 8 14 2 9.4h7.6z"/>');
+      acts.append(copyBtn, open, custom);
 
-      const copyBtn = document.createElement('button');
-      copyBtn.textContent = dict().copy;
-      copyBtn.onclick = () => { input.select(); copyText(url, copyBtn); };
-
-      const open = document.createElement('a');
-      open.className = 'open'; open.href = url; open.target = '_blank'; open.textContent = dict().open;
-
-      const custom = document.createElement('a');
-      custom.className = 'open'; custom.href = customizeUrl(p.id); custom.target = '_blank';
-      custom.title = dict().customize; custom.textContent = '🎲';
-
-      row.append(dot, name, input, copyBtn, open, custom);
+      row.append(who, input, acts);
       wrap.appendChild(row);
     }
   }
@@ -176,17 +511,69 @@
       const v = d[el.getAttribute('data-i18n')];
       if (v != null) el.innerHTML = v;
     });
-    const open = document.getElementById('overlayOpen');
-    if (open) open.href = overlayUrl;
     document.querySelectorAll('[data-lang]').forEach((b) =>
       b.setAttribute('aria-pressed', String(b.dataset.lang === lang)));
-    renderPlayers(); // re-render rows so button/labels follow the language
+    renderPlayers();
   }
-  function setLang(l) { lang = l; try { localStorage.setItem('ovr_lang', l); } catch {} applyLang(); }
+  function setLang(l) { lang = l; try { localStorage.setItem('ovr_lang', l); } catch (e) {} applyLang(); }
   document.querySelectorAll('[data-lang]').forEach((b) =>
     b.addEventListener('click', () => setLang(b.dataset.lang)));
 
-  // Poll the relay for the roster the userscript pushes; refresh the list live.
+  // copy buttons (static)
+  document.querySelectorAll('button[data-copy]').forEach((b) => {
+    b.addEventListener('click', () => {
+      const el = document.getElementById(b.dataset.copy);
+      el.select();
+      try { document.execCommand('copy'); } catch (e) {}
+      copyText(el.value, b);
+    });
+  });
+
+  // ── room settings ──
+  const durEl = document.getElementById('set_duration');
+  const durOut = document.getElementById('set_duration_out');
+  function syncDur() {
+    durOut.textContent = parseFloat(durEl.value).toFixed(1) + 's';
+    const pct = ((durEl.value - durEl.min) / (durEl.max - durEl.min)) * 100;
+    durEl.style.setProperty('--fill', pct + '%');
+  }
+  durEl.addEventListener('input', syncDur); syncDur();
+
+  function readSettings() {
+    return {
+      displaySeconds: parseFloat(durEl.value),
+      system: document.getElementById('set_system').value,
+      confetti: document.getElementById('set_confetti').checked,
+      sound: document.getElementById('set_sound').checked,
+      hideGm: document.getElementById('set_hidegm').checked,
+    };
+  }
+  function seedSettings(s) {
+    if (!s) return;
+    if (s.displaySeconds != null) { durEl.value = s.displaySeconds; syncDur(); }
+    if (s.system) document.getElementById('set_system').value = s.system;
+    if (s.confetti != null) document.getElementById('set_confetti').checked = !!s.confetti;
+    if (s.sound != null) document.getElementById('set_sound').checked = !!s.sound;
+    if (s.hideGm != null) document.getElementById('set_hidegm').checked = !!s.hideGm;
+  }
+  document.getElementById('saveSettings').addEventListener('click', async () => {
+    const flash = () => { const s = document.getElementById('settingsSaved'); s.classList.add('show'); setTimeout(() => s.classList.remove('show'), 1500); };
+    try {
+      await fetch(`/room/${room}/settings`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings: readSettings() }),
+      });
+      flash();
+    } catch (e) { flash(); }
+  });
+  async function loadSettings() {
+    try {
+      const r = await fetch(`/room/${room}/settings`);
+      if (r.ok) { const d = await r.json(); seedSettings(d.settings || d); }
+    } catch (e) {}
+  }
+
+  // ── poll roster ──
   async function fetchPlayers() {
     try {
       const res = await fetch(`/room/${room}/players`);
@@ -194,11 +581,24 @@
       const data = await res.json();
       const next = Array.isArray(data.players) ? data.players : [];
       if (JSON.stringify(next) !== JSON.stringify(players)) { players = next; renderPlayers(); }
-    } catch {}
+    } catch (e) {}
   }
+
+  // ── scrollspy for sidebar ──
+  const navMap = { links: 'links', 'players-sec': 'players', settings: 'settings' };
+  const spy = new IntersectionObserver((entries) => {
+    entries.forEach((en) => {
+      if (en.isIntersecting) {
+        const key = navMap[en.target.id];
+        document.querySelectorAll('.side-nav a').forEach((a) => a.classList.toggle('active', a.dataset.nav === key));
+      }
+    });
+  }, { rootMargin: '-30% 0px -60% 0px' });
+  ['links', 'players-sec', 'settings'].forEach((id) => { const el = document.getElementById(id); if (el) spy.observe(el); });
 
   applyLang();
   fetchPlayers();
+  loadSettings();
   setInterval(fetchPlayers, 4000);
 </script>
 </body>
