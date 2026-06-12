@@ -43,7 +43,7 @@
     {
       id: 'arcane',
       name: 'Arcane Plaque',
-      art: '/assets/plaques/arcane-frame.png',
+      art: '/assets/plaque_templates/arcane-plaque.png',
       colors:   { accent: '#ffd24a', badge: '#2e7d32', name: '#e6c87f' },
       editable: { accent: true, badge: true, name: false },
       zones: zonesArcane(),

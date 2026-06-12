@@ -79,7 +79,7 @@
     st.zones.forEach((z) => {
       const el = $(`.zone[data-id="${z.id}"]`); if (!el) return;
       el.style.left = z.cx + '%'; el.style.top = z.cy + '%';
-      if (z.kind === 'image') { el.style.width = z.w + '%'; el.style.height = z.w + '%'; }
+      if (z.kind === 'image') { el.style.width = z.w + '%'; el.style.height = ''; } /* height from aspect-ratio:1 → perfect circle */
       else if (z.kind === 'pill') { el.style.width = 'auto'; }
       else { el.style.width = z.w + '%'; }
       el.style.display = z.visible ? '' : 'none';
@@ -473,8 +473,8 @@
     // dice roll is a visual flourish layered on top; never let it block the plaque
     if (BR.playRoll && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
       setMode('plaque');
-      plaqueEl.classList.add('dimmed'); $('#diceLayer').classList.add('on');
-      const restore = () => { $('#diceLayer').classList.remove('on'); plaqueEl.classList.remove('dimmed'); };
+      $('#diceLayer').classList.add('on'); // dice roll over the plaque — no dimming overlay
+      const restore = () => { $('#diceLayer').classList.remove('on'); };
       const timeout = new Promise((r) => setTimeout(r, 2600));
       Promise.race([Promise.resolve(BR.playRoll(trg.die)).catch(() => {}), timeout]).then(restore);
     }
@@ -490,12 +490,17 @@
     const reader = new FileReader();
     reader.onload = () => {
       const img = $('#cropImg'); img.onload = () => {
-        const frame = $('#cropFrame').getBoundingClientRect();
-        const s0 = Math.max(frame.width / img.naturalWidth, frame.height / img.naturalHeight);
-        crop = { x: 0, y: 0, s: s0, s0, nat: { w: img.naturalWidth, h: img.naturalHeight }, frameW: frame.width, frameH: frame.height };
-        applyCropTransform();
-        const z = $('#cropZoom'); z.value = 1; setFill(z);
+        // Show the modal FIRST, then measure the crop frame on the next frame — while
+        // the modal is display:none its frame has zero size, which scaled the image to
+        // nothing (image never appeared).
         $('#cropModal').classList.add('show');
+        requestAnimationFrame(() => {
+          const frame = $('#cropFrame').getBoundingClientRect();
+          const s0 = Math.max(frame.width / img.naturalWidth, frame.height / img.naturalHeight) || 1;
+          crop = { x: 0, y: 0, s: s0, s0, nat: { w: img.naturalWidth, h: img.naturalHeight }, frameW: frame.width, frameH: frame.height };
+          applyCropTransform();
+          const z = $('#cropZoom'); z.value = 1; setFill(z);
+        });
       };
       img.src = reader.result;
     };
