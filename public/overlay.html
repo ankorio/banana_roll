@@ -21,8 +21,10 @@
     /* 3D dice canvas fills the screen; the plaque result sits on top. */
     #dice { position: fixed; inset: 0; z-index: 1; }
     #dice canvas { width: 100% !important; height: 100% !important; }
+    /* Centered row of result plaques. New rolls insert at the end and the row stays
+       centered; --plaque-h (set per-frame by relayout) shrinks them all to fit. */
     #stage { position: fixed; inset: 0; z-index: 2; display: flex;
-      align-items: center; justify-content: center; pointer-events: none; }
+      align-items: center; justify-content: center; gap: 1.6vw; pointer-events: none; }
 
     /* ── Result plaque ───────────────────────────────────────────────────────────
        The plaque content (art/background + zones) is rendered from the player's saved
@@ -30,14 +32,21 @@
        Only the framing, entrance animation, and whole-plaque crit/fumble glow live here. */
     .plaque {
       position: relative;
-      height: min(80vh, 560px);
+      flex: 0 0 auto;
+      height: var(--plaque-h, min(80vh, 560px));
       aspect-ratio: 398 / 440;
       container-type: inline-size;
       filter: drop-shadow(0 12px 40px rgba(0, 0, 0, 0.55));
       transform: translateY(34px) scale(0.95); opacity: 0;
-      transition: transform 0.4s cubic-bezier(.2,.9,.25,1.2), opacity 0.4s ease;
+      /* transform+opacity drive both the entrance AND the FLIP reflow (JS slides each
+         plaque from its old box to the new one). Height snaps instantly so it doesn't
+         fight the FLIP measurement. */
+      transition: transform 0.42s cubic-bezier(.2,.9,.25,1.2), opacity 0.4s ease;
     }
     .plaque.show { transform: translateY(0) scale(1); opacity: 1; }
+    /* Exit: lift away + shrink + fade. The plaque is pulled from flow (position:fixed) by
+       dismissCard() so the remaining plaques slide in underneath at the same time. */
+    .plaque.leaving { transform: translateY(-26px) scale(0.8); opacity: 0; pointer-events: none; }
     .plaque.crit {
       filter: drop-shadow(0 0 7cqw rgba(255, 190, 0, 0.6)) drop-shadow(0 12px 40px rgba(0, 0, 0, 0.5));
     }
@@ -97,7 +106,7 @@
   // Fallback = our own fork's built artifact, served from a pinned git tag via jsdelivr /gh
   // (upstream @3d-dice is unmaintained). Its dist externalizes three → resolved by the
   // import map above; assetPath below uses the fork's vendored public/ textures.
-  const CDN = 'https://cdn.jsdelivr.net/gh/ankorio/dice-box-threejs@v0.1.0';
+  const CDN = 'https://cdn.jsdelivr.net/gh/ankorio/dice-box-threejs@v0.1.2';
   const SUPPORTED_SIDES = new Set([4, 6, 8, 10, 12, 20, 100]);
 
   const params = new URLSearchParams(location.search);
@@ -218,13 +227,14 @@
     };
   }
 
-  // ── per-style texture cache ──────────────────────────────────────────────────
-  // Resolving a style runs the engine's loadTheme → ImageLoader (loads the texture
-  // image) and produces a `colorData` object holding the loaded texture. We cache
-  // that colorData per distinct style so repeat rolls just re-apply it (no reload),
-  // and the overlay pre-warms every known player's style on connect. A style change
-  // yields a new key → it's re-resolved (re-cached) the next time it's needed.
-  const styleCache = new Map();        // styleKey -> resolved colorData
+  // ── per-style colorData cache ────────────────────────────────────────────────
+  // Resolving a style runs the engine's ImageLoader (loads the texture image) and
+  // produces a `colorData` object. With concurrent rolls each die group carries its
+  // OWN colorData (so different players' dice keep distinct looks at the same time),
+  // so we resolve once per distinct style and cache it — repeat rolls reuse it, and
+  // the overlay pre-warms every known player's style on connect. The engine no longer
+  // needs a global "current theme"; colorData is passed straight to Box.rollGroup.
+  const colorCache = new Map();        // styleKey -> resolved colorData (or a pending Promise)
   const STYLE_CACHE_MAX = 64;
   function styleKey(style) {
     const s = style || {};
@@ -232,38 +242,27 @@
       s.foreground || '', s.background || '', s.edge || '']);
   }
 
-  // Serialize everything that touches the engine (warming vs. rolling) so their
-  // async steps never interleave on the single shared DiceBox/DiceFactory.
-  let engineLock = Promise.resolve();
-  function withEngine(fn) {
-    const p = engineLock.then(fn, fn);
-    engineLock = p.catch(() => {});
-    return p;
+  // Map a per-player style to the engine's theme shape ({ colorset | customColorset,
+  // texture, material }) via the existing styleToConfig().
+  function themeFromStyle(style) {
+    const c = styleToConfig(style);
+    if (c.theme_customColorset) return { customColorset: c.theme_customColorset, texture: c.theme_texture, material: c.theme_material };
+    return { colorset: c.theme_colorset, texture: c.theme_texture, material: c.theme_material };
   }
 
-  // Resolve+cache a style if needed, then make the dice use it. Fast path: a cache
-  // hit just re-applies the stored colorData (no network, no engine re-resolve).
-  function applyStyle(style) {
-    return withEngine(async () => {
-      if (!Box) return;
-      const key = styleKey(style);
-      const cached = styleCache.get(key);
-      if (cached) {
-        try { Box.DiceFactory.applyColorSet(cached); Box.colorData = cached; }
-        catch (e) { console.warn('[overlay] applyColorSet failed', e); }
-        return;
-      }
-      // Miss: resolve via the engine (clear its name-keyed memo first so the texture
-      // actually re-resolves), then capture and cache the loaded colorData.
-      try { if (Box.DiceColors) Box.DiceColors.colorsets = {}; } catch {}
-      try {
-        await Box.updateConfig(styleToConfig(style));
-        if (Box.colorData) {
-          styleCache.set(key, Box.colorData);
-          while (styleCache.size > STYLE_CACHE_MAX) styleCache.delete(styleCache.keys().next().value);
-        }
-      } catch (e) { console.warn('[overlay] style resolve failed', e); }
-    });
+  // Resolve (and cache) a style's colorData. Returns a Promise; concurrent callers
+  // for the same style share the in-flight resolve. Fast path: a cache hit resolves
+  // instantly with the stored colorData (no network, no re-resolve).
+  function resolveStyle(style) {
+    if (!Box) return Promise.resolve(null);
+    const key = styleKey(style);
+    const hit = colorCache.get(key);
+    if (hit) return Promise.resolve(hit).then((cd) => { colorCache.set(key, cd); return cd; });
+    const p = Box.resolveColorData(themeFromStyle(style))
+      .then((cd) => { colorCache.set(key, cd); while (colorCache.size > STYLE_CACHE_MAX) colorCache.delete(colorCache.keys().next().value); return cd; })
+      .catch((e) => { console.warn('[overlay] style resolve failed', e); colorCache.delete(key); return null; });
+    colorCache.set(key, p);
+    return p;
   }
 
   // Pre-load (and re-load on change) every known player's dice textures so the first
@@ -280,8 +279,8 @@
       const d = JSON.parse(txt);
       const styles = [d.defaultStyle, ...Object.values(d.styles || {})].filter(Boolean);
       const keep = new Set([styleKey(null), ...styles.map(styleKey)]);
-      for (const k of [...styleCache.keys()]) if (!keep.has(k)) styleCache.delete(k); // drop updated/removed
-      for (const s of styles) if (!styleCache.has(styleKey(s))) await applyStyle(s);   // warm new ones
+      for (const k of [...colorCache.keys()]) if (!keep.has(k)) colorCache.delete(k); // drop updated/removed
+      for (const s of styles) if (!colorCache.has(styleKey(s))) await resolveStyle(s);  // warm new ones
     } catch {}
   }
 
@@ -494,40 +493,159 @@
     }
   }
 
-  // ── one-at-a-time roll queue ──────────────────────────────────────────────────
-  const queue = [];
-  let busy = false;
-  function enqueue(roll) { queue.push(roll); if (!busy) drain(); }
+  // ── async roll tracks ─────────────────────────────────────────────────────────
+  // Each roll runs its OWN lifecycle (keyed by the roll's id, so one player can have
+  // two things rolling at once): dice spawn into the shared box from that player's
+  // fixed edge, a plaque appears in the centered row, and after its own timer the
+  // plaque fades and that die group is removed — all independent of other rolls.
+  // Up to MAX_VISIBLE plaques share the screen (scaled to fit); extra rolls wait in
+  // `pending` and slot in as space frees.
+  const MAX_VISIBLE = 5;
+  const tracks = new Map();   // roll.id -> { roll, card, timer }
+  const pending = [];         // overflow rolls waiting for a free slot
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-  async function drain() {
-    busy = true;
-    while (queue.length) {
-      const roll = queue.shift();
-      const plan = rollPlan(roll);
-      try {
-        if (Box && plan.notation) {
-          // Re-theme to the rolling player's style (cached → no texture reload).
-          await applyStyle(roll.style);
-          Box.clearDice();
-          await withTimeout(Box.roll(plan.notation), CONFIG.settleTimeoutMs);
-        }
-      } catch (e) { console.warn('[overlay] dice roll failed', e); }
-      const card = showCard(roll, plan);
-      fireParticles(roll);
-      await sleep(displayMs());
-      card.classList.remove('show');
-      await sleep(420);
-      card.remove();
-      if (Box) { try { Box.clearDice(); } catch {} }
+  // Stable entry edge per player (seeded by playerid → same edge across reloads).
+  const SIDES = ['left', 'right', 'top', 'bottom'];
+  function sideFor(playerid) { return SIDES[hueFor(playerid || '') % SIDES.length]; }
+
+  function rollId(roll) { return roll && roll.id ? String(roll.id) : ('r' + Date.now() + '_' + Math.random().toString(36).slice(2, 7)); }
+
+  // Size every visible plaque so the whole centered row fits the viewport width,
+  // capped at the single-plaque base height. cqw units inside the plaque scale with
+  // its width, so shrinking the height (→ width via aspect-ratio) scales all content.
+  const PLAQUE_ASPECT = 398 / 440;
+  function relayout() {
+    // Cards animating out (.leaving) are pulled from flow → exclude them so the rest
+    // size and position as if the leaving plaque is already gone.
+    const cards = [...stage.children].filter((el) => !el.classList.contains('leaving'));
+    const n = cards.length;
+    if (!n) return;
+    const base = Math.min(window.innerHeight * 0.8, 560);
+    const gap = window.innerWidth * 0.016;
+    const avail = window.innerWidth * 0.96;
+    const hByWidth = (avail - (n - 1) * gap) / n / PLAQUE_ASPECT;
+    const h = Math.max(0, Math.min(base, hByWidth));
+    const targetW = h * PLAQUE_ASPECT;
+    stage.style.setProperty('--plaque-h', h + 'px');
+    // Size zone fonts from the TARGET width so text is crisp the instant the row reflows.
+    for (const el of cards) if (el._zones) sizeFonts(el, el._zones, targetW);
+  }
+  function sizeFonts(el, zones, plaqueW) {
+    for (const z of zones) {
+      if (z.kind === 'image') continue;
+      const zc = el.querySelector('.zone[data-id="' + z.id + '"] .zc');
+      if (zc) zc.style.fontSize = (plaqueW * z.coef * z.fs) + 'px';
     }
-    busy = false;
-    // Demo mode: tell the embedding landing page the queue drained so it can pace
-    // the next auto-play roll without the queue piling up.
-    if (DEMO) { try { parent.postMessage({ type: 'demo-idle' }, location.origin); } catch {} }
+  }
+  window.addEventListener('resize', relayout);
+
+  // FLIP helpers: record where the shown plaques are (FIRST), and after a layout change
+  // animate each from its old box to its new one (INVERT + PLAY) so the row slides
+  // smoothly instead of snapping.
+  function captureRects(exclude) {
+    const m = new Map();
+    for (const el of stage.children) {
+      if (el === exclude || el.classList.contains('leaving') || !el.classList.contains('show')) continue;
+      m.set(el, el.getBoundingClientRect());
+    }
+    return m;
+  }
+  function playFlip(firsts) {
+    for (const el of stage.children) {
+      const first = firsts.get(el);
+      if (!first) continue;
+      const last = el.getBoundingClientRect();
+      const dx = first.left - last.left, dy = first.top - last.top;
+      const ds = last.width ? first.width / last.width : 1;
+      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5 && Math.abs(ds - 1) < 0.01) continue;
+      el.style.transition = 'none';                                   // INVERT to the old box
+      el.style.transform = `translate(${dx}px, ${dy}px) scale(${ds})`;
+      requestAnimationFrame(() => { el.style.transition = ''; el.style.transform = ''; }); // PLAY
+    }
+  }
+  // Insert: a brand-new card (not in the "first" set) is skipped → it plays its own entrance.
+  function reflowAround(mutate) {
+    const firsts = captureRects(null);
+    mutate();
+    relayout();
+    playFlip(firsts);
+  }
+  // Dismiss: the leaving plaque is pulled out of flow and animates away (it lifts, shrinks
+  // and fades) while the remaining plaques immediately slide in to fill the gap.
+  function dismissCard(card) {
+    const firsts = captureRects(card);          // the OTHER plaques, at their current spots
+    const r = card.getBoundingClientRect();
+    card.style.position = 'fixed';              // pull it from flow so siblings reflow now
+    card.style.left = r.left + 'px'; card.style.top = r.top + 'px';
+    card.style.width = r.width + 'px'; card.style.height = r.height + 'px';
+    card.style.margin = '0';
+    card.classList.add('leaving');              // exit movement (CSS)
+    card.classList.remove('show');
+    relayout();                                 // remaining cards take the freed space…
+    playFlip(firsts);                           // …and slide there smoothly
+    sleep(480).then(() => card.remove());
   }
 
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  const withTimeout = (p, ms) => Promise.race([Promise.resolve(p), sleep(ms)]);
+  function startRoll(roll) {
+    const id = rollId(roll);
+    const plan = rollPlan(roll);
+    // Reserve the track now — it occupies a slot while the dice tumble. The plaque is
+    // revealed only when this group SETTLES (or after a safety timeout if physics hangs),
+    // so the result lands with the dice instead of before them.
+    const tr = { roll, plan, card: null, timer: null };
+    tracks.set(id, tr);
+    if (Box && plan.notation) {
+      resolveStyle(roll.style)
+        .then((colorData) => Promise.race([
+          Box.rollGroup({ groupId: id, notation: plan.notation, colorData, side: sideFor(roll.playerid) }),
+          sleep(CONFIG.settleTimeoutMs),
+        ]))
+        .catch((e) => console.warn('[overlay] dice roll failed', e))
+        .finally(() => revealCard(id));
+    } else {
+      revealCard(id);   // no 3D dice → show the plaque right away
+    }
+  }
+
+  // Reveal a reserved track's plaque (on dice settle); slide siblings aside; start timer.
+  function revealCard(id) {
+    const tr = tracks.get(id);
+    if (!tr || tr.card) return;          // ended early, or already revealed
+    let card;
+    reflowAround(() => { card = showCard(tr.roll, tr.plan); });
+    tr.card = card;
+    fireParticles(tr.roll);
+    tr.timer = setTimeout(() => endTrack(id), displayMs());
+  }
+
+  function endTrack(id) {
+    const tr = tracks.get(id);
+    if (!tr) return;
+    tracks.delete(id);
+    if (tr.timer) clearTimeout(tr.timer);
+    if (Box) { try { Box.removeGroup(id); } catch {} } // pull the dice as the plaque leaves
+    if (tr.card) dismissCard(tr.card);                 // leaving plaque animates out; row slides in
+    pumpQueue();
+  }
+
+  function pumpQueue() {
+    if (pending.length && tracks.size < MAX_VISIBLE) startRoll(pending.shift());
+    else maybeDemoIdle();
+  }
+
+  function maybeDemoIdle() {
+    if (DEMO && !tracks.size && !pending.length) {
+      try { parent.postMessage({ type: 'demo-idle' }, location.origin); } catch {}
+    }
+  }
+
+  function enqueue(roll) {
+    const id = rollId(roll);
+    if (tracks.has(id)) return;                       // de-dup (e.g. SSE replay of retained roll)
+    if (tracks.size >= MAX_VISIBLE) { pending.push(roll); return; }
+    startRoll(roll);
+  }
 
   // ── SSE ───────────────────────────────────────────────────────────────────────
   function connect() {
@@ -555,11 +673,7 @@
     loadTemplates(); loadPlaques(); loadSettings();
     setInterval(() => { loadPlaques(); loadSettings(); }, 15000);
   }
-  // Keep zone fonts sized to the plaque if the OBS source / window is resized mid-display.
-  window.addEventListener('resize', () => {
-    const el = stage.querySelector('.plaque');
-    if (el && el._zones && window.BRPlaque) BRPlaque.recomputeFont(el, el._zones);
-  });
+  // (Zone fonts + plaque sizing on resize are handled by relayout(), registered above.)
 
   if (DEMO) {
     // Embedded on the landing page: no room/SSE. The parent page sends rolls via

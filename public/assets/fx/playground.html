@@ -135,7 +135,7 @@
     let Box = null, rolling = false;
     (async () => {
       const LOCAL = '/assets/dice-box/dice-box.bundle.js';
-      const CDN = 'https://cdn.jsdelivr.net/gh/ankorio/dice-box-threejs@v0.1.0'; // our fork via jsdelivr /gh
+      const CDN = 'https://cdn.jsdelivr.net/gh/ankorio/dice-box-threejs@v0.1.2'; // our fork via jsdelivr /gh
       try {
         let usedCdn = false, mod;
         try { mod = await import(LOCAL); } catch { usedCdn = true; mod = await import(`${CDN}/dist/dice-box-threejs.es.js`); }

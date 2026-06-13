@@ -4247,24 +4247,23 @@ var Jn = { type: "postStep" }, Yn = { type: "preStep" }, K = {
 		this.colordata = e, this.label_color = e.foreground, this.dice_color = e.background, this.label_outline = e.outline, this.dice_texture = e.texture, this.dice_material = e?.texture?.material || "none", this.edge_color = e.hasOwnProperty("edge") ? e.edge : e.background;
 	}
 	setMaterialInfo(e = "") {
-		let t = this.colordata, n = this.dice_texture, r = this.dice_material;
-		if (this.dice_color_rand = "", this.label_color_rand = "", this.label_outline_rand = "", this.dice_texture_rand = "", this.dice_material_rand = "", this.edge_color_rand = "", Array.isArray(this.dice_color)) {
-			var i = Math.floor(Math.random() * this.dice_color.length);
-			Array.isArray(this.label_color) && this.label_color.length == this.dice_color.length && (this.label_color_rand = this.label_color[i], Array.isArray(this.label_outline) && this.label_outline.length == this.label_color.length && (this.label_outline_rand = this.label_outline[i])), Array.isArray(this.dice_texture) && this.dice_texture.length == this.dice_color.length && (this.dice_texture_rand = this.dice_texture[i], this.dice_material_rand = this.dice_texture_rand.material), Array.isArray(this.edge_color) && this.edge_color.length == this.dice_color.length && (this.edge_color_rand = this.edge_color[i]), this.dice_color_rand = this.dice_color[i];
+		if (this.colordata, this.dice_texture, this.dice_material, this.dice_color_rand = "", this.label_color_rand = "", this.label_outline_rand = "", this.dice_texture_rand = "", this.dice_material_rand = "", this.edge_color_rand = "", Array.isArray(this.dice_color)) {
+			var t = Math.floor(Math.random() * this.dice_color.length);
+			Array.isArray(this.label_color) && this.label_color.length == this.dice_color.length && (this.label_color_rand = this.label_color[t], Array.isArray(this.label_outline) && this.label_outline.length == this.label_color.length && (this.label_outline_rand = this.label_outline[t])), Array.isArray(this.dice_texture) && this.dice_texture.length == this.dice_color.length && (this.dice_texture_rand = this.dice_texture[t], this.dice_material_rand = this.dice_texture_rand.material), Array.isArray(this.edge_color) && this.edge_color.length == this.dice_color.length && (this.edge_color_rand = this.edge_color[t]), this.dice_color_rand = this.dice_color[t];
 		} else this.dice_color_rand = this.dice_color;
 		if (this.edge_color_rand == "") if (Array.isArray(this.edge_color)) {
-			var i = Math.floor(Math.random() * this.edge_color.length);
-			this.edge_color_rand = this.edge_color[i];
+			var t = Math.floor(Math.random() * this.edge_color.length);
+			this.edge_color_rand = this.edge_color[t];
 		} else this.edge_color_rand = this.edge_color;
 		if (this.label_color_rand == "" && Array.isArray(this.label_color)) {
-			var i = this.label_color[Math.floor(Math.random() * this.label_color.length)];
-			Array.isArray(this.label_outline) && this.label_outline.length == this.label_color.length && (this.label_outline_rand = this.label_outline[i]), this.label_color_rand = this.label_color[i];
+			var t = this.label_color[Math.floor(Math.random() * this.label_color.length)];
+			Array.isArray(this.label_outline) && this.label_outline.length == this.label_color.length && (this.label_outline_rand = this.label_outline[t]), this.label_color_rand = this.label_color[t];
 		} else this.label_color_rand == "" && (this.label_color_rand = this.label_color);
 		if (this.label_outline_rand == "" && Array.isArray(this.label_outline)) {
-			var i = this.label_outline[Math.floor(Math.random() * this.label_outline.length)];
-			this.label_outline_rand = this.label_outline[i];
+			var t = this.label_outline[Math.floor(Math.random() * this.label_outline.length)];
+			this.label_outline_rand = this.label_outline[t];
 		} else this.label_outline_rand == "" && (this.label_outline_rand = this.label_outline);
-		this.dice_texture_rand == "" && Array.isArray(this.dice_texture) ? (this.dice_texture_rand = this.dice_texture[Math.floor(Math.random() * this.dice_texture.length)], this.dice_material_rand = this.dice_texture_rand.material || this.dice_material) : this.dice_texture_rand == "" && (this.dice_texture_rand = this.dice_texture, this.dice_material_rand = this.dice_texture_rand.material || this.dice_material), this.dice_material_rand == "" && Array.isArray(this.dice_material) ? this.dice_material_rand = this.dice_material[Math.floor(Math.random() * this.dice_material.length)] : this.dice_material_rand == "" && (this.dice_material_rand = this.dice_material), this.colordata && this.colordata.id != t.id && this.applyColorSet(t, n, r);
+		this.dice_texture_rand == "" && Array.isArray(this.dice_texture) ? (this.dice_texture_rand = this.dice_texture[Math.floor(Math.random() * this.dice_texture.length)], this.dice_material_rand = this.dice_texture_rand.material || this.dice_material) : this.dice_texture_rand == "" && (this.dice_texture_rand = this.dice_texture, this.dice_material_rand = this.dice_texture_rand.material || this.dice_material), this.dice_material_rand == "" && Array.isArray(this.dice_material) ? this.dice_material_rand = this.dice_material[Math.floor(Math.random() * this.dice_material.length)] : this.dice_material_rand == "" && (this.dice_material_rand = this.dice_material);
 	}
 	calc_texture_size(e) {
 		return 2 ** Math.floor(Math.log(e) / Math.log(2));
@@ -5368,15 +5367,19 @@ var Jn = { type: "postStep" }, Yn = { type: "preStep" }, K = {
 		});
 	}
 	async getColorSet(e) {
-		let t, n;
-		if (typeof e == "string" && (t = e), typeof e == "object" && (t = e.colorset), this.colorsets.hasOwnProperty(t)) return this.colorsets[t];
-		let r = cr[t];
-		return n = e.texture || r.texture, r.texture = this.getTexture(n), r.texture = await this.ImageLoader(r.texture), e.material && (r.texture.material = e.material), this.colorsets[t] = r, r;
+		let t, n, r;
+		typeof e == "string" && (t = e), typeof e == "object" && (t = e.colorset, n = e.texture, r = e.material);
+		let i = cr[t] || cr.white;
+		n ||= i.texture;
+		let a = Array.isArray(n) ? n.join(",") : n, o = `${t}|${a}|${r || ""}`;
+		if (this.colorsets.hasOwnProperty(o)) return this.colorsets[o];
+		let s = Object.assign({}, i);
+		return s.texture = await this.ImageLoader(this.getTexture(n)), r && !Array.isArray(s.texture) && (s.texture = Object.assign({}, s.texture), s.texture.material = r), this.colorsets[o] = s, s;
 	}
 	async makeColorSet(e = {}) {
 		if (this.colorsets.hasOwnProperty(e.name)) return this.colorsets[e.name];
 		let t = cr.white, n = Object.assign({}, t, e), r = this.getTexture(n.texture);
-		return n.texture = await this.ImageLoader(r), e.material && (n.texture.material = e.material), n.name.toLowerCase() === "white" && (n.name = `${Date.now()}`), this.colorsets[n.name] = n, n;
+		return n.texture = await this.ImageLoader(r), e.material && !Array.isArray(n.texture) && (n.texture = Object.assign({}, n.texture), n.texture.material = e.material), n.name.toLowerCase() === "white" && (n.name = `${Date.now()}`), this.colorsets[n.name] = n, n;
 	}
 	getTexture(e) {
 		if (Array.isArray(e)) {
@@ -5594,7 +5597,7 @@ var Jn = { type: "postStep" }, Yn = { type: "preStep" }, K = {
 			close: null,
 			medium: null,
 			far: null
-		}, this.scene = new e.Scene(), this.world = new Kn(), this.dice_body_material = new R(), this.sounds_table = {}, this.sounds_dice = [], this.lastSoundType = "", this.lastSoundStep = 0, this.lastSound = 0, this.iteration, this.renderer, this.barrier, this.camera, this.light, this.light_amb, this.desk, this.box_body = {}, this.bodies = [], this.meshes = [], this.diceList = [], this.notationVectors = null, this.dieIndex = 0, this._beforeRenderCallbacks = [], this._afterRenderCallbacks = [], this._lastRenderTime = 0, this._continuousRunning = !1, this._continuousRAF = null, this.soundDelay = 10, this.animstate = "", this.selector = {
+		}, this.scene = new e.Scene(), this.world = new Kn(), this.dice_body_material = new R(), this.sounds_table = {}, this.sounds_dice = [], this.lastSoundType = "", this.lastSoundStep = 0, this.lastSound = 0, this.iteration, this.renderer, this.barrier, this.camera, this.light, this.light_amb, this.desk, this.box_body = {}, this.bodies = [], this.meshes = [], this.diceList = [], this.notationVectors = null, this.dieIndex = 0, this.groups = /* @__PURE__ */ new Map(), this._addCounter = 0, this._lastStepTime = 0, this._beforeRenderCallbacks = [], this._afterRenderCallbacks = [], this._lastRenderTime = 0, this._continuousRunning = !1, this._continuousRAF = null, this.soundDelay = 10, this.animstate = "", this.selector = {
 			animate: !0,
 			rotate: !0,
 			intersected: null,
@@ -5630,20 +5633,57 @@ var Jn = { type: "postStep" }, Yn = { type: "preStep" }, K = {
 	}
 	start() {
 		if (this._continuousRunning) return;
-		this._continuousRunning = !0, this._lastRenderTime = 0;
+		this._continuousRunning = !0, this._lastRenderTime = 0, this._lastStepTime = 0;
 		let e = () => {
-			this._continuousRunning && (this.rolling || this.render(), this._continuousRAF = requestAnimationFrame(e));
+			this._continuousRunning && (this.stepAndRender(), this._continuousRAF = requestAnimationFrame(e));
 		};
 		this._continuousRAF = requestAnimationFrame(e);
 	}
 	stop() {
 		this._continuousRunning = !1, this._continuousRAF != null && (cancelAnimationFrame(this._continuousRAF), this._continuousRAF = null);
 	}
+	hasAnimatingGroup() {
+		for (let e of this.groups.values()) if (e.state === "animating") return !0;
+		return !1;
+	}
+	stepAndRender() {
+		let e = this.hasAnimatingGroup();
+		if (this.rolling = e, e) {
+			let e = Date.now();
+			this._lastStepTime ||= e - this.framerate * 1e3;
+			let t = (e - this._lastStepTime) / 1e3;
+			t > .5 && (t = .5);
+			let n = Math.max(1, Math.floor(t / this.framerate));
+			this.animstate = "throw";
+			for (let e = 0; e < n; e++) this.world.step(this.framerate);
+			this._lastStepTime += n * this.framerate * 1e3;
+			for (let e in this.scene.children) {
+				let t = this.scene.children[e];
+				t.body != null && (t.position.copy(t.body.position), t.quaternion.copy(t.body.quaternion));
+			}
+			for (let e of this.groups.values()) e.state === "animating" && (e.iteration += n, this.groupFinished(e) && this.finalizeGroup(e));
+			this.renderer && (this.renderer.shadowMap.needsUpdate = !0);
+		} else this._lastStepTime = Date.now();
+		this.render();
+	}
+	finalizeGroup(e) {
+		if (e.state !== "animating") return;
+		e.state = "settled", e.settled = !0;
+		let t = this.buildResults(e.notationVectors, e.meshes), n = e.waiters;
+		e.waiters = [];
+		for (let e of n) try {
+			e(t);
+		} catch {}
+		document.dispatchEvent(new CustomEvent("groupComplete", { detail: {
+			groupId: e.groupId,
+			results: t
+		} }));
+	}
 	async initialize() {
 		this.renderer = new e.WebGLRenderer({
 			antialias: !0,
 			alpha: !0
-		}), this.container.appendChild(this.renderer.domElement), this.renderer.shadowMap.enabled = this.shadows, this.renderer.shadowMap.type = e.PCFSoftShadowMap, this.renderer.setClearColor(0, 0), this.setDimensions(this.dimensions), this.world.gravity.set(0, 0, -9.8 * this.gravity_multiplier), this.world.broadphase = new ve(), this.world.solver.iterations = 14, this.world.allowSleep = !0, this.makeWorldBox(), this.resizeWorld(), await this.loadTheme({
+		}), this.container.appendChild(this.renderer.domElement), this.renderer.shadowMap.enabled = this.shadows, this.renderer.shadowMap.type = e.VSMShadowMap, this.renderer.shadowMap.autoUpdate = !1, this.renderer.shadowMap.needsUpdate = !0, this.renderer.setClearColor(0, 0), this.setDimensions(this.dimensions), this.world.gravity.set(0, 0, -9.8 * this.gravity_multiplier), this.world.broadphase = new ve(), this.world.solver.iterations = 14, this.world.allowSleep = !0, this.makeWorldBox(), this.resizeWorld(), await this.loadTheme({
 			colorset: this.theme_colorset,
 			texture: this.theme_texture,
 			material: this.theme_material
@@ -5651,7 +5691,7 @@ var Jn = { type: "postStep" }, Yn = { type: "preStep" }, K = {
 			throw Error("Unable to load theme");
 		}), this.sounds && await this.loadSounds().catch((e) => {
 			throw Error("Unable to load sounds");
-		}), this.initialized = !0, this.renderer.render(this.scene, this.camera), this.continuousRender && this.start();
+		}), this.initialized = !0, this.renderer.render(this.scene, this.camera), this.start();
 	}
 	makeWorldBox() {
 		Object.keys(this.box_body).length && (this.world.removeBody(this.box_body.desk), this.world.removeBody(this.box_body.topWall), this.world.removeBody(this.box_body.bottomWall), this.world.removeBody(this.box_body.leftWall), this.world.removeBody(this.box_body.rightWall));
@@ -5696,8 +5736,31 @@ var Jn = { type: "postStep" }, Yn = { type: "preStep" }, K = {
 		}), this.box_body.rightWall.quaternion.setFromAxisAngle(new r(0, 1, 0), Math.PI / 2), this.box_body.rightWall.position.set(-this.display.containerWidth * .93, 0, 0), this.world.addBody(this.box_body.rightWall);
 	}
 	async loadTheme(e) {
-		let t;
-		t = this.theme_customColorset ? await this.DiceColors.makeColorSet(this.theme_customColorset) : await this.DiceColors.getColorSet(e), this.DiceFactory.applyColorSet(t), this.colorData = t;
+		let t = await this.resolveColorData(e && e.customColorset ? { customColorset: e.customColorset } : e);
+		this.DiceFactory.applyColorSet(t), this.colorData = t;
+	}
+	async resolveColorData(e = {}) {
+		return e && (e.customColorset || this.theme_customColorset && e.useGlobalCustom) ? await this.DiceColors.makeColorSet(e.customColorset || this.theme_customColorset) : await this.DiceColors.getColorSet({
+			colorset: e.colorset || this.theme_colorset,
+			texture: e.texture == null ? this.theme_texture : e.texture,
+			material: e.material || this.theme_material
+		});
+	}
+	currentTheme() {
+		return this.theme_customColorset ? { customColorset: this.theme_customColorset } : {
+			colorset: this.theme_colorset,
+			texture: this.theme_texture,
+			material: this.theme_material
+		};
+	}
+	randomSide() {
+		let e = [
+			"left",
+			"right",
+			"top",
+			"bottom"
+		];
+		return e[Math.floor(Math.random() * e.length)];
 	}
 	async loadSounds() {
 		let e = {
@@ -5762,9 +5825,9 @@ var Jn = { type: "postStep" }, Yn = { type: "preStep" }, K = {
 		let n = Math.max(this.display.containerWidth, this.display.containerHeight);
 		this.light && this.scene.remove(this.light), this.light_amb && this.scene.remove(this.light_amb);
 		let r = Math.PI;
-		this.light = new e.SpotLight(this.color_spotlight, this.light_intensity * r), this.light.position.set(-n / 2, n / 2, n * 3), this.light.target.position.set(0, 0, 0), this.light.distance = n * 5, this.light.decay = 0, this.light.angle = Math.PI / 4, this.light.castShadow = this.shadows, this.light.shadow.camera.near = n / 10, this.light.shadow.camera.far = n * 5, this.light.shadow.camera.fov = 50, this.light.shadow.bias = .001, this.light.shadow.mapSize.width = 1024, this.light.shadow.mapSize.height = 1024, this.scene.add(this.light), this.light_amb = new e.HemisphereLight(16777147, 6776689, this.light_intensity * r), this.scene.add(this.light_amb), this.desk && this.scene.remove(this.desk);
+		this.light = new e.SpotLight(this.color_spotlight, this.light_intensity * r), this.light.position.set(-n / 2, n / 2, n * 3), this.light.target.position.set(0, 0, 0), this.light.distance = n * 5, this.light.decay = 0, this.light.angle = Math.PI / 4, this.light.castShadow = this.shadows, this.light.shadow.camera.near = n / 10, this.light.shadow.camera.far = n * 5, this.light.shadow.camera.fov = 50, this.light.shadow.bias = -5e-4, this.light.shadow.mapSize.width = 2048, this.light.shadow.mapSize.height = 2048, this.light.shadow.radius = 6, this.light.shadow.blurSamples = 16, this.scene.add(this.light), this.renderer && (this.renderer.shadowMap.needsUpdate = !0), this.light_amb = new e.HemisphereLight(16777147, 6776689, this.light_intensity * r), this.scene.add(this.light_amb), this.desk && this.scene.remove(this.desk);
 		let i = new e.ShadowMaterial();
-		i.opacity = .5, this.desk = new e.Mesh(new e.PlaneGeometry(this.display.containerWidth * 6, this.display.containerHeight * 6, 1, 1), i), this.desk.receiveShadow = this.shadows, this.scene.add(this.desk), this.renderer.render(this.scene, this.camera);
+		i.opacity = .6, this.desk = new e.Mesh(new e.PlaneGeometry(this.display.containerWidth * 6, this.display.containerHeight * 6, 1, 1), i), this.desk.receiveShadow = this.shadows, this.scene.add(this.desk), this.renderer && (this.renderer.shadowMap.needsUpdate = !0), this.renderer.render(this.scene, this.camera);
 	}
 	resizeWorld() {
 		let t = dr(() => {
@@ -5886,21 +5949,21 @@ var Jn = { type: "postStep" }, Yn = { type: "preStep" }, K = {
 		}
 		i != 0 && (i < 0 && (i += 4), e.material = this.DiceFactory.createMaterials(n, 0, 0, !1, i)), e.geometry = a;
 	}
-	spawnDice(e, t = !1) {
-		let { pos: n, axis: i, angle: a, velocity: o } = e, s;
-		if (t) s = t, s.stopped = 0, this.world.removeBody(s.body);
+	spawnDice(e, t = !1, n = null) {
+		let { pos: i, axis: a, angle: o, velocity: s } = e, c;
+		if (t) c = t, c.stopped = 0, this.world.removeBody(c.body);
 		else {
-			if (s = this.DiceFactory.create(e.type, this.colorData), !s) return;
-			s.notation = e, s.result = [], s.stopped = 0, s.castShadow = this.shadows, this.scene.add(s), this.diceList.push(s);
+			if (c = this.DiceFactory.create(e.type), !c) return;
+			c.notation = e, c.result = [], c.stopped = 0, c.castShadow = this.shadows, c.groupId = n ? n.groupId : void 0, c._group = n, this.scene.add(c), this.diceList.push(c);
 		}
-		s.body = new k({
+		c.body = new k({
 			allowSleep: !0,
 			sleepSpeedLimit: 75,
 			sleepTimeLimit: .9,
-			mass: s.mass,
-			shape: s.geometry.cannon_shape,
+			mass: c.mass,
+			shape: c.geometry.cannon_shape,
 			material: this.dice_body_material
-		}), s.body.type = k.DYNAMIC, s.body.position.set(n.x, n.y, n.z), s.body.quaternion.setFromAxisAngle(new r(i.x, i.y, i.z), i.a * Math.PI * 2), s.body.angularVelocity.set(a.x, a.y, a.z), s.body.velocity.set(o.x, o.y, o.z), s.body.linearDamping = .1, s.body.angularDamping = .1, s.body.diceShape = s.shape, s.body.sleepState = 0, s.body.addEventListener("collide", this.eventCollide.bind(this)), this.world.addBody(s.body);
+		}), c.body.type = k.DYNAMIC, c.body.position.set(i.x, i.y, i.z), c.body.quaternion.setFromAxisAngle(new r(a.x, a.y, a.z), a.a * Math.PI * 2), c.body.angularVelocity.set(o.x, o.y, o.z), c.body.velocity.set(s.x, s.y, s.z), c.body.linearDamping = .1, c.body.angularDamping = .1, c.body.diceShape = c.shape, c.body.sleepState = 0, c.body.addEventListener("collide", this.eventCollide.bind(this)), this.world.addBody(c.body);
 	}
 	eventCollide({ body: e, target: t }) {
 		if (this.animstate == "simulate" || !this.sounds || !e || this.volume <= 0) return;
@@ -5923,191 +5986,227 @@ var Jn = { type: "postStep" }, Yn = { type: "preStep" }, K = {
 	checkForRethrow(e) {
 		return e.notation.func && e.notation.func.toLowerCase(), !1;
 	}
-	throwFinished() {
-		let e = this.iteration > this.iterationLimit;
-		for (let t = 0, n = this.diceList.length; t < n; ++t) {
-			let n = this.diceList[t], i = k.SLEEPING;
-			if (n.body.sleepState < i && !e) return !1;
-			if (n.body.sleepState == i || e) {
-				if (n.body.type === k.KINEMATIC) continue;
-				let e = !1;
-				if (n.result.length == 0 ? (n.storeRolledValue(n.resultReason), e = this.checkForRethrow(n)) : n.result.length > 0 && n.rerolling && (n.rerolling = !1, n.storeRolledValue("reroll"), e = this.checkForRethrow(n)), e) return n.rerolls += 1, n.rerolling = !0, n.body.wakeUp(), n.body.type = k.DYNAMIC, n.body.angularVelocity = new r(25, 25, 25), n.body.velocity = new r(0, 0, 3e3), !1;
-				n.rerolling = !1, n.body.type = k.KINEMATIC;
+	groupFinished(e) {
+		let t = e.iteration > this.iterationLimit, n = k.SLEEPING;
+		for (let i = 0, a = e.meshes.length; i < a; ++i) {
+			let a = e.meshes[i];
+			if (!(!a || !a.body)) {
+				if (a.body.sleepState < n && !t) return !1;
+				if (a.body.sleepState == n || t) {
+					if (a.body.type === k.KINEMATIC) continue;
+					let e = !1;
+					if (a.result.length == 0 ? (a.storeRolledValue(a.resultReason), e = this.checkForRethrow(a)) : a.result.length > 0 && a.rerolling && (a.rerolling = !1, a.storeRolledValue("reroll"), e = this.checkForRethrow(a)), e) return a.rerolls += 1, a.rerolling = !0, a.body.wakeUp(), a.body.type = k.DYNAMIC, a.body.angularVelocity = new r(25, 25, 25), a.body.velocity = new r(0, 0, 3e3), !1;
+					a.rerolling = !1, a.body.type = k.KINEMATIC;
+				}
 			}
 		}
 		return !0;
 	}
-	simulateThrow() {
-		for (this.animstate = "simulate", this.iteration = 0, this.rolling = !0; !this.throwFinished(!0);) ++this.iteration, this.world.step(this.framerate);
-	}
-	animateThrow(e, t) {
-		this.animstate = "throw";
-		let n = Date.now();
-		this.last_time = this.last_time || n - this.framerate * 1e3;
-		let r = (n - this.last_time) / 1e3;
-		++this.iteration;
-		let i = Math.floor(r / this.framerate);
-		for (let e = 0; e < i; e++) this.world.step(this.framerate), ++this.steps;
-		for (let e in this.scene.children) {
-			let t = this.scene.children[e];
-			t.body != null && (t.position.copy(t.body.position), t.quaternion.copy(t.body.quaternion));
+	simulateGroup(e) {
+		let t = this.animstate;
+		this.animstate = "simulate";
+		let n = [];
+		for (let t = 0, r = this.diceList.length; t < r; ++t) {
+			let r = this.diceList[t];
+			!r || !r.body || r._group !== e && (this.world.removeBody(r.body), n.push(r.body));
 		}
-		if (this.render(), this.last_time += i * this.framerate * 1e3, this.running == e && this.throwFinished()) {
-			this.running = !1, this.rolling = !1, t && t.call(this, this.notationVectors), this.running = Date.now(), this.animateAfterThrow(this.running);
-			return;
-		}
-		this.running == e && ((e, t, n, i, a) => {
-			!n && r < this.framerate ? setTimeout(() => {
-				requestAnimationFrame(() => {
-					e.call(this, t, i, a);
-				});
-			}, (this.framerate - r) * 1e3) : requestAnimationFrame(() => {
-				e.call(this, t, i, a);
-			});
-		}).bind(this)(this.animateThrow, e, this.adaptive_timestep, t);
+		for (e.iteration = 0; !this.groupFinished(e);) ++e.iteration, this.world.step(this.framerate);
+		for (let e = 0; e < n.length; e++) this.world.addBody(n[e]);
+		this.animstate = t;
 	}
-	animateAfterThrow(e) {
-		this.animstate = "afterthrow";
-		let t = Date.now(), n = (t - this.last_time) / 1e3;
-		n > 3 && (n = this.framerate), this.running = !1, this.last_time = t, this.render(), this.running == e && ((e, t, r) => {
-			!r && n < this.framerate ? setTimeout(() => {
-				requestAnimationFrame(() => {
-					e.call(this, t);
-				});
-			}, (this.framerate - n) * 1e3) : requestAnimationFrame(() => {
-				e.call(this, t);
-			});
-		}).bind(this)(this.animateAfterThrow, e, this.adaptive_timestep);
-	}
-	startClickThrow(e) {
-		this.rolling &&= (this.clearDice(), !1);
-		let t = {
-			x: (Math.random() * 2 - .5) * this.display.currentWidth,
-			y: -(Math.random() * 2 - .5) * this.display.currentHeight
-		}, n = Math.sqrt(t.x * t.x + t.y * t.y) + 100, r = (Math.random() + 3) * n * this.strength;
-		return this.getNotationVectors(e, t, r, n);
+	startClickThrow(e, t) {
+		let n, r = this.display.currentWidth, i = this.display.currentHeight;
+		if (t) {
+			let e = (e) => (Math.random() * 2 - 1) * e * .5;
+			switch (t) {
+				case "left":
+					n = {
+						x: r,
+						y: e(i)
+					};
+					break;
+				case "right":
+					n = {
+						x: -r,
+						y: e(i)
+					};
+					break;
+				case "top":
+					n = {
+						x: e(r),
+						y: -i
+					};
+					break;
+				case "bottom":
+					n = {
+						x: e(r),
+						y: i
+					};
+					break;
+				default: n = {
+					x: (Math.random() * 2 - .5) * r,
+					y: -(Math.random() * 2 - .5) * i
+				};
+			}
+		} else n = {
+			x: (Math.random() * 2 - .5) * r,
+			y: -(Math.random() * 2 - .5) * i
+		};
+		let a = Math.sqrt(n.x * n.x + n.y * n.y) + 100, o = (Math.random() + 3) * a * this.strength;
+		return this.getNotationVectors(e, n, o, a);
 	}
 	clearDice() {
 		this.running = !1;
 		let e;
 		for (; e = this.diceList.pop();) this.scene.remove(e), e.body && this.world.removeBody(e.body);
-		this.renderer.render(this.scene, this.camera), setTimeout(() => {
-			this.renderer.render(this.scene, this.camera);
+		this.renderer.shadowMap.needsUpdate = !0, this.renderer.render(this.scene, this.camera), setTimeout(() => {
+			this.renderer.shadowMap.needsUpdate = !0, this.renderer.render(this.scene, this.camera);
 		}, 100);
 	}
+	clearAllGroups() {
+		this.clearDice(), this.groups.clear();
+	}
 	getDiceResults(e) {
-		if (e !== void 0) return {
+		return e === void 0 ? this.buildResults(this.notationVectors, this.diceList) : {
 			type: this.diceList[e].shape,
 			sides: parseInt(this.diceList[e].shape.substring(1)),
 			id: e,
 			...this.diceList[e].result.at(-1)
 		};
-		let t = 0, n = this.notationVectors.constant ? parseInt(`${this.notationVectors.op}${this.notationVectors.constant}`) : 0, r = n;
+	}
+	buildResults(e, t) {
+		let n = 0, r = e.constant ? parseInt(`${e.op}${e.constant}`) : 0, i = r;
 		return {
-			notation: this.notationVectors.notation,
-			sets: this.notationVectors.set.map((e) => {
-				let n = t + e.num - 1, i = 0, a = [];
-				for (let r = t; r <= n; r++) {
-					if (this.diceList[t].result.at(-1).reason === "remove") {
-						t++;
+			notation: e.notation,
+			sets: e.set.map((e) => {
+				let r = n + e.num - 1, a = 0, o = [];
+				for (let i = n; i <= r; i++) {
+					if (t[n].result.at(-1).reason === "remove") {
+						n++;
 						continue;
 					}
-					a.push({
+					o.push({
 						type: e.type,
 						sides: parseInt(e.type.substring(1)),
-						id: t,
-						...this.diceList[t].result.at(-1)
-					}), i += this.diceList[t].result.at(-1).value, t++;
+						id: n,
+						...t[n].result.at(-1)
+					}), a += t[n].result.at(-1).value, n++;
 				}
-				let o = {
+				let s = {
 					num: e.num,
 					type: e.type,
 					sides: parseInt(e.type.substring(1)),
-					rolls: a,
-					total: i
+					rolls: o,
+					total: a
 				};
-				return r += i, o;
+				return i += a, s;
 			}),
-			modifier: n,
-			total: r
+			modifier: r,
+			total: i
 		};
 	}
-	async roll(e) {
-		if (this.notationVectors = this.startClickThrow(e), this.notationVectors) return new Promise((e, t) => {
-			this.rollDice(() => {
-				let t = this.getDiceResults();
-				this.onRollComplete(t);
-				let n = new CustomEvent("rollComplete", { detail: t });
-				document.dispatchEvent(n), e(t);
-			});
-		});
+	singleDieResult(e) {
+		return {
+			type: e.shape,
+			sides: parseInt(e.shape.substring(1)),
+			...e.result.at(-1)
+		};
 	}
-	async reroll(e) {
-		return this.rolling = !0, this.running = Date.now(), this.iteration = 0, this.last_time = 0, new Promise((t, n) => {
-			e.forEach((e) => {
-				let t = this.diceList[e];
-				t.rerolls += 1, t.rerolling = !0, t.body.wakeUp(), t.body.type = k.DYNAMIC, t.body.angularVelocity = new r(25, 25, 25), t.body.velocity = new r(0, 0, 3e3);
-			}), this.animateThrow(this.running, () => {
-				let n = e.map((e) => this.getDiceResults(e));
-				this.onRerollComplete(n);
-				let r = new CustomEvent("rerollComplete", { detail: n });
-				document.dispatchEvent(r), t(n);
-			});
+	async rollGroup({ groupId: e, notation: t, theme: n, colorData: r, side: i } = {}) {
+		e ||= `g${Date.now()}_${this._addCounter++}`, this.groups.has(e) && this.removeGroup(e), r ||= await this.resolveColorData(n || this.currentTheme());
+		let a = this.startClickThrow(t, i), o = {
+			groupId: e,
+			notationVectors: a,
+			colorData: r,
+			side: i,
+			meshes: [],
+			state: "spawning",
+			settled: !1,
+			iteration: 0,
+			waiters: []
+		};
+		this.groups.set(e, o);
+		let s = new Promise((e) => {
+			o.waiters.push(e);
 		});
+		if (!a || a.error) {
+			o.state = "settled";
+			let e = o.waiters;
+			o.waiters = [];
+			for (let t of e) try {
+				t(null);
+			} catch {}
+			return s;
+		}
+		this.DiceFactory.applyColorSet(r);
+		for (let e = 0, t = a.vectors.length; e < t; ++e) {
+			let t = this.diceList.length;
+			this.spawnDice(a.vectors[e], !1, o), this.diceList.length > t && o.meshes.push(this.diceList[this.diceList.length - 1]);
+		}
+		this.simulateGroup(o);
+		for (let e = 0; e < o.meshes.length; e++) this.spawnDice(a.vectors[e], o.meshes[e], o);
+		if (a.result && a.result.length > 0) for (let e = 0; e < a.result.length; e++) {
+			let t = o.meshes[e];
+			t && t.getLastValue().value != a.result[e] && this.swapDiceFace(t, a.result[e]);
+		}
+		for (let e of o.meshes) e.body && e.body.wakeUp();
+		return o.iteration = 0, o.state = "animating", this.rolling = !0, this._lastStepTime = 0, this._continuousRunning || this.start(), s;
+	}
+	async removeGroup(e) {
+		let t = this.groups.get(e);
+		if (!t) return [];
+		let n = [];
+		for (let e of t.meshes) e.body && this.world.removeBody(e.body), this.scene.remove(e), e.storeRolledValue("remove"), n.push(this.singleDieResult(e));
+		t.state = "removed";
+		let r = new Set(t.meshes);
+		return this.diceList = this.diceList.filter((e) => !r.has(e)), this.groups.delete(e), this.renderer && (this.renderer.shadowMap.needsUpdate = !0), this.onRemoveDiceComplete(n), document.dispatchEvent(new CustomEvent("removeGroupComplete", { detail: {
+			groupId: e,
+			results: n
+		} })), n;
+	}
+	getGroupResults(e) {
+		let t = this.groups.get(e);
+		return t ? this.buildResults(t.notationVectors, t.meshes) : null;
+	}
+	async roll(e) {
+		this.clearAllGroups();
+		let t = await this.rollGroup({
+			groupId: "__default__",
+			notation: e,
+			theme: this.currentTheme(),
+			side: this.randomSide()
+		});
+		return this.notationVectors = this.groups.get("__default__") ? this.groups.get("__default__").notationVectors : this.notationVectors, this.onRollComplete(t), document.dispatchEvent(new CustomEvent("rollComplete", { detail: t })), t;
 	}
 	async add(e) {
-		let t = this.diceList.length;
-		if (!t) return this.roll(e);
-		let n = this.startClickThrow(e), r = [];
-		for (let e = 0, t = n.vectors.length; e < t; ++e) this.spawnDice(n.vectors[e]);
-		this.simulateThrow(), this.steps = 0, this.iteration = 0;
-		for (let e = 0, i = n.vectors.length; e < i; ++e) {
-			let i = t + e;
-			this.diceList[i] && (this.spawnDice(n.vectors[e], this.diceList[i]), r.push(i));
-		}
-		if (n.result && n.result.length > 0) for (let e = 0; e < n.result.length; e++) {
-			let r = t + e, i = this.diceList[r];
-			i && i.getLastValue().value != n.result[e] && this.swapDiceFace(i, n.result[e]);
-		}
-		for (let e of r) {
-			let t = this.diceList[e];
-			t && t.body && t.body.wakeUp();
-		}
-		return this.notationVectors = er.mergeNotation(this.notationVectors, n), new Promise((e, t) => {
-			let n = () => {
-				let t = r.map((e) => this.getDiceResults(e));
-				this.onAddDiceComplete(t);
-				let n = new CustomEvent("addDiceComplete", { detail: t });
-				document.dispatchEvent(n), e(t);
-			};
-			this.rolling = !0, this.running = Date.now(), this.last_time = 0, this.animateThrow(this.running, n);
+		let t = await this.rollGroup({
+			groupId: `__add__${this._addCounter++}`,
+			notation: e,
+			theme: this.currentTheme(),
+			side: this.randomSide()
 		});
+		return this.onAddDiceComplete(t), document.dispatchEvent(new CustomEvent("addDiceComplete", { detail: t })), t;
+	}
+	async reroll(e) {
+		let t = /* @__PURE__ */ new Set();
+		e.forEach((e) => {
+			let n = this.diceList[e];
+			!n || !n.body || (n.rerolls += 1, n.rerolling = !0, n.body.wakeUp(), n.body.type = k.DYNAMIC, n.body.angularVelocity = new r(25, 25, 25), n.body.velocity = new r(0, 0, 3e3), n._group && t.add(n._group));
+		}), t.forEach((e) => {
+			e.state = "animating", e.settled = !1, e.iteration = 0;
+		}), this.rolling = !0, this._lastStepTime = 0, this._continuousRunning || this.start(), await Promise.all([...t].map((e) => new Promise((t) => e.waiters.push(t))));
+		let n = e.map((e) => this.getDiceResults(e));
+		return this.onRerollComplete(n), document.dispatchEvent(new CustomEvent("rerollComplete", { detail: n })), n;
 	}
 	async remove(e) {
-		return new Promise((t, n) => {
-			let r = [];
-			e.forEach((e) => {
-				let t = this.diceList[e];
-				t.body && this.world.removeBody(t.body), this.scene.remove(t), t.storeRolledValue("remove"), r.push(this.getDiceResults(e));
-			}), this.renderer.render(this.scene, this.camera), this.onRemoveDiceComplete(r);
-			let i = new CustomEvent("removeDiceComplete", { detail: r });
-			document.dispatchEvent(i), t(r);
-		});
-	}
-	rollDice(e) {
-		if (this.notationVectors.error) {
-			e.call(this);
-			return;
-		}
-		this.clearDice();
-		for (let e = 0, t = this.notationVectors.vectors.length; e < t; ++e) this.spawnDice(this.notationVectors.vectors[e]);
-		this.simulateThrow(), this.steps = 0, this.iteration = 0;
-		for (let e = 0, t = this.diceList.length; e < t; ++e) this.diceList[e] && this.spawnDice(this.notationVectors.vectors[e], this.diceList[e]);
-		if (this.notationVectors.result && this.notationVectors.result.length > 0) for (let e = 0; e < this.notationVectors.result.length; e++) {
-			let t = this.diceList[e];
-			t && t.getLastValue().value != this.notationVectors.result[e] && this.swapDiceFace(t, this.notationVectors.result[e]);
-		}
-		this.rolling = !0, this.running = Date.now(), this.last_time = 0, this.animateThrow(this.running, e);
+		let t = [];
+		return e.forEach((e) => {
+			let n = this.diceList[e];
+			if (n && (n.body && this.world.removeBody(n.body), this.scene.remove(n), n.storeRolledValue("remove"), t.push(this.getDiceResults(e)), n._group)) {
+				let e = n._group;
+				e.meshes = e.meshes.filter((e) => e !== n);
+			}
+		}), this.render(), this.onRemoveDiceComplete(t), document.dispatchEvent(new CustomEvent("removeDiceComplete", { detail: t })), t;
 	}
 };
 //#endregion
