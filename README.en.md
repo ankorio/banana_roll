@@ -8,7 +8,7 @@ Show your Roll20 dice rolls on stream with animated 3D overlays. A Roll20 tab se
 
 👉 **Live demo: https://bananaroll.up.railway.app**
 
-Heads up: this came out of an intense **single-day vibe-coding sprint**, so treat it for what it is: a fun hobby project, not bulletproof production software. It works and has already been used live, but the commit history is short and the bus factor is one. PRs are welcome. 🍌
+Heads up: this came out of an intense **single-day vibe-coding sprint**, so take it for what it is: a fun hobby project, not bulletproof production software. It works and has already been used live, but the commit history is short and the bus factor is one. PRs are welcome. 🍌
 
 ```text
 Roll20 tab (userscript) --HTTP POST--> Node relay (rooms + parsing) --SSE--> OBS Browser Source
@@ -28,28 +28,49 @@ The userscript hooks into the Firebase data feed used by Roll20 at the transport
 <details>
 <summary><strong>Real 3D dice that match the result.</strong></summary>
 
-The physical dice from `dice-box-threejs` are prepared to land on the exact values returned by the parser. For advantage or disadvantage rolls, two d20s are rolled and the correct die is shown on camera.
+The physical dice from `dice-box-threejs` are set up to land on the exact values returned by the parser. For advantage or disadvantage rolls, two d20s are rolled and the correct die is shown on camera.
+
+</details>
+
+<details>
+<summary><strong>Several rolls at once, side by side.</strong></summary>
+
+Each roll is its own independent throw with its own dice and its own plaque, so simultaneous rolls from different players never queue up behind each other. The plaque appears when the dice settle, and the plaques line up in a centered row that smoothly reflows as new ones land and finished ones lift away.
 
 </details>
 
 <details>
 <summary><strong>An overlay that actually looks good.</strong></summary>
 
-The “Arcane Plaque” design includes an ornate frame, portrait, large total, roll name, dice breakdown, advantage/disadvantage badge, and critical hit or fumble label. Critical hits and fumbles also trigger confetti particles.
+The “Arcane Plaque” design includes an ornate frame, portrait, large total, roll name, dice breakdown, advantage/disadvantage badge, and critical hit or fumble label. Critical hits and fumbles also trigger confetti particles, and the overlay renders each player's saved plaque design — what you build in the editor is exactly what appears on stream.
 
 </details>
 
 <details>
-<summary><strong>Shared overlay or per-player overlays.</strong></summary>
+<summary><strong>Design your own plaque.</strong></summary>
 
-Each player gets a filtered overlay URL, for example `…/overlay?player=<id>`, which is useful for individual scenes, separate cameras, or custom OBS layouts.
+A WYSIWYG editor lets each player build their own result plaque: pick frame art from a template library (class-themed plaques and character art), recolor it, drag the zones around, and even drop in a custom background image. A live test roll shows precisely what viewers will see.
 
 </details>
 
 <details>
 <summary><strong>Per-player dice styles.</strong></summary>
 
-The customization page lets each player choose the texture, material, and colors of their dice. Preferences are saved on the server and persist between sessions.
+The customization page lets each player dial in their dice: start from a curated preset, then fine-tune the material, texture, and per-channel colors (numbers, body, edge) with a live preview. Preferences are saved on the server and persist between sessions.
+
+</details>
+
+<details>
+<summary><strong>Your look follows you across campaigns.</strong></summary>
+
+Dice and plaque customizations are tied to your Roll20 account rather than a single game. Join a new campaign and your saved look comes with you automatically, no need to set it up again.
+
+</details>
+
+<details>
+<summary><strong>Shared overlay or per-player overlays.</strong></summary>
+
+Each player gets a filtered overlay URL, for example `…/overlay?player=<id>`, useful for individual scenes, separate cameras, or custom OBS layouts.
 
 </details>
 
@@ -68,9 +89,16 @@ The dice engine, fonts, sounds, and confetti are vendored and loaded locally fir
 </details>
 
 <details>
+<summary><strong>Self-updating capture script.</strong></summary>
+
+The userscript checks for new versions and keeps itself current. A built-in compatibility gate cleanly stops an outdated script instead of sending broken data, and it fails open so a GitHub hiccup never blocks capture.
+
+</details>
+
+<details>
 <summary><strong>Preview without OBS.</strong></summary>
 
-Open any overlay URL in your browser and press **T** to cycle through fake rolls: normal → critical hit → fumble.
+Open any overlay URL in your browser and press **T** to cycle through test rolls: normal → critical hit → fumble.
 
 </details>
 
@@ -117,7 +145,7 @@ npm run dice:build # rebuilds the dice bundle and manifest after adding textures
 
 ### State and persistence — ⚠️ the one thing you need to understand
 
-State lives in an in-memory `Map` per instance. It has to work that way because that is where the live SSE connections are kept. Durable or shared state is replicated to an **interchangeable backend**, selected at startup depending on the environment:
+State lives in an in-memory `Map` per instance. It has to work that way because that is where the active SSE connections live. Durable or shared state is replicated to an **interchangeable backend**, selected at startup depending on the environment:
 
 | Environment  | Backend                                                  | Usage                          |
 | ------------ | -------------------------------------------------------- | ------------------------------ |

@@ -8,7 +8,7 @@ Muestra las tiradas de Roll20 en directo con overlays 3D animados. Una pestaña 
 
 👉 **Demo en vivo: https://bananaroll.up.railway.app**
 
-Aviso: esto salió de una sesión intensa de **vibe coding en un solo día**, así que conviene tomarlo como lo que es: un proyecto hobby divertido, no un software blindado. Funciona y ya se ha usado en directo, pero el historial de commits es corto y el bus factor es uno. Se aceptan PRs.
+Aviso: esto salió de una sesión intensa de **vibe coding en un solo día**, así que conviene tomarlo como lo que es: un proyecto personal divertido, no un software blindado. Funciona y ya se ha usado en directo, pero el historial de commits es corto y el bus factor es uno. Se aceptan PRs.
 
 
 ```text
@@ -34,23 +34,44 @@ Los dados físicos de `dice-box-threejs` están preparados para caer en los valo
 </details>
 
 <details>
-<summary><strong>Un overlay que de verdad queda bien.</strong></summary>
+<summary><strong>Varias tiradas a la vez, una al lado de otra.</strong></summary>
 
-El diseño “Arcane Plaque” incluye marco ornamentado, retrato, total grande, nombre de la tirada, desglose de dados, insignia de ventaja/desventaja y etiqueta de crítico o pifia. Además, hay partículas de confeti en críticos y pifias.
+Cada tirada es un lanzamiento independiente, con sus propios dados y su propia placa, así que las tiradas simultáneas de distintos jugadores nunca hacen cola unas detrás de otras. La placa aparece cuando los dados se asientan, y las placas se alinean en una fila centrada que se reordena con suavidad según caen nuevas y se retiran las terminadas.
 
 </details>
 
 <details>
-<summary><strong>Overlay general o por jugador.</strong></summary>
+<summary><strong>Un overlay que de verdad queda bien.</strong></summary>
 
-Cada jugador tiene una URL de overlay filtrada, por ejemplo `…/overlay?player=<id>`, útil para escenas individuales, cámaras separadas o composiciones personalizadas en OBS.
+El diseño “Arcane Plaque” incluye marco ornamentado, retrato, total grande, nombre de la tirada, desglose de dados, insignia de ventaja/desventaja y etiqueta de crítico o pifia. Además, hay partículas de confeti en críticos y pifias, y el overlay renderiza la placa que cada jugador ha guardado: lo que montas en el editor es exactamente lo que se ve en directo.
+
+</details>
+
+<details>
+<summary><strong>Diseña tu propia placa.</strong></summary>
+
+Un editor WYSIWYG permite que cada jugador monte su propia placa de resultado: elige el arte del marco de una biblioteca de plantillas (placas temáticas por clase y arte de personaje), recolórealo, arrastra las zonas a tu gusto e incluso pon una imagen de fondo personalizada. Una tirada de prueba en vivo muestra justo lo que verá tu audiencia.
 
 </details>
 
 <details>
 <summary><strong>Estilos de dados por jugador.</strong></summary>
 
-La página de personalización permite que cada jugador elija textura, material y colores para sus dados. Las preferencias se guardan en el servidor y se mantienen entre sesiones.
+La página de personalización permite que cada jugador ajuste sus dados: parte de un preset bien afinado y luego afina el material, la textura y los colores por canal (números, cuerpo, borde) con vista previa en vivo. Las preferencias se guardan en el servidor y se mantienen entre sesiones.
+
+</details>
+
+<details>
+<summary><strong>Tu estilo te sigue entre campañas.</strong></summary>
+
+Las personalizaciones de dados y placa van ligadas a tu cuenta de Roll20, no a una partida concreta. Entra en una campaña nueva y tu estilo guardado te acompaña automáticamente, sin volver a configurarlo.
+
+</details>
+
+<details>
+<summary><strong>Overlay compartido o por jugador.</strong></summary>
+
+Cada jugador tiene una URL de overlay filtrada, por ejemplo `…/overlay?player=<id>`, útil para escenas individuales, cámaras separadas o composiciones personalizadas en OBS.
 
 </details>
 
@@ -62,16 +83,23 @@ La lógica de críticos y pifias es configurable según el sistema de juego. Por
 </details>
 
 <details>
-<summary><strong>Fallbacks razonables.</strong></summary>
+<summary><strong>Alternativas razonables.</strong></summary>
 
 El motor de dados, las fuentes, los sonidos y el confeti están vendorizados y se cargan primero en local. Si algo falla, el overlay sigue mostrando una placa limpia con el total.
 
 </details>
 
 <details>
+<summary><strong>Script de captura que se actualiza solo.</strong></summary>
+
+El userscript comprueba si hay versiones nuevas y se mantiene al día. Una compuerta de compatibilidad detiene limpiamente un script desactualizado en lugar de enviar datos rotos, y falla en abierto, así que un fallo puntual de GitHub nunca bloquea la captura.
+
+</details>
+
+<details>
 <summary><strong>Vista previa sin OBS.</strong></summary>
 
-Abre cualquier URL de overlay en el navegador y pulsa **T** para alternar entre tiradas falsas: normal → crítico → pifia.
+Abre cualquier URL de overlay en el navegador y pulsa **T** para alternar entre tiradas de prueba: normal → crítico → pifia.
 
 </details>
 
@@ -128,7 +156,7 @@ El estado vive en un `Map` en memoria por instancia. Tiene que ser así, porque 
 
 El backend Redis es lo que permite trabajar con varias instancias: una tirada que llega a la instancia A alcanza a los clientes SSE conectados a la instancia B mediante pub/sub, y los datos de sala y estilo se comparten entre instancias.
 
-Aun así, mantén las réplicas en 1 por ahora salvo que lo hayas probado con carga real. Una sola máquina aguanta muchísimos clientes SSE, y aunque el camino de pub/sub está implementado y testeado, todavía no se ha probado en serio entre réplicas reales. El `Set` de clientes SSE siempre es local a cada instancia y nunca sale del proceso.
+Aun así, mantén una sola réplica por ahora salvo que lo hayas probado con carga real. Una sola máquina aguanta muchísimos clientes SSE, y aunque el camino de pub/sub está implementado y testeado, todavía no se ha probado en serio entre réplicas reales. El `Set` de clientes SSE siempre es local a cada instancia y nunca sale del proceso.
 
 ### Configuración por entorno
 

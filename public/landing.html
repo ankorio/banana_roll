@@ -373,7 +373,7 @@
       <div class="reveal in">
         <span class="eyebrow" data-i18n="hero_eyebrow">Roll20 → OBS overlay</span>
         <h1 data-i18n="hero_h1">Your dice rolls, <span class="accent">live on your stream.</span></h1>
-        <p class="lead" data-i18n="hero_sub">Banana Roll turns every Roll20 dice roll into an animated 3D overlay in OBS — landing on the exact number that came up at the table. No copy-paste, no special format. Just roll.</p>
+        <p class="lead" data-i18n="hero_sub">Banana Roll turns every Roll20 roll into an animated 3D OBS overlay that lands on the exact number rolled at the table. No copy-paste. No special syntax. Just roll.</p>
         <div class="hero-cta">
           <a class="btn btn-gold" href="#demo">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
@@ -418,7 +418,7 @@
       <div class="sec-head reveal">
         <span class="eyebrow" data-i18n="demo_eyebrow">See it in action</span>
         <h2 data-i18n="demo_h2">Watch the dice fly</h2>
-        <p data-i18n="demo_sub">This is the real overlay engine — the same 3D dice and Arcane Plaque your viewers see. Hit a button to roll, or just watch it play.</p>
+        <p data-i18n="demo_sub">This is the real overlay engine — the same 3D dice and Arcane Plaque your viewers will see. Press a button to roll, or let it play on its own.</p>
       </div>
 
       <div class="demo-live reveal">
@@ -432,7 +432,7 @@
           <button class="dbtn crit" type="button" data-roll="crit" data-i18n="demo_b_crit">Critical hit</button>
           <button class="dbtn fumble" type="button" data-roll="fumble" data-i18n="demo_b_fumble">Fumble</button>
         </div>
-        <p class="demo-hint" id="demo-hint" data-i18n="demo_hint">Auto-playing random rolls — click any button to take the dice.</p>
+        <p class="demo-hint" id="demo-hint" data-i18n="demo_hint">Auto-playing random rolls — click any button to take over.</p>
       </div>
     </div>
   </section>
@@ -446,13 +446,17 @@
       </div>
       <div class="feat-grid">
         <div class="fcard reveal"><div class="mark"><b>1</b></div><h3 data-i18n="f1_t">Captures everyone's rolls</h3><p data-i18n="f1_d">Auto-detects public rolls from every player — no special format to type. Private whispers and GM rolls are never shown.</p></div>
-        <div class="fcard reveal"><div class="mark"><b>2</b></div><h3 data-i18n="f2_t">Real 3D dice that match</h3><p data-i18n="f2_d">The physical dice land on the exact value rolled. For advantage or disadvantage, both d20s roll and the right one is shown.</p></div>
-        <div class="fcard reveal"><div class="mark"><b>3</b></div><h3 data-i18n="f3_t">An overlay that looks good</h3><p data-i18n="f3_d">The Arcane Plaque shows portrait, big total, roll name, dice breakdown, advantage badge, and crit / fumble labels.</p></div>
-        <div class="fcard reveal"><div class="mark"><b>4</b></div><h3 data-i18n="f4_t">Shared or per-player overlays</h3><p data-i18n="f4_d">Each player gets a filtered overlay URL — perfect for individual scenes, separate cameras, or custom OBS layouts.</p></div>
-        <div class="fcard reveal"><div class="mark"><b>5</b></div><h3 data-i18n="f5_t">Per-player dice styles</h3><p data-i18n="f5_d">Everyone can choose their own texture, material, and colors. Preferences are saved and carry over between sessions.</p></div>
-        <div class="fcard reveal"><div class="mark"><b>6</b></div><h3 data-i18n="f6_t">Server-side rules</h3><p data-i18n="f6_d">Crit and fumble logic adapts to your game system — D&amp;D 5e by default — with no need to reinstall anything.</p></div>
-        <div class="fcard reveal"><div class="mark"><b>7</b></div><h3 data-i18n="f7_t">Reasonable fallbacks</h3><p data-i18n="f7_d">Dice engine, fonts, sounds, and confetti are bundled locally. If anything fails, you still get a clean plaque with the total.</p></div>
-        <div class="fcard reveal"><div class="mark"><b>8</b></div><h3 data-i18n="f8_t">Preview without OBS</h3><p data-i18n="f8_d">Open any overlay URL in your browser and press T to cycle through fake rolls: normal → critical → fumble.</p></div>
+        <div class="fcard reveal"><div class="mark"><b>2</b></div><h3 data-i18n="f2_t">3D dice that match the result</h3><p data-i18n="f2_d">The physical dice land on the exact value rolled. For advantage or disadvantage, both d20s roll and the right one is shown.</p></div>
+        <div class="fcard reveal"><div class="mark"><b>3</b></div><h3 data-i18n="f3_t">Several rolls at once</h3><p data-i18n="f3_d">Every roll is its own throw with its own plaque, so simultaneous rolls from different players never queue up — the plaques line up in a row that reflows as dice land and settle.</p></div>
+        <div class="fcard reveal"><div class="mark"><b>4</b></div><h3 data-i18n="f4_t">An overlay that actually looks good</h3><p data-i18n="f4_d">The Arcane Plaque shows the portrait, big total, roll name, dice breakdown, advantage badge, and crit or fumble tags.</p></div>
+        <div class="fcard reveal"><div class="mark"><b>5</b></div><h3 data-i18n="f5_t">Design your own plaque</h3><p data-i18n="f5_d">A WYSIWYG editor lets you pick frame art from a template library, recolor it, drag the zones around, and add a custom background. The overlay renders exactly what you build.</p></div>
+        <div class="fcard reveal"><div class="mark"><b>6</b></div><h3 data-i18n="f6_t">Per-player dice styles</h3><p data-i18n="f6_d">Start from a curated preset, then fine-tune material, texture, and per-channel colors — numbers, body, edge — with a live preview.</p></div>
+        <div class="fcard reveal"><div class="mark"><b>7</b></div><h3 data-i18n="f7_t">Your look follows you</h3><p data-i18n="f7_d">Dice and plaque customizations are tied to your Roll20 account, not a single game, so your saved look comes with you into every new campaign automatically.</p></div>
+        <div class="fcard reveal"><div class="mark"><b>8</b></div><h3 data-i18n="f8_t">Shared or per-player overlays</h3><p data-i18n="f8_d">Each player gets a filtered overlay URL — perfect for individual scenes, separate cameras, or custom OBS layouts.</p></div>
+        <div class="fcard reveal"><div class="mark"><b>9</b></div><h3 data-i18n="f9_t">Server-side rules</h3><p data-i18n="f9_d">Crit and fumble logic adapts to your game system — D&amp;D 5e by default — with no need to reinstall anything.</p></div>
+        <div class="fcard reveal"><div class="mark"><b>10</b></div><h3 data-i18n="f10_t">Graceful fallbacks</h3><p data-i18n="f10_d">The dice engine, fonts, sounds, and confetti are bundled locally. If anything fails, you still get a clean plaque with the total.</p></div>
+        <div class="fcard reveal"><div class="mark"><b>11</b></div><h3 data-i18n="f11_t">Self-updating capture script</h3><p data-i18n="f11_d">The userscript keeps itself current, and a compatibility gate stops an outdated script cleanly instead of sending broken data — no manual reinstalls.</p></div>
+        <div class="fcard reveal"><div class="mark"><b>12</b></div><h3 data-i18n="f12_t">Preview without OBS</h3><p data-i18n="f12_d">Open any overlay URL in your browser and press T to cycle through test rolls: normal → critical → fumble.</p></div>
       </div>
     </div>
   </section>
@@ -493,7 +497,7 @@
               <input id="scripturl" readonly value="__ORIGIN__/roll20-capture.user.js" />
               <button data-copy="scripturl" data-i18n="copy">Copy</button>
             </div>
-            <p class="note" data-i18n="s2_note2">It's pre-configured for the hosted relay — no editing needed, and it auto-updates from here.</p>
+            <p class="note" data-i18n="s2_note2">It comes preconfigured for the hosted relay, so there is nothing to edit, and it will auto-update from here.</p>
           </div>
         </div>
 
@@ -501,9 +505,9 @@
           <div class="num">3</div>
           <div>
             <h3 data-i18n="s3_h">Open Roll20 &amp; add the overlay to OBS</h3>
-            <p data-i18n="s3_p1">Launch your Roll20 game. An <b>OBS Overlay</b> panel appears (bottom-right) and creates a room for you. Copy its <b>Overlay URL</b>.</p>
-            <p data-i18n="s3_p2">In OBS: <span class="mono">Sources → + → Browser</span>, paste the URL, set the size (e.g. 1920×1080) with a transparent background. Your rolls now pop on stream.</p>
-            <p class="note" data-i18n="s3_note">Want per-player overlays? Each player's URL is in the panel too — add one Browser source each.</p>
+            <p data-i18n="s3_p1">Open your Roll20 game. An <b>OBS Overlay</b> panel appears in the bottom-right corner and creates a room for you. Copy the <b>Overlay URL</b>.</p>
+            <p data-i18n="s3_p2">In OBS, go to <span class="mono">Sources → + → Browser</span>, paste the URL, and set the size to match your canvas (for example 1920×1080). The background stays transparent.</p>
+            <p class="note" data-i18n="s3_note">Want per-player overlays? Each player's URL is in the panel too — add one Browser source per player.</p>
           </div>
         </div>
       </div>
@@ -512,7 +516,7 @@
         <div class="ti"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1h6c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2Z"/></svg></div>
         <div>
           <h3 data-i18n="tip_h">No OBS handy? Try it right now</h3>
-          <p data-i18n="tip_p">Open any overlay URL in your browser and press <span class="kbd">T</span> to cycle through demo rolls: normal → critical → fumble.</p>
+          <p data-i18n="tip_p">Open any overlay URL in your browser and press <span class="kbd">T</span> to cycle through test rolls: normal → critical → fumble.</p>
         </div>
       </div>
     </div>
@@ -523,7 +527,7 @@
     <div class="wrap">
       <div class="cta-inner reveal">
         <h2 data-i18n="cta_h">Ready to roll?</h2>
-        <p data-i18n="cta_sub">Drop the overlay into OBS and let your table's luck steal the show.</p>
+        <p data-i18n="cta_sub">Drop the overlay into OBS and let your table's luck steal the spotlight.</p>
         <div class="hero-cta">
           <a class="btn btn-gold" href="#demo">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
@@ -548,7 +552,7 @@
       <div class="foot-grid">
         <div class="foot-brand">
           <div class="brand"><span class="die"><span>20</span></span>Banana&nbsp;Roll</div>
-          <p data-i18n="foot_tagline">Roll20 dice rolls, rendered live in OBS. A small, fun, open-source overlay for streamers and GMs.</p>
+          <p data-i18n="foot_tagline">Roll20 dice rolls, rendered live in OBS. A small open-source overlay for streamers and GMs.</p>
         </div>
         <div class="foot-links">
           <div class="foot-col">
@@ -665,7 +669,7 @@
         doc_title: 'Banana Roll — Roll20 dice rolls, live in OBS',
         nav_demo: 'Demo', nav_features: 'Features', nav_install: 'Install', nav_coffee: 'Buy me a coffee',
         hero_eyebrow: 'Roll20 → OBS overlay',
-        hero_h1: 'Your dice rolls, <span class="accent">live on stream.</span>',
+        hero_h1: 'Your dice rolls, <span class="accent">live on your stream.</span>',
         hero_sub: 'Banana Roll turns every Roll20 roll into an animated 3D OBS overlay that lands on the exact number rolled at the table. No copy-paste. No special syntax. Just roll.',
         hero_cta1: 'Watch the demo', hero_cta2: 'View on GitHub', hero_cta3: 'Install',
         trust1: 'Free &amp; open source', trust2: 'MIT licensed', trust3: 'Works with OBS Browser Source',
@@ -678,12 +682,16 @@
         feat_eyebrow: 'What it does', feat_h2: 'Every roll at your table, on screen',
         f1_t: "Captures everyone's rolls", f1_d: 'Automatically detects public rolls from every player — no one has to type in a special format. Private whispers and GM rolls stay private.',
         f2_t: '3D dice that match the result', f2_d: 'The dice physically land on the exact number rolled. With advantage or disadvantage, both d20s are shown and the kept die is clearly highlighted.',
-        f3_t: 'An overlay built for stream', f3_d: 'The Arcane Plaque shows the portrait, big total, roll name, dice breakdown, advantage badge, and crit or fumble tags.',
-        f4_t: 'Shared or per-player overlays', f4_d: 'Each player gets a filtered overlay URL — perfect for individual scenes, separate cameras, or custom OBS layouts.',
-        f5_t: 'Per-player dice styles', f5_d: 'Everyone can choose their own texture, material, and colors. Preferences are saved and carry over between sessions.',
-        f6_t: 'Server-side rules', f6_d: 'Crit and fumble logic adapts to your game system — D&amp;D 5e by default — with nothing to reinstall on the Roll20 side.',
-        f7_t: 'Graceful fallbacks', f7_d: 'The dice engine, fonts, sounds, and confetti are bundled locally. If anything fails, you still get a clean plaque with the total.',
-        f8_t: 'Preview without OBS', f8_d: 'Open any overlay URL in your browser and press T to cycle through test rolls: normal → critical → fumble.',
+        f3_t: 'Several rolls at once', f3_d: 'Every roll is its own throw with its own plaque, so simultaneous rolls from different players never queue up — the plaques line up in a row that reflows as dice land and settle.',
+        f4_t: 'An overlay that actually looks good', f4_d: 'The Arcane Plaque shows the portrait, big total, roll name, dice breakdown, advantage badge, and crit or fumble tags.',
+        f5_t: 'Design your own plaque', f5_d: 'A WYSIWYG editor lets you pick frame art from a template library, recolor it, drag the zones around, and add a custom background. The overlay renders exactly what you build.',
+        f6_t: 'Per-player dice styles', f6_d: 'Start from a curated preset, then fine-tune the material, texture, and per-channel colors — numbers, body, and edge — with a live preview.',
+        f7_t: 'Your look follows you', f7_d: 'Dice and plaque customizations are tied to your Roll20 account, not a single game, so your saved look comes with you into every new campaign automatically.',
+        f8_t: 'Shared or per-player overlays', f8_d: 'Each player gets a filtered overlay URL — perfect for individual scenes, separate cameras, or custom OBS layouts.',
+        f9_t: 'Server-side rules', f9_d: 'Crit and fumble logic adapts to your game system — D&amp;D 5e by default — with nothing to reinstall on the Roll20 side.',
+        f10_t: 'Graceful fallbacks', f10_d: 'The dice engine, fonts, sounds, and confetti are bundled locally. If anything fails, you still get a clean plaque with the total.',
+        f11_t: 'Self-updating capture script', f11_d: 'The userscript keeps itself current, and a compatibility gate stops an outdated script cleanly instead of sending broken data — no manual reinstalls.',
+        f12_t: 'Preview without OBS', f12_d: 'Open any overlay URL in your browser and press T to cycle through test rolls: normal → critical → fumble.',
         inst_eyebrow: 'Setup', inst_h2: 'Ready in two minutes',
         inst_sub: 'Three steps, no coding. Works in Chromium-based browsers and Firefox.',
         s1_h: 'Install Tampermonkey', s1_p: 'A free browser extension that runs the capture script on your Roll20 tab.',
@@ -712,7 +720,7 @@
         nav_demo: 'Demo', nav_features: 'Características', nav_install: 'Instalar', nav_coffee: 'Invítame a un café',
         hero_eyebrow: 'Overlay de Roll20 para OBS',
         hero_h1: 'Tus tiradas, <span class="accent">en directo en tu stream.</span>',
-        hero_sub: 'Banana Roll convierte cada tirada de Roll20 en un overlay 3D animado para OBS que cae exactamente en el resultado que salió en mesa. Sin copiar y pegar. Sin formatos raros. Solo tirar.',
+        hero_sub: 'Banana Roll convierte cada tirada de Roll20 en un overlay 3D animado para OBS que cae exactamente en el número que salió en mesa. Sin copiar y pegar. Sin formatos raros. Solo tira.',
         hero_cta1: 'Ver la demo', hero_cta2: 'Ver en GitHub', hero_cta3: 'Instalar',
         trust1: 'Gratis y de código abierto', trust2: 'Licencia MIT', trust3: 'Funciona con OBS Browser Source',
         plaque_badge: 'Ventaja', plaque_role: 'Ataque de espada larga', plaque_crit: '¡Crítico!',
@@ -724,12 +732,16 @@
         feat_eyebrow: 'Qué hace', feat_h2: 'Todo lo que se tira en tu mesa, en pantalla',
         f1_t: 'Captura las tiradas de toda la mesa', f1_d: 'Detecta automáticamente las tiradas públicas de todos los jugadores; nadie tiene que escribir nada especial. Los susurros privados y las tiradas del DM nunca salen de Roll20.',
         f2_t: 'Dados 3D que coinciden con el resultado', f2_d: 'Los dados caen en el valor exacto que se ha tirado. Con ventaja o desventaja, se lanzan ambos d20 y se destaca claramente cuál cuenta.',
-        f3_t: 'Un overlay pensado para verse bien', f3_d: 'La Placa Arcana muestra el retrato, el total, el nombre de la tirada, el desglose de dados, la insignia de ventaja y las etiquetas de crítico o pifia.',
-        f4_t: 'Overlay compartido o por jugador', f4_d: 'Cada jugador tiene su propia URL de overlay filtrada: ideal para escenas individuales, cámaras separadas o composiciones personalizadas en OBS.',
-        f5_t: 'Estilos de dados por jugador', f5_d: 'Cada persona puede elegir su propia textura, material y paleta de color. Las preferencias se guardan y se mantienen entre sesiones.',
-        f6_t: 'Reglas en el servidor', f6_d: 'La lógica de críticos y pifias se adapta a tu sistema de juego — D&amp;D 5e por defecto — sin tener que reinstalar nada en Roll20.',
-        f7_t: 'Respaldo cuando algo falla', f7_d: 'El motor de dados, las fuentes, los sonidos y el confeti van empaquetados en local. Si algo falla, el overlay sigue mostrando una placa limpia con el total.',
-        f8_t: 'Vista previa sin OBS', f8_d: 'Abre cualquier URL de overlay en el navegador y pulsa T para ir alternando tiradas de prueba: normal → crítico → pifia.',
+        f3_t: 'Varias tiradas a la vez', f3_d: 'Cada tirada es un lanzamiento propio con su propia placa, así que las tiradas simultáneas de distintos jugadores nunca hacen cola: las placas se alinean en una fila que se reordena según caen y se asientan los dados.',
+        f4_t: 'Un overlay que de verdad se ve bien', f4_d: 'La Placa Arcana muestra el retrato, el total, el nombre de la tirada, el desglose de dados, la insignia de ventaja y las etiquetas de crítico o pifia.',
+        f5_t: 'Diseña tu propia placa', f5_d: 'Un editor WYSIWYG te permite elegir el arte del marco de una biblioteca de plantillas, recolorearlo, arrastrar las zonas y añadir un fondo personalizado. El overlay renderiza justo lo que montas.',
+        f6_t: 'Estilos de dados por jugador', f6_d: 'Parte de un preset bien afinado y luego afina el material, la textura y los colores por canal —números, cuerpo y borde— con vista previa en vivo.',
+        f7_t: 'Tu estilo te sigue', f7_d: 'Las personalizaciones de dados y placa van ligadas a tu cuenta de Roll20, no a una partida: tu estilo guardado te acompaña a cada campaña nueva automáticamente.',
+        f8_t: 'Overlay compartido o por jugador', f8_d: 'Cada jugador tiene su propia URL de overlay filtrada: ideal para escenas individuales, cámaras separadas o composiciones personalizadas en OBS.',
+        f9_t: 'Reglas en el servidor', f9_d: 'La lógica de críticos y pifias se adapta a tu sistema de juego — D&amp;D 5e por defecto — sin tener que reinstalar nada en Roll20.',
+        f10_t: 'Alternativas si algo falla', f10_d: 'El motor de dados, las fuentes, los sonidos y el confeti están empaquetados localmente. Si algo falla, el overlay sigue mostrando una placa limpia con el total.',
+        f11_t: 'Script de captura que se actualiza solo', f11_d: 'El userscript se mantiene al día y una compuerta de compatibilidad detiene limpiamente un script desactualizado en lugar de enviar datos rotos, sin reinstalaciones manuales.',
+        f12_t: 'Vista previa sin OBS', f12_d: 'Abre cualquier URL de overlay en el navegador y pulsa T para ir alternando tiradas de prueba: normal → crítico → pifia.',
         inst_eyebrow: 'Configuración', inst_h2: 'Listo en dos minutos',
         inst_sub: 'Tres pasos y sin tocar código. Funciona en navegadores basados en Chromium y en Firefox.',
         s1_h: 'Instala Tampermonkey', s1_p: 'Una extensión de navegador gratuita que ejecuta el script de captura en tu pestaña de Roll20.',
