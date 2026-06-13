@@ -157,12 +157,19 @@
 
   <script src="/assets/customizer/editor.js"></script>
 
+  <!-- Single shared three (r182), vendored local-first — the externalized dice
+       bundle resolves this bare `three`; the CDN engine fallback bundles its own. -->
+  <script type="importmap">
+  { "imports": { "three": "/assets/three/three.module.js" } }
+  </script>
+
   <!-- ── 3D dice engine (optional, graceful) ── -->
   <script type="module">
     const BR = window.BR;
     const ASSET_PATH = '/assets/';
     const LOCAL_ENGINE = '/assets/dice-box/dice-box.bundle.js';
-    const CDN = 'https://cdn.jsdelivr.net/npm/@3d-dice/dice-box-threejs@0.0.12';
+    // Fallback = our fork's build via jsdelivr /gh from a pinned tag (upstream is unmaintained).
+    const CDN = 'https://cdn.jsdelivr.net/gh/ankorio/dice-box-threejs@v0.1.0';
     let Box = null, rolling = false;
 
     async function init() {

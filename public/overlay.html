@@ -60,6 +60,14 @@
   <div id="stage"></div>
   <div id="status">connecting…</div>
 
+  <!-- Single shared three (r182), vendored local-first. The dice engine bundle is
+       built with three externalized, so it resolves this bare `three` specifier;
+       keeping it local (not a CDN) preserves the overlay's CDN-outage resilience.
+       The CDN engine fallback bundles its own three and ignores this map. -->
+  <script type="importmap">
+  { "imports": { "three": "/assets/three/three.module.js" } }
+  </script>
+
   <script type="module">
   /* ─────────────────────────────────────────────────────────────────────────
      OVERLAY CONFIG — the DEFAULT dice look (used when a roll carries no per-player
@@ -86,7 +94,10 @@
   // locally-built bundle; the CDN fallback gives built-in textures only.)
   const ASSET_PATH = '/assets/';
   const LOCAL_ENGINE = '/assets/dice-box/dice-box.bundle.js';
-  const CDN = 'https://cdn.jsdelivr.net/npm/@3d-dice/dice-box-threejs@0.0.12';
+  // Fallback = our own fork's built artifact, served from a pinned git tag via jsdelivr /gh
+  // (upstream @3d-dice is unmaintained). Its dist externalizes three → resolved by the
+  // import map above; assetPath below uses the fork's vendored public/ textures.
+  const CDN = 'https://cdn.jsdelivr.net/gh/ankorio/dice-box-threejs@v0.1.0';
   const SUPPORTED_SIDES = new Set([4, 6, 8, 10, 12, 20, 100]);
 
   const params = new URLSearchParams(location.search);
