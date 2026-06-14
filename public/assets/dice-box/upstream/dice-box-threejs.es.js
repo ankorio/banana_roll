@@ -5808,7 +5808,7 @@ var Jn = { type: "postStep" }, Yn = { type: "preStep" }, K = {
 		});
 	}
 	async updateConfig(e = {}) {
-		Object.apply(this, e), this.theme_customColorset = e.theme_customColorset ? e.theme_customColorset : null, e.theme_colorset && (this.theme_colorset = e.theme_colorset), e.theme_texture && (this.theme_texture = e.theme_texture), e.theme_material && (this.theme_material = e.theme_material), (e.theme_colorset || e.theme_texture || e.theme_material || e.theme_customColorset) && await this.loadTheme({
+		Object.apply(this, e), this.theme_customColorset = e.theme_customColorset ? e.theme_customColorset : null, e.theme_colorset && (this.theme_colorset = e.theme_colorset), e.theme_texture && (this.theme_texture = e.theme_texture), e.theme_material && (this.theme_material = e.theme_material), (e.theme_colorset || e.theme_texture || e.theme_material || e.theme_customColorset) && await this.loadTheme(this.theme_customColorset ? { customColorset: this.theme_customColorset } : {
 			colorset: this.theme_colorset,
 			texture: this.theme_texture,
 			material: this.theme_material

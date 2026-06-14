@@ -3,6 +3,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const rooms = require('./rooms');
 const parser = require('./parser');
 const templates = require('./templates');
@@ -65,11 +66,30 @@ const STATIC_TYPES = {
   '.json': 'application/json; charset=utf-8',
   '.woff2': 'font/woff2',
 };
-function serveFile(res, file, headers = {}) {
+// Cache policy. Code/markup (html/js/css/json) is served `no-cache`: the browser may
+// store it but MUST revalidate every load, so edits show up without a hard refresh
+// (Ctrl+F5). Paired with an ETag, an unchanged file costs only a tiny 304. Heavy,
+// rarely-edited media (textures/sounds/fonts/art) stays cached for a day. Set
+// NO_CACHE=1 to force-revalidate everything too (handy when iterating on textures).
+const NO_CACHE = /^(1|true|yes|on)$/i.test(process.env.NO_CACHE || '');
+const REVALIDATE_EXT = new Set(['.html', '.js', '.css', '.json']);
+function cacheControlFor(ext) {
+  if (NO_CACHE || REVALIDATE_EXT.has(ext)) return 'no-cache';
+  return 'public, max-age=86400';
+}
+function serveFile(res, file, headers = {}, req = null) {
   fs.readFile(file, (err, data) => {
     if (err) { sendJson(res, 404, { error: 'not found' }); return; }
-    const type = STATIC_TYPES[path.extname(file)] || 'application/octet-stream';
-    res.writeHead(200, { 'Content-Type': type, ...headers });
+    const ext = path.extname(file);
+    const type = STATIC_TYPES[ext] || 'application/octet-stream';
+    const etag = '"' + crypto.createHash('sha1').update(data).digest('hex').slice(0, 20) + '"';
+    // Caller-supplied headers win (lets a route force a specific Cache-Control).
+    const respHeaders = { 'Cache-Control': cacheControlFor(ext), ETag: etag, ...headers };
+    if (req && req.headers['if-none-match'] === etag) {
+      res.writeHead(304, respHeaders);
+      return res.end();
+    }
+    res.writeHead(200, { 'Content-Type': type, ...respHeaders });
     res.end(data);
   });
 }
@@ -79,12 +99,15 @@ function serveFile(res, file, headers = {}) {
 // /assets/textures/marble.webp) with a path-traversal guard: the resolved path must
 // stay inside public/assets/.
 const ASSETS_DIR = path.join(PUBLIC_DIR, 'assets');
-function serveAsset(res, rel) {
+function serveAsset(res, rel, req) {
   const target = path.normalize(path.join(ASSETS_DIR, rel));
   if (target !== ASSETS_DIR && !target.startsWith(ASSETS_DIR + path.sep)) {
     return sendJson(res, 403, { error: 'forbidden' });
   }
-  serveFile(res, target, { 'Cache-Control': 'public, max-age=86400' });
+  // Cache-Control is decided by extension in serveFile: the customizer's editor.js /
+  // data.js / dice-box.bundle.js / dice-manifest.json revalidate (instant updates),
+  // while textures/sounds/fonts keep the long cache.
+  serveFile(res, target, {}, req);
 }
 
 // Landing/setup page, served at `/` with this deployment's origin baked in so the
@@ -93,12 +116,12 @@ function serveAsset(res, rel) {
 let landingTemplate = null;
 function serveLanding(req, res) {
   try {
-    if (landingTemplate == null) {
+    if (landingTemplate == null || NO_CACHE) {
       landingTemplate = fs.readFileSync(path.join(PUBLIC_DIR, 'landing.html'), 'utf8');
     }
   } catch { return sendJson(res, 404, { error: 'not found' }); }
   const body = landingTemplate.replace(/__ORIGIN__/g, baseUrl(req));
-  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
   res.end(body);
 }
 
@@ -107,7 +130,7 @@ function serveLanding(req, res) {
 // self-provisions, keeping the token off room-id-only responses.)
 let userscriptTemplate = null;
 function buildUserscript(req) {
-  if (userscriptTemplate == null) {
+  if (userscriptTemplate == null || NO_CACHE) {
     userscriptTemplate = fs.readFileSync(path.join(PUBLIC_DIR, 'roll20-capture.user.js'), 'utf8');
   }
   const origin = baseUrl(req);
@@ -120,7 +143,7 @@ function buildUserscript(req) {
 function serveUserscript(req, res) {
   let body;
   try { body = buildUserscript(req); } catch { return sendJson(res, 404, { error: 'not found' }); }
-  res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8' });
+  res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-cache' });
   res.end(body);
 }
 // Tampermonkey fetches <name>.meta.js (just the header) to check @version for updates.
@@ -130,7 +153,7 @@ function serveUserscriptMeta(req, res) {
   const marker = '// ==/UserScript==';
   const end = body.indexOf(marker);
   const meta = end >= 0 ? body.slice(0, end + marker.length) + '\n' : body;
-  res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8' });
+  res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-cache' });
   res.end(meta);
 }
 
@@ -634,7 +657,7 @@ const server = http.createServer((req, res) => {
   // dice manifest). Nested paths allowed; serveAsset() guards against traversal.
   const asset = pathname.match(/^\/assets\/(.+)$/);
   if (asset && method === 'GET') {
-    return serveAsset(res, decodeURIComponent(asset[1]));
+    return serveAsset(res, decodeURIComponent(asset[1]), req);
   }
   if (pathname === '/roll20-capture.meta.js' && method === 'GET') {
     return serveUserscriptMeta(req, res);
@@ -668,14 +691,14 @@ const server = http.createServer((req, res) => {
     }
     if (action === 'overlay' && method === 'GET') {
       // overlay reads its room id from the path on the client side
-      return serveFile(res, path.join(PUBLIC_DIR, 'overlay.html'));
+      return serveFile(res, path.join(PUBLIC_DIR, 'overlay.html'), {}, req);
     }
     if (action === 'setup' && method === 'GET') {
-      return serveFile(res, path.join(PUBLIC_DIR, 'setup.html'));
+      return serveFile(res, path.join(PUBLIC_DIR, 'setup.html'), {}, req);
     }
     if (action === 'customize' && method === 'GET') {
       // self-serve dice styling page; reads room id + ?player= on the client side
-      return serveFile(res, path.join(PUBLIC_DIR, 'customize.html'));
+      return serveFile(res, path.join(PUBLIC_DIR, 'customize.html'), {}, req);
     }
     return sendJson(res, 405, { error: 'method not allowed' });
   }

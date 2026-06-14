@@ -13,6 +13,11 @@ Roll20 tab (userscript: relay raw chat records) --HTTP POST--> Node server (pars
 - `npm run smoke` — end-to-end smoke test (create room, SSE, post + duplicate, bad token).
 - Env: `PORT`, `BASE_URL` (absolute URL base for generated links), `ROOM_TTL` (ms),
   `MAX_ROOMS`, rate-limit knobs (see `src/rooms.js`).
+- **Caching:** `serveFile` sends code/markup (`.html/.js/.css/.json`) as `no-cache` + an
+  ETag (always revalidate → instant edits, cheap `304` when unchanged); heavy media
+  (textures/sounds/fonts/art) keeps `max-age=86400`. `NO_CACHE=1` forces `no-cache` on
+  everything **and** re-reads the in-memory `landing.html`/userscript templates per request
+  (dev: see edits without a server restart or Ctrl+F5).
 
 ## Architecture
 - **Capture = Firebase transport hook (thin relay).** The userscript runs at `document-start`

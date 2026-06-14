@@ -110,6 +110,8 @@ npm start                 # starts on http://localhost:8765 and builds the dice 
 
 1. **Install the userscript:** open `http://localhost:8765/roll20-capture.user.js` with [Tampermonkey](https://www.tampermonkey.net/). The server already injects its own origin, so you do not need to edit anything. The first time it runs on Roll20, it will automatically create a room and open the setup page.
 
+   > **Chrome & Edge (Manifest V3):** you must enable user scripts or nothing runs (no panel appears in Roll20). Chrome: `chrome://extensions` → enable **Developer mode**, then on the Tampermonkey card turn on **Allow user scripts**. Edge: `edge://extensions` → Tampermonkey → **Details** → **Allow user scripts**. Reload the Roll20 tab afterwards. Firefox needs nothing extra. Step-by-step with screenshots: [Tampermonkey FAQ Q209](https://www.tampermonkey.net/faq.php?q=Q209#google_vignette).
+
 2. **Add the overlay to OBS:** Sources → **+** → **Browser**, then paste the `overlayUrl`. The background is transparent.
 
 3. **Roll dice in Roll20.** The rolls will appear in the overlay.

@@ -111,6 +111,8 @@ npm start                 # arranca en http://localhost:8765 y compila antes el 
 
 1. **Instala el userscript:** abre `http://localhost:8765/roll20-capture.user.js` con [Tampermonkey](https://www.tampermonkey.net/). El servidor ya inserta su propio origen, así que no tienes que editar nada. La primera vez que se ejecute en Roll20 creará una sala automáticamente y abrirá la página de configuración.
 
+   > **Chrome y Edge (Manifest V3):** debes activar los user scripts o no se ejecutará nada (no aparece el panel en Roll20). Chrome: `chrome://extensions` → activa el **Modo de desarrollador** y en la tarjeta de Tampermonkey activa **Permitir user scripts**. Edge: `edge://extensions` → Tampermonkey → **Detalles** → **Permitir user scripts**. Recarga la pestaña de Roll20 después. Firefox no necesita nada extra. Paso a paso con capturas: [FAQ de Tampermonkey Q209](https://www.tampermonkey.net/faq.php?q=Q209#google_vignette).
+
 2. **Añade el overlay a OBS:** Fuentes → **+** → **Navegador** y pega la `overlayUrl`. El fondo es transparente.
 
 3. **Tira dados en Roll20.** Las tiradas aparecerán en el overlay.
