@@ -81,6 +81,18 @@ display; only the **profile key** is the account id. Requires userscript ≥ 0.8
 `userid`, so customizations stay per-campaign). The live overlay does **not** yet render `plaqueConfig` (deferred — it keeps
 its fixed CSS plaque); plaque configs persist but don't drive the overlay yet.
 
+**Aligning template defaults (live tuning → core):** templates are seeded server-side in
+`src/templates.js`. Every template uses one shared layout (`zonesArcane()`) + `DEFAULT_COLORS`;
+a template id listed in `TEMPLATE_OVERRIDES` uses its own `zones`/`colors` instead (omit a field
+to keep the shared default). `public/assets/customizer/data.js` mirrors this (`TPL_OVERRIDES`) as
+the editor's offline fallback — templates.js is the source of truth (the editor loads
+`GET /room/:id/templates`). To promote what you tuned in the customizer into the core: open the
+plaque in the customize page (it loads any saved config into `BR.state`), tune it, then run
+**`BR.exportTemplate()`** in the DevTools console. It logs + clipboard-copies two paste-ready
+blocks — a SHARED-DEFAULT block (paste into `zonesArcane()` + `DEFAULT_COLORS`, applies to all)
+and a PER-TEMPLATE OVERRIDE block keyed by the current template id (paste into `TEMPLATE_OVERRIDES`
+/ `TPL_OVERRIDES`). Restart the server (or `NO_CACHE=1`) to pick up the change.
+
 **Roll event shape:** (`id` is the Firebase chat push-id; `playerid` is optional)
 ```json
 { "id": "<firebase-chat-key>", "who": "Player", "formula": "Fire Bolt: 1d20 + 7", "total": 23,

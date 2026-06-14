@@ -758,4 +758,41 @@
     return { theme_customColorset: null, theme_colorset: s.colorset, theme_texture: texture, theme_material: material };
   };
   BR.afterEngine = function (note) { const n = $('#engineNote'); if (n) n.textContent = note; };
+
+  // ── export current plaque as core defaults ─────────────────────────────────
+  // Dump the LIVE editor state (the selected template's zones + colors, exactly as
+  // you've tuned them on screen) as paste-ready blocks for the core: a SHARED-DEFAULT
+  // block (zonesArcane() body + DEFAULT_COLORS, used by every template) and a
+  // PER-TEMPLATE OVERRIDE block keyed by the current template id. Run
+  // `BR.exportTemplate()` in the DevTools console — it logs the blocks and copies them
+  // to the clipboard. See CLAUDE.md → "Aligning template defaults".
+  BR.exportTemplate = function () {
+    const r1 = (n) => Math.round((+n || 0) * 10) / 10;
+    const r2 = (n) => Math.round((+n || 0) * 100) / 100;
+    const r3 = (n) => Math.round((+n || 0) * 1000) / 1000;
+    const zline = (z, pad) => `${pad}{ id: '${z.id}', kind: '${z.kind}', cx: ${r1(z.cx)}, cy: ${r1(z.cy)}, w: ${r1(z.w)}, coef: ${r3(z.coef)}, fs: ${r2(z.fs)}, align: '${z.align}', colorKey: ${z.colorKey ? `'${z.colorKey}'` : 'null'}, visible: ${z.visible !== false}, locked: ${!!z.locked} },`;
+    const zonesAt = (pad) => st.zones.map((z) => zline(z, pad)).join('\n');
+    const colors = `{ accent: '${st.colors.accent}', badge: '${st.colors.badge}', name: '${st.colors.name}' }`;
+    const id = st.templateId;
+    const out = [
+      `/* ===== SHARED DEFAULT (every template) — src/templates.js + data.js ===== */`,
+      `// → DEFAULT_COLORS / TPL_DEFAULT_COLORS:`,
+      `${colors}`,
+      `// → zonesArcane() return body:`,
+      `return [`,
+      zonesAt('    '),
+      `];`,
+      ``,
+      `/* ===== PER-TEMPLATE OVERRIDE for "${id}" — add to TEMPLATE_OVERRIDES (templates.js) / TPL_OVERRIDES (data.js) ===== */`,
+      `  ${JSON.stringify(id)}: {`,
+      `    colors: ${colors},`,
+      `    zones: [`,
+      zonesAt('      '),
+      `    ],`,
+      `  },`,
+    ].join('\n');
+    try { navigator.clipboard.writeText(out); console.log('%c[export] copied to clipboard ✓', 'color:#3ad17a;font-weight:700'); } catch (e) { console.log('[export] (clipboard blocked — copy from below)'); }
+    console.log(out);
+    return out;
+  };
 })();
