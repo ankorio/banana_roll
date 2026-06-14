@@ -13,6 +13,11 @@ Roll20 tab (userscript: relay raw chat records) --HTTP POST--> Node server (pars
 - `npm run smoke` — end-to-end smoke test (create room, SSE, post + duplicate, bad token).
 - Env: `PORT`, `BASE_URL` (absolute URL base for generated links), `ROOM_TTL` (ms),
   `MAX_ROOMS`, rate-limit knobs (see `src/rooms.js`).
+- **Caching:** `serveFile` sends code/markup (`.html/.js/.css/.json`) as `no-cache` + an
+  ETag (always revalidate → instant edits, cheap `304` when unchanged); heavy media
+  (textures/sounds/fonts/art) keeps `max-age=86400`. `NO_CACHE=1` forces `no-cache` on
+  everything **and** re-reads the in-memory `landing.html`/userscript templates per request
+  (dev: see edits without a server restart or Ctrl+F5).
 
 ## Architecture
 - **Capture = Firebase transport hook (thin relay).** The userscript runs at `document-start`
@@ -75,6 +80,18 @@ per-roll path). The per-campaign `playerid` still drives roll filtering, per-pla
 display; only the **profile key** is the account id. Requires userscript ≥ 0.8.0 (older scripts omit
 `userid`, so customizations stay per-campaign). The live overlay does **not** yet render `plaqueConfig` (deferred — it keeps
 its fixed CSS plaque); plaque configs persist but don't drive the overlay yet.
+
+**Aligning template defaults (live tuning → core):** templates are seeded server-side in
+`src/templates.js`. Every template uses one shared layout (`zonesArcane()`) + `DEFAULT_COLORS`;
+a template id listed in `TEMPLATE_OVERRIDES` uses its own `zones`/`colors` instead (omit a field
+to keep the shared default). `public/assets/customizer/data.js` mirrors this (`TPL_OVERRIDES`) as
+the editor's offline fallback — templates.js is the source of truth (the editor loads
+`GET /room/:id/templates`). To promote what you tuned in the customizer into the core: open the
+plaque in the customize page (it loads any saved config into `BR.state`), tune it, then run
+**`BR.exportTemplate()`** in the DevTools console. It logs + clipboard-copies two paste-ready
+blocks — a SHARED-DEFAULT block (paste into `zonesArcane()` + `DEFAULT_COLORS`, applies to all)
+and a PER-TEMPLATE OVERRIDE block keyed by the current template id (paste into `TEMPLATE_OVERRIDES`
+/ `TPL_OVERRIDES`). Restart the server (or `NO_CACHE=1`) to pick up the change.
 
 **Roll event shape:** (`id` is the Firebase chat push-id; `playerid` is optional)
 ```json

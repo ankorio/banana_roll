@@ -62,12 +62,23 @@
 
     #status { position: fixed; top: 6px; left: 8px; z-index: 3; font-size: 11px; color: #888;
       font-family: monospace; opacity: 0.5; }
+    /* Test button: roll a random plaque + dice + result. Auto-fades when the mouse is
+       idle (3s) so it never shows on a static stream — move the mouse to bring it back. */
+    #testbtn { position: fixed; left: 12px; bottom: 12px; z-index: 5; font-family: 'Cinzel', serif;
+      font-size: 13px; font-weight: 700; color: #2a1d00; cursor: pointer; border: 0;
+      padding: 9px 14px; border-radius: 10px; background: linear-gradient(180deg, #ffdf72, #ffd24a);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, .45); opacity: .9;
+      transition: opacity .45s ease, transform .08s ease; }
+    #testbtn:hover { opacity: 1; }
+    #testbtn:active { transform: translateY(1px); }
+    #testbtn.idle { opacity: 0; pointer-events: none; }
   </style>
 </head>
 <body>
   <div id="dice"></div>
   <div id="stage"></div>
   <div id="status">connecting…</div>
+  <button id="testbtn" type="button" hidden>🎲 Test roll</button>
 
   <!-- Single shared three (r182), vendored local-first. The dice engine bundle is
        built with three externalized, so it resolves this bare `three` specifier;
@@ -388,6 +399,7 @@
   }
   function templateArt(id) { const tp = templatesById[id]; return tp ? tp.art : (id === BUILTIN_PLAQUE.templateId ? BUILTIN_PLAQUE.art : null); }
   function plaqueConfigFor(roll) {
+    if (roll && roll._plaque) return roll._plaque;   // test button: a forced random template
     const id = roll && roll.playerid;
     return (id && plaqueCache.plaques[id]) || plaqueCache.defaultPlaque ||
       templatesById.arcane && { templateId: 'arcane', colors: templatesById.arcane.colors, zones: templatesById.arcane.zones, background: null } ||
@@ -715,6 +727,80 @@
         mode: 'normal', d20: null, dice: [d20(v)], isCrit: v === 20, isFumble: v === 1, ts: Date.now() });
     }
   });
+
+  // ── test button: random template + random dice look + random event/result ────
+  // Each click builds one complete roll and runs it through the real pipeline (3D
+  // dice + plaque + particles). Hidden in the landing-page demo; the button auto-fades
+  // when the mouse is idle so it never lands on a static OBS stream.
+  if (!DEMO) {
+    const testBtn = document.getElementById('testbtn');
+    testBtn.hidden = false;
+
+    const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+    const randInt = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
+    // HSL→hex so each random dice palette stays coherent: light numbers, saturated body, dark edge.
+    function hslHex(h, s, l) {
+      s /= 100; l /= 100;
+      const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = l - c / 2;
+      const [r, g, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x]
+        : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+      const hx = (v) => Math.round((v + m) * 255).toString(16).padStart(2, '0');
+      return '#' + hx(r) + hx(g) + hx(b);
+    }
+    const TEST_TEX = ['marble', 'fire', 'ice', 'metal', 'stars', 'astral', 'glitter', 'dragon', 'water', 'speckles', 'stainedglass', 'none'];
+    const TEST_MAT = ['glass', 'metal', 'plastic', 'wood', 'none'];
+    function randomDiceStyle() {
+      const h = randInt(0, 359);
+      return {
+        texture: pick(TEST_TEX),
+        material: pick(TEST_MAT),
+        foreground: hslHex((h + randInt(20, 40)) % 360, 70, 85),
+        background: hslHex(h, randInt(55, 80), randInt(28, 45)),
+        edge: hslHex(h, 50, 12),
+      };
+    }
+    // A random plaque template from whatever the relay has loaded; null → the default/
+    // builtin plaque (e.g. before /templates lands, or when running without a room).
+    function randomTemplate() {
+      const ids = Object.keys(templatesById);
+      if (!ids.length) return null;
+      const tp = templatesById[pick(ids)];
+      return { templateId: tp.id, colors: tp.colors, zones: tp.zones, background: null };
+    }
+    const TEST_WHO = ['Seraphina', 'Thorne', 'Lyra', 'Grimm', 'Vesper', 'Kael', 'Mara', 'Orin', 'Sable', 'Quill'];
+    const TEST_RNAME = ['Longsword Attack', 'Fire Bolt', 'Stealth Check', 'Perception', 'Wisdom Save', 'Eldritch Blast', 'Sacred Flame', 'Arcana', 'Athletics', 'Initiative'];
+    let testN = 0;
+    function randomTestRoll() {
+      testN++;
+      // Weight toward normal; adv/dis roll two d20s, crit/fumble force 20/1.
+      const ev = pick(['normal', 'normal', 'normal', 'advantage', 'disadvantage', 'crit', 'fumble']);
+      const mod = randInt(0, 9);
+      const d20 = (v) => ({ sides: '20', value: v, crit: v === 20, fumble: v === 1 });
+      const base = {
+        id: 'test' + testN + '_' + Math.random().toString(36).slice(2, 6),
+        who: pick(TEST_WHO), style: randomDiceStyle(), ts: Date.now(),
+      };
+      const tpl = randomTemplate(); if (tpl) base._plaque = tpl;
+      const rname = pick(TEST_RNAME);
+      if (ev === 'advantage' || ev === 'disadvantage') {
+        const a = randInt(1, 20), b = randInt(1, 20), adv = ev === 'advantage';
+        const kept = adv ? Math.max(a, b) : Math.min(a, b);
+        return { ...base, formula: `${rname}: 1d20 + ${mod}`, total: kept + mod, modifier: mod, mode: ev,
+          d20: { values: [a, b], keptIndex: adv ? (a >= b ? 0 : 1) : (a <= b ? 0 : 1) },
+          dice: [d20(kept)], isCrit: kept === 20, isFumble: kept === 1 };
+      }
+      const v = ev === 'crit' ? 20 : ev === 'fumble' ? 1 : randInt(1, 20);
+      return { ...base, formula: `${rname}: 1d20 + ${mod}`, total: v + mod, modifier: mod, mode: 'normal',
+        d20: null, dice: [d20(v)], isCrit: v === 20, isFumble: v === 1 };
+    }
+    testBtn.addEventListener('click', () => enqueue(randomTestRoll()));
+
+    // Auto-fade when the mouse is idle (kept clickable while you're interacting).
+    let idleT = null;
+    const wake = () => { testBtn.classList.remove('idle'); clearTimeout(idleT); idleT = setTimeout(() => testBtn.classList.add('idle'), 3000); };
+    ['mousemove', 'pointerdown', 'keydown'].forEach((ev) => window.addEventListener(ev, wake));
+    wake();
+  }
   </script>
 </body>
 </html>

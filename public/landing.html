@@ -270,6 +270,12 @@
     display: grid; place-items: center; color: var(--gold); }
   .tip h3 { font-family: var(--sans); font-size: 16px; font-weight: 700; letter-spacing: 0; }
   .tip p { color: var(--muted); font-size: 14.5px; margin: 4px 0 0; }
+  .callout { margin: 14px 0 4px; border: 1px solid var(--gold-soft); border-left-width: 3px;
+    border-radius: 10px; padding: 12px 14px; background: rgba(255,210,74,.05); }
+  .callout b { color: var(--ink); }
+  .callout p { color: var(--ink-2); font-size: 14px; margin: 0; }
+  .callout p + p { margin-top: 7px; }
+  .callout .mono { color: var(--gold); }
 
   /* ── cta band ──────────────────────────────────── */
   .cta-band { text-align: center; }
@@ -498,6 +504,11 @@
               <button data-copy="scripturl" data-i18n="copy">Copy</button>
             </div>
             <p class="note" data-i18n="s2_note2">It comes preconfigured for the hosted relay, so there is nothing to edit, and it will auto-update from here.</p>
+            <div class="callout">
+              <p data-i18n="s2_chrome_h"><b>⚠️ Chrome &amp; Edge: turn on user scripts</b></p>
+              <p data-i18n="s2_chrome_p">Chromium browsers now require one extra toggle or the script silently won't run (no panel appears in Roll20). In <b>Chrome</b>: open <span class="mono">chrome://extensions</span>, enable <b>Developer mode</b> (top-right), then on the Tampermonkey card turn on <b>Allow user scripts</b>. In <b>Edge</b>: open <span class="mono">edge://extensions</span> → Tampermonkey → <b>Details</b> and turn on <b>Allow user scripts</b>. Then reload your Roll20 tab. Firefox needs nothing extra.</p>
+              <p data-i18n="s2_chrome_link">Step-by-step with screenshots: <a href="https://www.tampermonkey.net/faq.php?q=Q209#google_vignette" target="_blank" rel="noopener">Tampermonkey FAQ Q209</a>.</p>
+            </div>
           </div>
         </div>
 
@@ -700,6 +711,9 @@
         s2_btn: 'Install the userscript ↓',
         s2_note1: 'Or paste this URL into Tampermonkey → <span class="mono">Utilities → Install from URL</span>:',
         s2_note2: 'It comes preconfigured for the hosted relay, so there is nothing to edit, and it will auto-update from here.',
+        s2_chrome_h: '⚠️ Chrome &amp; Edge: turn on user scripts',
+        s2_chrome_p: 'Chromium browsers now require one extra toggle or the script silently won\'t run (no panel appears in Roll20). In <b>Chrome</b>: open <span class="mono">chrome://extensions</span>, enable <b>Developer mode</b> (top-right), then on the Tampermonkey card turn on <b>Allow user scripts</b>. In <b>Edge</b>: open <span class="mono">edge://extensions</span> → Tampermonkey → <b>Details</b> and turn on <b>Allow user scripts</b>. Then reload your Roll20 tab. Firefox needs nothing extra.',
+        s2_chrome_link: 'Step-by-step with screenshots: <a href="https://www.tampermonkey.net/faq.php?q=Q209#google_vignette" target="_blank" rel="noopener">Tampermonkey FAQ Q209</a>.',
         s3_h: 'Open Roll20 &amp; add the overlay to OBS',
         s3_p1: 'Open your Roll20 game. An <b>OBS Overlay</b> panel appears in the bottom-right corner and creates a room for you. Copy the <b>Overlay URL</b>.',
         s3_p2: 'In OBS, go to <span class="mono">Sources → + → Browser</span>, paste the URL, and set the size to match your canvas (for example 1920×1080). The background stays transparent.',
@@ -750,6 +764,9 @@
         s2_btn: 'Instalar el userscript ↓',
         s2_note1: 'O pega esta URL en Tampermonkey → <span class="mono">Utilidades → Instalar desde URL</span>:',
         s2_note2: 'Ya viene configurado para el relay alojado, así que no tienes que editar nada y además se actualizará desde aquí.',
+        s2_chrome_h: '⚠️ Chrome y Edge: activa los user scripts',
+        s2_chrome_p: 'Los navegadores Chromium ahora exigen un ajuste extra o el script no se ejecuta (no aparece el panel en Roll20). En <b>Chrome</b>: abre <span class="mono">chrome://extensions</span>, activa el <b>Modo de desarrollador</b> (arriba a la derecha) y en la tarjeta de Tampermonkey activa <b>Permitir user scripts</b>. En <b>Edge</b>: abre <span class="mono">edge://extensions</span> → Tampermonkey → <b>Detalles</b> y activa <b>Permitir user scripts</b>. Después recarga la pestaña de Roll20. Firefox no necesita nada extra.',
+        s2_chrome_link: 'Paso a paso con capturas: <a href="https://www.tampermonkey.net/faq.php?q=Q209#google_vignette" target="_blank" rel="noopener">FAQ de Tampermonkey Q209</a>.',
         s3_h: 'Abre Roll20 y añade el overlay a OBS',
         s3_p1: 'Abre tu partida de Roll20. En la esquina inferior derecha aparecerá un panel <b>OBS Overlay</b> que creará una sala por ti. Copia la <b>URL del overlay</b>.',
         s3_p2: 'En OBS, ve a <span class="mono">Fuentes → + → Navegador</span>, pega la URL y ajusta el tamaño para que coincida con tu lienzo (por ejemplo 1920×1080). El fondo seguirá siendo transparente.',

@@ -19,13 +19,13 @@
   --------------------------------------------------------------------------- */
   function zonesArcane() {
     return [
-      { id: 'portrait',  kind: 'image', cx: 50, cy: 21.6, w: 21.5, coef: 0,     fs: 1, align: 'center', colorKey: null,    visible: true,  locked: false, sample: 'S' },
-      { id: 'name',      kind: 'text',  cx: 50, cy: 39.8, w: 70,   coef: 0.034, fs: 1, align: 'center', colorKey: 'name',  visible: true,  locked: false, sample: 'Seraphina' },
-      { id: 'badge',     kind: 'pill',  cx: 50, cy: 51.5, w: 0,    coef: 0.024, fs: 1, align: 'center', colorKey: 'badge', visible: true,  locked: false, sample: 'Advantage' },
-      { id: 'total',     kind: 'text',  cx: 50, cy: 62.8, w: 50,   coef: 0.205, fs: 1, align: 'center', colorKey: 'accent', visible: true, locked: false, sample: '28' },
-      { id: 'rname',     kind: 'text',  cx: 50, cy: 75.0, w: 82,   coef: 0.041, fs: 1, align: 'center', colorKey: 'accent', visible: true, locked: false, sample: 'Longsword Attack' },
-      { id: 'breakdown', kind: 'text',  cx: 50, cy: 83.2, w: 60,   coef: 0.031, fs: 1, align: 'center', colorKey: 'name',  visible: true,  locked: false, sample: '20 + 8' },
-      { id: 'tag',       kind: 'pill',  cx: 50, cy: 91.2, w: 0,    coef: 0.028, fs: 1, align: 'center', colorKey: 'accent', visible: true, locked: false, sample: 'Critical hit!' },
+        { id: 'portrait', kind: 'image', cx: 50, cy: 21.6, w: 21.5, coef: 0, fs: 1, align: 'center', colorKey: null, visible: true, locked: false },
+        { id: 'name', kind: 'text', cx: 50, cy: 43, w: 70, coef: 0.034, fs: 1, align: 'center', colorKey: 'name', visible: true, locked: false },
+        { id: 'badge', kind: 'pill', cx: 50, cy: 50, w: 0, coef: 0.024, fs: 1, align: 'center', colorKey: 'badge', visible: true, locked: false },
+        { id: 'total', kind: 'text', cx: 50, cy: 62.8, w: 50, coef: 0.205, fs: 1, align: 'center', colorKey: 'accent', visible: true, locked: false },
+        { id: 'rname', kind: 'text', cx: 50, cy: 75, w: 82, coef: 0.041, fs: 1, align: 'center', colorKey: 'accent', visible: true, locked: false },
+        { id: 'breakdown', kind: 'text', cx: 50, cy: 81.4, w: 60, coef: 0.031, fs: 1, align: 'center', colorKey: 'name', visible: true, locked: false },
+        { id: 'tag', kind: 'pill', cx: 50, cy: 90.1, w: 0, coef: 0.028, fs: 1, align: 'center', colorKey: 'accent', visible: true, locked: false },
     ];
   }
 
@@ -64,13 +64,25 @@
     ['huesped',       'Huesped',       'huesped.png'],
     ['jenny',         'Jenny',         'jenny.png'],
     ['luna',          'Luna',          'luna.png'],
-  ].map(([id, name, file, editable]) => ({
-    id, name,
-    art: '/assets/plaque_templates/' + file,
-    colors: { ...TPL_DEFAULT_COLORS },
-    editable: editable || { ...TPL_ALL_EDITABLE },
-    zones: zonesArcane(),
-  }));
+  ];
+
+  // Per-template overrides (offline fallback mirror of TEMPLATE_OVERRIDES in
+  // src/templates.js — the editor normally replaces BR.TEMPLATES with GET
+  // /room/:id/templates, so templates.js is the source of truth; this keeps the
+  // offline fallback faithful). Same shape; `sample` on zones is optional.
+  const TPL_OVERRIDES = {
+    // wizard: { colors: { accent: '#7db8ff' }, zones: [ /* … */ ] },
+  };
+  BR.TEMPLATES = BR.TEMPLATES.map(([id, name, file, editable]) => {
+    const o = TPL_OVERRIDES[id] || {};
+    return {
+      id, name,
+      art: '/assets/plaque_templates/' + file,
+      colors: { ...TPL_DEFAULT_COLORS, ...(o.colors || {}) },
+      editable: editable || { ...TPL_ALL_EDITABLE },
+      zones: o.zones ? o.zones.map((z) => ({ ...z })) : zonesArcane(),
+    };
+  });
 
   /* Accent swatch palette (plaque). */
   BR.ACCENTS = ['#ffd24a', '#ff7a7a', '#5fd08a', '#7db8ff', '#c08bff', '#ff8fbf', '#ffae57', '#e8e8ee'];
