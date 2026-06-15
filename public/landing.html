@@ -20,6 +20,7 @@
     --gold-soft: rgba(255, 210, 74, 0.22);
     --blue: #7db8ff;
     --crit: #ff7a7a;
+    --green: #75d6a2;
     --ink: #f1f1f7;
     --ink-2: #d6d6e2;
     --muted: #9a9ab2;
@@ -72,6 +73,7 @@
   .btn-ghost:hover { border-color: #43435a; background: rgba(255,255,255,.05); }
   .btn-coffee { background: #1b1b27; color: var(--gold); border-color: var(--gold-soft); }
   .btn-coffee:hover { border-color: var(--gold); background: #20202e; }
+  .btn-small { padding: 10px 16px; font-size: 14px; }
   .btn svg { width: 17px; height: 17px; display: block; }
 
   /* ── header ────────────────────────────────────── */
@@ -242,6 +244,7 @@
     display: grid; grid-template-columns: 52px 1fr; gap: 20px; align-items: start;
     background: var(--card); border: 1px solid var(--line-soft); border-radius: var(--r); padding: 26px 28px;
   }
+  .step[hidden] { display: none !important; }
   .step .num {
     width: 46px; height: 46px; border-radius: 12px; background: linear-gradient(180deg, #ffdf72, var(--gold));
     color: #2a2000; font-family: var(--serif); font-weight: 800; font-size: 22px; display: grid; place-items: center;
@@ -249,16 +252,106 @@
   .step h3 { font-family: var(--sans); font-size: 19px; font-weight: 700; letter-spacing: 0; }
   .step p { color: var(--ink-2); margin: 8px 0 0; font-size: 15.5px; }
   .step p.note { color: var(--muted); font-size: 14px; }
+  .step-body { display: grid; gap: 16px; min-width: 0; }
+  .step-subhead {
+    font-family: var(--mono); font-size: 12px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--gold); margin-bottom: 8px;
+  }
+  .step-actions { display: flex; flex-wrap: wrap; gap: 10px; }
   .stores { display: flex; flex-wrap: wrap; gap: 9px; margin: 16px 0 4px; }
   .stores a { background: #1d1d29; border: 1px solid var(--line); border-radius: 9px; padding: 8px 14px;
     color: var(--ink); font-size: 14px; font-weight: 600; transition: border-color .15s, background .15s; }
   .stores a:hover { border-color: #43435a; background: #24243200; }
+  .browser-picker { display: flex; flex-wrap: wrap; gap: 12px; }
+  .browser-choice {
+    display: inline-flex; align-items: center; justify-content: center; min-width: 168px;
+    padding: 13px 18px; border-radius: 999px; border: 1px solid var(--line);
+    background: rgba(255,255,255,.02); color: var(--ink); cursor: pointer;
+    font-family: var(--sans); font-size: 15px; font-weight: 700;
+    transition: border-color .15s ease, background .15s ease, transform .15s ease, color .15s ease;
+  }
+  .browser-choice:hover { transform: translateY(-1px); border-color: #43435a; background: rgba(255,255,255,.05); }
+  .browser-choice[aria-pressed="true"] {
+    background: linear-gradient(180deg, #ffdf72, var(--gold)); color: #2a2000; border-color: transparent;
+    box-shadow: 0 10px 30px -14px rgba(255, 210, 74, .8);
+  }
+  .browser-panel[hidden] { display: none !important; }
+  .steps > .step:nth-of-type(2) [data-i18n="s2_btn"],
+  .steps > .step:nth-of-type(2) [data-i18n="s2_note1"],
+  .steps > .step:nth-of-type(2) [data-i18n="s2_note2"],
+  .steps > .step:nth-of-type(2) .callout,
+  .steps > .step:nth-of-type(2) > .step-body > .urlbox { display: none !important; }
+  .success-pill {
+    display: inline-flex; align-items: center; gap: 9px; width: fit-content; max-width: 100%;
+    padding: 10px 14px; border-radius: 999px; border: 1px solid rgba(117, 214, 162, .26);
+    background: rgba(49, 110, 84, .18); color: #d6ffe8; font-size: 13.5px; font-weight: 700;
+  }
+  .success-pill::before { content: "OK"; font-family: var(--mono); font-size: 12px; letter-spacing: 1px; color: #9dffc8; }
+  .info-box {
+    border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px;
+    background: rgba(255,255,255,.03);
+  }
+  .info-box strong { display: block; color: var(--ink); font-size: 15px; }
+  .info-box p:first-of-type { margin-top: 10px; }
+  .info-box-warm { border-color: rgba(255, 210, 74, .24); background: rgba(255, 210, 74, .05); }
+  .info-box-cool { border-color: rgba(125, 184, 255, .24); background: rgba(125, 184, 255, .06); }
+  .info-box-muted { border-color: rgba(255,255,255,.08); background: rgba(255,255,255,.02); }
+  .ordered-list { margin: 12px 0 0; padding-left: 20px; color: var(--ink-2); }
+  .ordered-list li { margin: 7px 0; }
+  .checklist { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+  .checklist li { display: flex; align-items: flex-start; gap: 10px; color: var(--ink-2); }
+  .checklist li::before {
+    content: "✓"; flex: 0 0 auto; width: 20px; height: 20px; border-radius: 999px;
+    display: grid; place-items: center; background: rgba(49, 110, 84, .22); color: #9dffc8;
+    font-size: 12px; font-weight: 900; margin-top: 1px;
+  }
+  .accordion {
+    border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.02); overflow: hidden;
+  }
+  .accordion summary {
+    list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 14px;
+    cursor: pointer; padding: 14px 18px; font-size: 14.5px; font-weight: 700; color: var(--ink);
+  }
+  .accordion summary::-webkit-details-marker { display: none; }
+  .accordion summary::after {
+    content: "+"; flex: 0 0 auto; width: 26px; height: 26px; border-radius: 999px;
+    display: grid; place-items: center; border: 1px solid var(--line); color: var(--gold);
+    font-family: var(--mono); font-size: 16px;
+  }
+  .accordion[open] summary::after { content: "-"; }
+  .accordion-body {
+    padding: 0 18px 18px; border-top: 1px solid var(--line-soft);
+  }
+  .accordion-body p.note:first-child { margin-top: 14px; }
   .urlbox { display: flex; gap: 9px; margin: 14px 0 6px; max-width: 560px; }
   .urlbox input { flex: 1; min-width: 0; background: #0a0a12; color: var(--gold); border: 1px solid var(--line);
     border-radius: 10px; padding: 11px 13px; font-family: var(--mono); font-size: 13px; }
   .urlbox button { background: #1d1d29; color: var(--ink); border: 1px solid var(--line); border-radius: 10px;
     padding: 0 18px; cursor: pointer; font-weight: 700; font-family: var(--sans); transition: border-color .15s; }
   .urlbox button:hover { border-color: #43435a; }
+  .path-box {
+    border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px;
+    background: #0c0c14; color: var(--ink); font-family: var(--mono); font-size: 13.5px; line-height: 1.7;
+  }
+  .visual-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .visual-grid.single { grid-template-columns: minmax(0, 1fr); max-width: 560px; }
+  .visual-card {
+    border: 1px solid var(--line); border-radius: 16px; padding: 16px;
+    background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015));
+    display: grid; gap: 12px;
+  }
+  .visual-label {
+    font-family: var(--mono); font-size: 11.5px; letter-spacing: 1.8px; text-transform: uppercase; color: var(--gold);
+  }
+  .visual-frame {
+    min-height: 170px; border-radius: 14px; border: 1px dashed rgba(255,255,255,.14);
+    background:
+      radial-gradient(110% 95% at 50% 0%, rgba(255,210,74,.08), transparent 56%),
+      radial-gradient(120% 90% at 50% 100%, rgba(125,184,255,.06), transparent 55%),
+      #10101a;
+    display: grid; place-items: center; text-align: center; padding: 18px;
+    color: var(--muted); font-family: var(--mono); font-size: 12.5px; line-height: 1.7;
+  }
   .mono { font-family: var(--mono); }
   .kbd { font-family: var(--mono); font-size: 12.5px; background: #0a0a12; border: 1px solid var(--line);
     border-bottom-width: 2px; border-radius: 6px; padding: 2px 7px; color: var(--gold); }
@@ -302,6 +395,73 @@
     display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; color: var(--muted-2);
     font-size: 13px; font-family: var(--mono); letter-spacing: .3px; }
 
+  /* ── install flow (Option A — guided focus rail) ──── */
+  .visual-frame.has-image { padding: 0; overflow: hidden; border-style: solid; background: #0c0c14; }
+  .visual-frame.has-image img { width: 100%; height: 100%; min-height: 170px; object-fit: contain; display: block; border-radius: 14px; }
+  .flow-host { display: block; }
+  .flowA { display: grid; grid-template-columns: 200px 1fr; gap: 28px; align-items: start; }
+  .flowA .frail { position: relative; display: flex; flex-direction: column; gap: 0; }
+  .flowA .frail-line { position: absolute; left: 19px; top: 28px; bottom: 28px; width: 2px; background: var(--line); border-radius: 2px; }
+  .flowA .frail-line .ffill { width: 100%; background: linear-gradient(180deg, var(--gold), var(--gold-deep)); border-radius: 2px;
+    height: 0; transition: height .4s cubic-bezier(.4,0,.2,1); }
+  .flowA .rstep { display: flex; align-items: center; gap: 14px; padding: 10px 0; cursor: pointer; min-height: 58px; }
+  .flowA .rstep[hidden] { display: none !important; }
+  .flowA .rlabel { font-size: 14px; font-weight: 700; color: var(--muted); line-height: 1.25; transition: color .2s ease; }
+  .flowA .rstep:hover .rlabel { color: var(--ink); }
+  .flowA .rstep .fnode.is-active ~ .rlabel { color: var(--ink); }
+  .flowA .rstep .fnode.is-done ~ .rlabel { color: var(--ink-2); }
+  .fnode {
+    --d: 40px; width: var(--d); height: var(--d); flex: 0 0 auto; position: relative; z-index: 2;
+    border-radius: 12px; display: grid; place-items: center;
+    font-family: var(--serif); font-weight: 800; font-size: 18px;
+    background: var(--card-2); color: var(--muted); border: 1px solid var(--line);
+    transition: background .25s ease, color .25s ease, border-color .25s ease, box-shadow .25s ease;
+  }
+  .fnode .fnum { line-height: 1; }
+  .fnode.is-active {
+    background: linear-gradient(180deg, #ffdf72, var(--gold)); color: #2a2000; border-color: transparent;
+    box-shadow: 0 0 0 4px rgba(255,210,74,.14), 0 10px 22px -10px rgba(255,210,74,.7);
+  }
+  .fnode.is-done { background: rgba(117,214,162,.14); color: var(--green); border-color: rgba(117,214,162,.3); }
+  .fnode.is-done .fnum { display: none; }
+  .fnode.is-done::after { content: "\2713"; font-size: 17px; font-weight: 900; }
+  .flowA .fpanel { border: 1px solid var(--line-soft); border-radius: 18px; padding: 28px; background: var(--card);
+    min-height: 340px; align-self: start; }
+  .flowA .fbody { display: none; gap: 16px; grid-template-columns: 1fr; animation: flowfade .35s ease; }
+  .flowA .fbody.is-active { display: grid; }
+  .fcounter { font-family: var(--mono); font-size: 11.5px; letter-spacing: 1.8px; text-transform: uppercase; color: var(--gold); }
+  .ftitle { font-family: var(--serif); font-size: clamp(20px, 2.2vw, 25px); font-weight: 800; }
+  .fdesc { color: var(--ink-2); font-size: 15.5px; margin: 0; }
+  .factions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .fnav { display: flex; gap: 10px; margin-top: 4px; }
+  .btn-back { background: transparent; color: var(--muted); border-color: var(--line); }
+  .btn-back:hover { color: var(--ink); border-color: #43435a; }
+  .bp-label { font-family: var(--mono); font-size: 11px; letter-spacing: 1.8px; text-transform: uppercase; color: var(--muted-2); margin: 0; }
+  .fcomplete { display: none; align-items: center; gap: 16px; margin-top: 22px;
+    border: 1px solid rgba(117,214,162,.28); border-radius: 16px; padding: 18px 20px; background: rgba(49,110,84,.12); }
+  .flow-host.is-complete .fcomplete { display: flex; }
+  .fcomplete .fc-dot { flex: 0 0 auto; width: 42px; height: 42px; border-radius: 11px; display: grid; place-items: center;
+    background: rgba(117,214,162,.18); color: var(--green); font-size: 20px; transform: rotate(45deg); }
+  .fcomplete .fc-dot span { transform: rotate(-45deg); }
+  .fcomplete h3 { font-family: var(--serif); font-size: 19px; font-weight: 800; margin: 0; }
+  .fcomplete p { margin: 3px 0 0; color: var(--ink-2); font-size: 14px; }
+  .fcomplete .fc-restart { margin-left: auto; }
+  .ts { margin-top: 22px; }
+  @keyframes flowfade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    .fbody, .ffill, .fnode { animation: none !important; transition: none !important; }
+  }
+  @media (max-width: 720px) {
+    .flowA { grid-template-columns: 1fr; gap: 18px; }
+    .flowA .frail { flex-direction: row; flex-wrap: wrap; gap: 8px; }
+    .flowA .frail-line { display: none; }
+    .flowA .rstep { min-height: 0; flex-direction: column; text-align: center; gap: 6px; width: 78px; }
+    .flowA .rlabel { font-size: 11px; }
+    .flowA .fpanel { padding: 22px 18px; }
+    .fcomplete { flex-wrap: wrap; }
+    .fcomplete .fc-restart { margin-left: 0; }
+  }
+
   /* ── reveal animation ──────────────────────────── */
   .reveal { opacity: 0; transform: translateY(18px); transition: opacity .7s ease, transform .7s ease; }
   .reveal.in { opacity: 1; transform: none; }
@@ -332,6 +492,16 @@
     .feat-grid { grid-template-columns: 1fr; }
     .foot-links { gap: 36px; }
     .step { grid-template-columns: 1fr; gap: 12px; }
+    .browser-picker { flex-direction: column; }
+    .browser-choice { width: 100%; min-width: 0; flex: 0 0 auto; }
+    .step-actions { flex-direction: column; align-items: stretch; }
+    .step-actions .btn { width: 100%; justify-content: center; }
+    .stores { flex-direction: column; align-items: stretch; }
+    .stores a { text-align: center; }
+    .urlbox { flex-direction: column; }
+    .urlbox button { min-height: 44px; }
+    .visual-grid { grid-template-columns: 1fr; }
+    .path-box { font-size: 13px; }
     /* keep the sticky header on one line on small phones */
     .wrap { padding: 0 16px; }
     .nav { gap: 10px; }
@@ -472,54 +642,202 @@
     <div class="wrap">
       <div class="sec-head reveal">
         <span class="eyebrow" data-i18n="inst_eyebrow">Setup</span>
-        <h2 data-i18n="inst_h2">Up and running in two minutes</h2>
-        <p data-i18n="inst_sub">Three steps, no coding. Works in any Chromium or Firefox browser.</p>
+        <h2 data-i18n="inst_h2">Ready in two minutes</h2>
+        <p data-i18n="inst_sub">No coding. No setup files. Install the browser extension, add Banana Roll to Roll20, then paste your overlay URL into OBS.</p>
       </div>
 
-      <div class="steps">
-        <div class="step reveal">
-          <div class="num">1</div>
-          <div>
-            <h3 data-i18n="s1_h">Install Tampermonkey</h3>
-            <p data-i18n="s1_p">A free browser extension that runs the capture script on your Roll20 tab.</p>
-            <div class="stores">
-              <a href="https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo" target="_blank" rel="noopener">Chrome</a>
-              <a href="https://addons.mozilla.org/firefox/addon/tampermonkey/" target="_blank" rel="noopener">Firefox</a>
-              <a href="https://microsoftedge.microsoft.com/addons/detail/tampermonkey/iikmkjmpaadaobahmlepeloendndfphd" target="_blank" rel="noopener">Edge</a>
-              <a href="https://apps.apple.com/app/tampermonkey/id1482490089" target="_blank" rel="noopener">Safari</a>
-              <a href="https://www.tampermonkey.net/" target="_blank" rel="noopener" data-i18n="s1_other">Other / tampermonkey.net</a>
+      <div class="flow-host reveal" id="install-flow">
+        <div class="flowA" data-flow>
+          <div class="frail">
+            <div class="frail-line"><div class="ffill"></div></div>
+            <div class="rstep" data-jump="tampermonkey"><span class="fnode" data-step-id="tampermonkey"><span class="fnum">1</span></span><span class="rlabel" data-i18n="st1_title">Install Tampermonkey</span></div>
+            <div class="rstep" data-jump="userscripts" data-browser-show="chromium"><span class="fnode" data-step-id="userscripts"><span class="fnum">2</span></span><span class="rlabel" data-i18n="st2_title">Allow user scripts</span></div>
+            <div class="rstep" data-jump="install"><span class="fnode" data-step-id="install"><span class="fnum">3</span></span><span class="rlabel" data-i18n="st3_title">Add Banana Roll</span></div>
+            <div class="rstep" data-jump="roll20"><span class="fnode" data-step-id="roll20"><span class="fnum">4</span></span><span class="rlabel" data-i18n="st4_title">Open Roll20</span></div>
+            <div class="rstep" data-jump="obs"><span class="fnode" data-step-id="obs"><span class="fnum">5</span></span><span class="rlabel" data-i18n="st5_rail">Add to OBS</span></div>
+          </div>
+
+          <div class="fpanel">
+            <!-- step 1 — install Tampermonkey -->
+            <div class="fbody" data-step-id="tampermonkey">
+              <span class="fcounter" data-counter>Step 1 of 5</span>
+              <h3 class="ftitle" data-i18n="st1_title">Install Tampermonkey</h3>
+              <p class="fdesc" data-i18n="st1_desc">A free browser extension that lets Banana Roll run inside Roll20. Pick your browser, then add it.</p>
+              <p class="bp-label" data-i18n="bp_label">Your browser</p>
+              <div class="browser-picker" role="group" aria-label="Browser choice">
+                <button class="browser-choice" type="button" data-browser-choice="chromium" aria-pressed="true" data-i18n="browser_chromium">Chrome / Edge</button>
+                <button class="browser-choice" type="button" data-browser-choice="firefox" aria-pressed="false" data-i18n="browser_firefox">Firefox</button>
+                <button class="browser-choice" type="button" data-browser-choice="other" aria-pressed="false" data-i18n="browser_other">Other browser</button>
+              </div>
+              <div data-store-panel="chromium">
+                <div class="stores">
+                  <a href="https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo" target="_blank" rel="noopener" data-advance data-i18n="st1_chrome">Tampermonkey for Chrome ↗</a>
+                  <a href="https://microsoftedge.microsoft.com/addons/detail/tampermonkey/iikmkjmpaadaobahmlepeloendndfphd" target="_blank" rel="noopener" data-advance data-i18n="st1_edge">Tampermonkey for Edge ↗</a>
+                </div>
+              </div>
+              <div data-store-panel="firefox" hidden>
+                <div class="stores">
+                  <a href="https://addons.mozilla.org/firefox/addon/tampermonkey/" target="_blank" rel="noopener" data-advance data-i18n="st1_firefox">Tampermonkey for Firefox ↗</a>
+                </div>
+              </div>
+              <div data-store-panel="other" hidden>
+                <p class="note" data-i18n="st1_other">Banana Roll works best on Chrome, Edge, or Firefox. Install Tampermonkey, then continue.</p>
+                <div class="stores">
+                  <a href="https://www.tampermonkey.net/" target="_blank" rel="noopener" data-advance data-i18n="st1_other_btn">Get Tampermonkey ↗</a>
+                </div>
+              </div>
+              <div class="fnav">
+                <button class="btn btn-gold btn-small" type="button" data-advance data-i18n="word_next_step">Next step</button>
+              </div>
+            </div>
+
+            <!-- step 2 — allow user scripts (Chromium only) -->
+            <div class="fbody" data-step-id="userscripts" data-browser-show="chromium">
+              <span class="fcounter" data-counter>Step 2 of 5</span>
+              <h3 class="ftitle" data-i18n="st2_title">Allow user scripts</h3>
+              <p class="fdesc" data-i18n="st2_desc">Chrome 138+ and Edge need this one permission, or Banana Roll's panel never loads.</p>
+              <ol class="ordered-list">
+                <li data-i18n="st2_l1">Right-click the Tampermonkey icon and choose <b>Manage extension</b>.</li>
+                <li data-i18n="st2_l2">Turn on <b>Allow user scripts</b>.</li>
+                <li data-i18n="st2_l3">Reload your Roll20 tab.</li>
+              </ol>
+              <div class="visual-grid single">
+                <div class="visual-card">
+                  <div class="visual-label" data-i18n="st2_shot1">Right-click → Manage extension</div>
+                  <div class="visual-frame has-image" data-img-slot="st2_shot1">
+                    <img src="/assets/install/us_step_1.jpg"loading="lazy" />
+                  </div>
+                </div>
+                <div class="visual-card">
+                  <div class="visual-label" data-i18n="st2_shot2">Allow user scripts toggle</div>
+                  <div class="visual-frame has-image" data-img-slot="st2_shot2">
+                    <img src="/assets/install/us_step_2.png"loading="lazy" />
+                  </div>
+                </div>
+              </div>
+              <details class="accordion">
+                <summary data-i18n="st2_fallback_s">Older Chrome / Edge? Use Developer mode</summary>
+                <div class="accordion-body">
+                  <p class="note" data-i18n="st2_fallback">Open <span class="mono">chrome://extensions</span> (<span class="mono">edge://extensions</span>) and switch on <b>Developer mode</b> at the top-right instead, then reload Roll20.</p>
+                  <div class="visual-grid">
+                    <div class="visual-card">
+                      <div class="visual-label" data-i18n="st2_shot3">Developer mode toggle</div>
+                        <div class="visual-frame has-image" data-img-slot="st2_shot3">
+                        <img src="/assets/install/us_step_1b.jpg"loading="lazy" />
+                      </div>
+                    </div>
+                    <div class="visual-card">
+                      <div class="visual-label" data-i18n="st2_shot3">Developer mode toggle</div>
+                        <div class="visual-frame has-image" data-img-slot="st2_shot3">
+                        <img src="/assets/install/us_step_2b.jpg"loading="lazy" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </details>
+              <p class="note"><a href="https://www.tampermonkey.net/faq.php?q=Q209#google_vignette" target="_blank" rel="noopener" data-i18n="st2_faq">Tampermonkey's official guide, with screenshots ↗</a></p>
+              <div class="fnav">
+                <button class="btn btn-ghost btn-small btn-back" type="button" data-back data-i18n="word_back">Back</button>
+                <button class="btn btn-gold btn-small" type="button" data-advance data-i18n="st2_btn">I've turned it on</button>
+              </div>
+            </div>
+
+            <!-- step 3 — add Banana Roll -->
+            <div class="fbody" data-step-id="install" id="install-banana-roll">
+              <span class="fcounter" data-counter>Step 3 of 5</span>
+              <h3 class="ftitle" data-i18n="st3_title">Add Banana Roll</h3>
+              <p class="fdesc" data-i18n="st3_desc">Click install — Tampermonkey opens a prompt, press <b>Install</b>. It's preconfigured, so there's nothing to edit, and it auto-updates.</p>
+              <div class="factions">
+                <a class="btn btn-gold" href="__ORIGIN__/roll20-capture.user.js" target="_blank" rel="noopener" data-advance data-i18n="st3_btn">Install Banana Roll</a>
+              </div>
+              <details class="accordion">
+                <summary data-i18n="st3_adv">Paste the URL manually</summary>
+                <div class="accordion-body">
+                  <p class="note" data-i18n="st3_adv_p">In Tampermonkey → <span class="mono">Utilities → Install from URL</span>, paste:</p>
+                  <div class="urlbox">
+                    <input id="scripturl" readonly value="__ORIGIN__/roll20-capture.user.js" />
+                    <button data-copy="scripturl" data-i18n="copy">Copy</button>
+                  </div>
+                </div>
+              </details>
+              <div class="fnav">
+                <button class="btn btn-ghost btn-small btn-back" type="button" data-back data-i18n="word_back">Back</button>
+              </div>
+            </div>
+
+            <!-- step 4 — open Roll20 -->
+            <div class="fbody" data-step-id="roll20">
+              <span class="fcounter" data-counter>Step 4 of 5</span>
+              <h3 class="ftitle" data-i18n="st4_title">Open Roll20</h3>
+              <p class="fdesc" data-i18n="st4_desc">Reload your Roll20 game. The Banana Roll panel appears in the bottom-right corner — that means it's working.</p>
+              <div class="visual-grid single">
+                <div class="visual-card">
+                  <div class="visual-label" data-i18n="st4_slot">Roll20 panel screenshot</div>
+                  <div class="visual-frame has-image" data-img-slot="st4_slot">
+                    <img src="/assets/install/roll20_step_1.png"loading="lazy" />
+                  </div>
+                </div>
+              </div>
+              <div class="fnav">
+                <button class="btn btn-ghost btn-small btn-back" type="button" data-back data-i18n="word_back">Back</button>
+                <button class="btn btn-gold btn-small" type="button" data-advance data-i18n="st4_btn">I can see the panel</button>
+              </div>
+            </div>
+
+            <!-- step 5 — add to OBS -->
+            <div class="fbody" data-step-id="obs">
+              <span class="fcounter" data-counter>Step 5 of 5</span>
+              <h3 class="ftitle" data-i18n="st5_title">Add the overlay to OBS</h3>
+              <p class="fdesc" data-i18n="st5_desc">Copy the Overlay URL from the panel, then add it as a Browser source in OBS.</p>
+              <div class="path-box" data-i18n="st5_path">Sources → + → Browser → paste the URL → 1920 × 1080</div>
+              <p class="note" data-i18n="st5_note">The background is transparent, so only the dice and plaque show on stream. Each player has their own overlay URL too.</p>
+              <div class="visual-grid single">
+                <div class="visual-card">
+                  <div class="visual-label" data-i18n="st5_slot">OBS browser source screenshot</div>
+                  <div class="visual-frame has-image" data-img-slot="st5_slot">
+                    <img src="/assets/install/obs_step_1.png"loading="lazy" />
+                  </div>
+                  <div class="visual-label" data-i18n="st5_slot">OBS browser source screenshot</div>
+                  <div class="visual-frame has-image" data-img-slot="st6_slot">
+                    <img src="/assets/install/obs_step_2.png"loading="lazy" />
+                  </div>
+                  <div class="visual-label" data-i18n="st5_slot">OBS browser source screenshot</div>
+                  <div class="visual-frame has-image" data-img-slot="st7_slot">
+                    <img src="/assets/install/obs_step_3.png"loading="lazy" />
+                  </div>
+                </div>
+              </div>
+              <div class="fnav">
+                <button class="btn btn-ghost btn-small btn-back" type="button" data-back data-i18n="word_back">Back</button>
+                <button class="btn btn-gold btn-small" type="button" data-advance data-i18n="st5_btn">Finish setup</button>
+              </div>
             </div>
           </div>
         </div>
 
-        <div class="step reveal">
-          <div class="num">2</div>
+        <div class="fcomplete">
+          <span class="fc-dot"><span>✓</span></span>
           <div>
-            <h3 data-i18n="s2_h">Install the capture script</h3>
-            <p data-i18n="s2_p">With Tampermonkey installed, click below to open the install prompt and hit <b>Install</b>.</p>
-            <a class="btn btn-gold" href="__ORIGIN__/roll20-capture.user.js" target="_blank" rel="noopener" style="margin:14px 0 4px;" data-i18n="s2_btn">Install the userscript ↓</a>
-            <p class="note" data-i18n="s2_note1">Or paste this URL into Tampermonkey → <span class="mono">Utilities → Install from URL</span>:</p>
-            <div class="urlbox">
-              <input id="scripturl" readonly value="__ORIGIN__/roll20-capture.user.js" />
-              <button data-copy="scripturl" data-i18n="copy">Copy</button>
-            </div>
-            <p class="note" data-i18n="s2_note2">It comes preconfigured for the hosted relay, so there is nothing to edit, and it will auto-update from here.</p>
-            <div class="callout">
-              <p data-i18n="s2_chrome_h"><b>⚠️ Chrome &amp; Edge: turn on user scripts</b></p>
-              <p data-i18n="s2_chrome_p">Chromium browsers now require one extra toggle or the script silently won't run (no panel appears in Roll20). In <b>Chrome</b>: open <span class="mono">chrome://extensions</span>, enable <b>Developer mode</b> (top-right), then on the Tampermonkey card turn on <b>Allow user scripts</b>. In <b>Edge</b>: open <span class="mono">edge://extensions</span> → Tampermonkey → <b>Details</b> and turn on <b>Allow user scripts</b>. Then reload your Roll20 tab. Firefox needs nothing extra.</p>
-              <p data-i18n="s2_chrome_link">Step-by-step with screenshots: <a href="https://www.tampermonkey.net/faq.php?q=Q209#google_vignette" target="_blank" rel="noopener">Tampermonkey FAQ Q209</a>.</p>
-            </div>
+            <h3 data-i18n="done_h">You're live.</h3>
+            <p data-i18n="done_p">Every public roll at your table now lands on your stream.</p>
           </div>
+          <button class="btn btn-ghost btn-small fc-restart" type="button" data-restart data-i18n="restart">Start over</button>
         </div>
 
-        <div class="step reveal">
-          <div class="num">3</div>
-          <div>
-            <h3 data-i18n="s3_h">Open Roll20 &amp; add the overlay to OBS</h3>
-            <p data-i18n="s3_p1">Open your Roll20 game. An <b>OBS Overlay</b> panel appears in the bottom-right corner and creates a room for you. Copy the <b>Overlay URL</b>.</p>
-            <p data-i18n="s3_p2">In OBS, go to <span class="mono">Sources → + → Browser</span>, paste the URL, and set the size to match your canvas (for example 1920×1080). The background stays transparent.</p>
-            <p class="note" data-i18n="s3_note">Want per-player overlays? Each player's URL is in the panel too — add one Browser source per player.</p>
-          </div>
+        <div class="ts">
+          <details class="accordion">
+            <summary data-i18n="inst7_h">Panel not appearing?</summary>
+            <div class="accordion-body">
+              <ul class="checklist">
+                <li data-i18n="inst7_c1">Tampermonkey is installed</li>
+                <li data-i18n="inst7_c2">The Banana Roll script is installed</li>
+                <li data-i18n="inst7_c3">Chrome/Edge: Allow User Scripts is enabled</li>
+                <li data-i18n="inst7_c4">Roll20 was reloaded after installing</li>
+                <li data-i18n="inst7_c5">The roll is public, not a private or GM roll</li>
+              </ul>
+              <p class="note" data-i18n="inst7_guide_p">If the panel still does not appear, fully reload Roll20, confirm Tampermonkey is enabled on that site, and recheck the Chrome/Edge permission. If a test roll is private, the overlay will stay quiet on purpose.</p>
+            </div>
+          </details>
         </div>
       </div>
 
@@ -704,7 +1022,39 @@
         f11_t: 'Self-updating capture script', f11_d: 'The userscript keeps itself current, and a compatibility gate stops an outdated script cleanly instead of sending broken data — no manual reinstalls.',
         f12_t: 'Preview without OBS', f12_d: 'Open any overlay URL in your browser and press T to cycle through test rolls: normal → critical → fumble.',
         inst_eyebrow: 'Setup', inst_h2: 'Ready in two minutes',
-        inst_sub: 'Three steps, no coding. Works in Chromium-based browsers and Firefox.',
+        inst_sub: 'No coding. No setup files. Install the browser extension, add Banana Roll to Roll20, then paste your overlay URL into OBS.',
+        inst1_k: 'Pick the path', inst1_h: 'Choose your browser', inst1_p: 'The guide below changes based on the browser you will use for Roll20.',
+        browser_chromium: 'Chrome / Edge', browser_firefox: 'Firefox', browser_other: 'Other browser',
+        inst1_ok: 'Success: the matching steps below are now highlighted.',
+        inst2_k: 'Browser extension', inst2_h: 'Install Tampermonkey', inst2_p: 'Tampermonkey is the browser extension that lets Banana Roll add its panel inside Roll20.',
+        inst2_chromium_p: 'First, install Tampermonkey:', inst2_chrome_btn: 'Install Tampermonkey for Chrome', inst2_edge_btn: 'Install Tampermonkey for Edge',
+        inst2_firefox_p: 'Firefox does not need the extra user-script permission.', inst2_firefox_btn: 'Install Tampermonkey for Firefox',
+        inst2_other_h: 'Banana Roll works best on Chrome, Edge, or Firefox with Tampermonkey installed.', inst2_other_p: 'If the Roll20 panel does not appear later, try Chrome, Edge, or Firefox.',
+        inst2_other_btn: 'Install Tampermonkey', inst2_other_continue: 'Continue anyway', inst2_ok: 'Success: Tampermonkey is installed in your browser.',
+        inst3_k: 'Required in Chrome and Edge', inst3_h: 'Enable user scripts', inst3_intro: 'Chrome and Edge need one extra permission before Banana Roll can work.',
+        inst3_l1: 'Open your browser extensions page.', inst3_l2: 'Open Tampermonkey details.', inst3_l3: 'Turn on <b>Allow User Scripts</b>.', inst3_l4: 'Reload your Roll20 tab.',
+        inst3_shots: 'Show me screenshots', inst3_shots_note: "Use Tampermonkey's official guide if you want screenshot-by-screenshot help.", inst3_shots_btn: 'Open screenshot guide',
+        inst3_shot1_t: 'Chrome', inst3_shot1_b: 'Screenshot placeholder: open <span class="mono">chrome://extensions</span>, then enable <b>Allow User Scripts</b> on Tampermonkey.',
+        inst3_shot2_t: 'Edge', inst3_shot2_b: 'Screenshot placeholder: open <span class="mono">edge://extensions</span>, open Tampermonkey details, then enable <b>Allow User Scripts</b>.',
+        inst3_ok: 'Success: Allow User Scripts is on and Roll20 has been reloaded.',
+        inst3_other_k: 'Before you continue', inst3_other_h: 'Supported browsers work best', inst3_other_intro: 'Banana Roll works best on Chrome, Edge, or Firefox with Tampermonkey installed.',
+        inst3_other_p: 'If the Roll20 panel does not appear after you install Banana Roll, switch to one of those browsers and try again.', inst3_other_ok: 'Success: you know the fallback if the panel does not appear.',
+        inst4_k: 'Add Banana Roll to Roll20', inst4_h: 'Install Banana Roll', inst4_p: 'Click the button below. Tampermonkey will open an install page. Press <b>Install</b>.',
+        inst4_btn: 'Install Banana Roll', inst4_note: 'No configuration needed. Just install it and reload Roll20.', inst4_ok: 'Success: Tampermonkey says the script is installed.',
+        inst4_adv: 'Advanced manual install', inst4_adv_p: 'If the button does not work, copy the script URL and paste it into Tampermonkey &rarr; <span class="mono">Utilities &rarr; Install from URL</span>.',
+        inst4_adv_note: 'The hosted install URL already includes the correct server address and keeps itself up to date.',
+        inst5_k: 'Check Roll20', inst5_h: 'Open Roll20', inst5_p: 'Open your Roll20 game and reload the page.',
+        inst5_result: 'You should see a Banana Roll / OBS Overlay panel in the bottom-right corner.', inst5_live: 'Panel visible = Banana Roll is working.',
+        inst5_visual_t: 'Roll20 panel preview', inst5_visual_b: 'Screenshot or GIF placeholder: the Banana Roll panel appears in the bottom-right corner of Roll20.', inst5_ok: 'Success: the panel is visible inside Roll20.',
+        inst6_k: 'Bring it into OBS', inst6_h: 'Add the overlay to OBS', inst6_p: 'In the Banana Roll panel, copy the Overlay URL, then add it as an OBS Browser Source / webpage source.',
+        inst6_path: 'Sources &rarr; + &rarr; Browser &rarr; paste the URL &rarr; set size to 1920 &times; 1080', inst6_note: 'The background is transparent, so only the dice and plaque appear on stream.',
+        inst6_player: 'Want per-player overlays? The panel also gives you one overlay URL per player.', inst6_visual_t: 'OBS setup preview',
+        inst6_visual_b: 'Screenshot or GIF placeholder: create a Browser source, paste the URL, and leave the background transparent.', inst6_ok: 'Success: only the plaque and dice appear on top of your scene.',
+        inst7_k: 'Troubleshooting', inst7_h: 'Panel not appearing?', inst7_p: 'Check these first:',
+        inst7_c1: 'Tampermonkey is installed', inst7_c2: 'The Banana Roll script is installed', inst7_c3: 'Chrome/Edge: Allow User Scripts is enabled',
+        inst7_c4: 'Roll20 was reloaded after installing', inst7_c5: 'The roll is public, not a private or GM roll',
+        inst7_guide: 'Open troubleshooting guide', inst7_guide_p: 'If the panel still does not appear, fully reload Roll20, confirm Tampermonkey is enabled on that site, and recheck the Chrome/Edge permission. If a test roll is private, the overlay will stay quiet on purpose.',
+        inst7_ok: 'Success: once the panel appears, you are ready to copy the overlay URL.',
         s1_h: 'Install Tampermonkey', s1_p: 'A free browser extension that runs the capture script on your Roll20 tab.',
         s1_other: 'Other / tampermonkey.net',
         s2_h: 'Install the capture script', s2_p: 'Once Tampermonkey is installed, click below to open the install prompt and hit <b>Install</b>.',
@@ -727,6 +1077,51 @@
         foot_support: 'Support', foot_coffee: 'Buy me a coffee',
         foot_made: 'Built in a day · MIT licensed · PRs welcome',
         foot_rights: 'Not affiliated with Roll20 or OBS.',
+        /* ── install flow (Option A) ── */
+        bp_label: 'Your browser',
+        st1_title: 'Install Tampermonkey',
+        st1_desc: 'A free browser extension that lets Banana Roll run inside Roll20. Pick your browser, then add it.',
+        st1_chrome: 'Tampermonkey for Chrome ↗',
+        st1_edge: 'Tampermonkey for Edge ↗',
+        st1_firefox: 'Tampermonkey for Firefox ↗',
+        st1_other: 'Banana Roll works best on Chrome, Edge, or Firefox. Install Tampermonkey, then continue.',
+        st1_other_btn: 'Get Tampermonkey ↗',
+        st2_title: 'Allow user scripts',
+        st2_desc: 'Chrome 138+ and Edge need this one permission, or Banana Roll\'s panel never loads.',
+        st2_l1: 'Right-click the Tampermonkey icon and choose <b>Manage extension</b>.',
+        st2_l2: 'Turn on <b>Allow user scripts</b>.',
+        st2_l3: 'Reload your Roll20 tab.',
+        st2_shot1: 'Right-click → Manage extension',
+        st2_shot2: 'Allow user scripts toggle',
+        st2_shot3: 'Developer mode toggle',
+        st2_fallback_s: 'Older Chrome / Edge? Use Developer mode',
+        st2_fallback: 'Open <span class="mono">chrome://extensions</span> (<span class="mono">edge://extensions</span>) and switch on <b>Developer mode</b> at the top-right instead, then reload Roll20.',
+        st2_faq: 'Tampermonkey\'s official guide, with screenshots ↗',
+        st2_btn: 'I\'ve turned it on',
+        st3_title: 'Add Banana Roll',
+        st3_desc: 'Click install — Tampermonkey opens a prompt, press <b>Install</b>. It\'s preconfigured, so there\'s nothing to edit, and it auto-updates.',
+        st3_btn: 'Install Banana Roll',
+        st3_adv: 'Paste the URL manually',
+        st3_adv_p: 'In Tampermonkey → <span class="mono">Utilities → Install from URL</span>, paste:',
+        st4_title: 'Open Roll20',
+        st4_desc: 'Reload your Roll20 game. The Banana Roll panel appears in the bottom-right corner — that means it\'s working.',
+        st4_slot: 'Roll20 panel screenshot',
+        st4_btn: 'I can see the panel',
+        st5_title: 'Add the overlay to OBS',
+        st5_rail: 'Add to OBS',
+        st5_desc: 'Copy the Overlay URL from the panel, then add it as a Browser source in OBS.',
+        st5_path: 'Sources → + → Browser → paste the URL → 1920 × 1080',
+        st5_note: 'The background is transparent, so only the dice and plaque show on stream. Each player has their own overlay URL too.',
+        st5_slot: 'OBS browser source screenshot',
+        st5_btn: 'Finish setup',
+        shot_soon: 'Screenshot coming soon.',
+        done_h: 'You\'re live.',
+        done_p: 'Every public roll at your table now lands on your stream.',
+        restart: 'Start over',
+        word_step: 'Step',
+        word_of: 'of',
+        word_back: 'Back',
+        word_next_step: 'Next step',
         copy: 'Copy', copied: 'Copied!',
       },
       es: {
@@ -784,6 +1179,132 @@
       },
     };
 
+    Object.assign(I18N.es, {
+      /* ── install flow (Option A) ── */
+      bp_label: 'Tu navegador',
+      st1_title: 'Instala Tampermonkey',
+      st1_desc: 'Una extensión de navegador gratuita que permite a Banana Roll funcionar dentro de Roll20. Elige tu navegador y añádela.',
+      st1_chrome: 'Tampermonkey para Chrome ↗',
+      st1_edge: 'Tampermonkey para Edge ↗',
+      st1_firefox: 'Tampermonkey para Firefox ↗',
+      st1_other: 'Banana Roll funciona mejor en Chrome, Edge o Firefox. Instala Tampermonkey y continúa.',
+      st1_other_btn: 'Conseguir Tampermonkey ↗',
+      st2_title: 'Activa los user scripts',
+      st2_desc: 'Chrome 138+ y Edge necesitan este permiso, o el panel de Banana Roll no carga.',
+      st2_l1: 'Haz clic derecho en el icono de Tampermonkey y elige <b>Administrar extensión</b>.',
+      st2_l2: 'Activa <b>Permitir user scripts</b>.',
+      st2_l3: 'Recarga tu pestaña de Roll20.',
+      st2_shot1: 'Clic derecho → Administrar extensión',
+      st2_shot2: 'Interruptor Permitir user scripts',
+      st2_shot3: 'Interruptor Modo de desarrollador',
+      st2_fallback_s: '¿Chrome / Edge antiguo? Usa el Modo de desarrollador',
+      st2_fallback: 'Abre <span class="mono">chrome://extensions</span> (<span class="mono">edge://extensions</span>) y activa el <b>Modo de desarrollador</b> arriba a la derecha, luego recarga Roll20.',
+      st2_faq: 'Guía oficial de Tampermonkey, con capturas ↗',
+      st2_btn: 'Ya lo activé',
+      st3_title: 'Añade Banana Roll',
+      st3_desc: 'Haz clic en instalar — Tampermonkey abre un aviso, pulsa <b>Instalar</b>. Viene preconfigurado: no hay nada que editar y se actualiza solo.',
+      st3_btn: 'Instalar Banana Roll',
+      st3_adv: 'Pegar la URL manualmente',
+      st3_adv_p: 'En Tampermonkey → <span class="mono">Utilidades → Instalar desde URL</span>, pega:',
+      st4_title: 'Abre Roll20',
+      st4_desc: 'Recarga tu partida de Roll20. El panel de Banana Roll aparece en la esquina inferior derecha — eso indica que funciona.',
+      st4_slot: 'Captura del panel de Roll20',
+      st4_btn: 'Ya veo el panel',
+      st5_title: 'Añade el overlay a OBS',
+      st5_rail: 'Añadir a OBS',
+      st5_desc: 'Copia la URL del overlay del panel y añádela como fuente Navegador en OBS.',
+      st5_path: 'Fuentes → + → Navegador → pega la URL → 1920 × 1080',
+      st5_note: 'El fondo es transparente, así que en stream solo se ven los dados y la placa. Cada jugador tiene también su propia URL de overlay.',
+      st5_slot: 'Captura de la fuente de OBS',
+      st5_btn: 'Terminar',
+      shot_soon: 'Captura próximamente.',
+      done_h: '¡Estás en directo!',
+      done_p: 'Cada tirada pública de tu mesa ya aparece en tu stream.',
+      restart: 'Empezar de nuevo',
+      word_step: 'Paso',
+      word_of: 'de',
+      word_back: 'Atrás',
+      word_next_step: 'Siguiente paso',
+      inst_sub: 'Sin c\u00f3digo. Sin archivos de configuraci\u00f3n. Instala la extensi\u00f3n del navegador, a\u00f1ade Banana Roll a Roll20 y pega la URL del overlay en OBS.',
+      inst1_k: 'Elige la ruta',
+      inst1_h: 'Elige tu navegador',
+      inst1_p: 'La gu\u00eda de abajo cambia seg\u00fan el navegador que vayas a usar con Roll20.',
+      browser_chromium: 'Chrome / Edge',
+      browser_firefox: 'Firefox',
+      browser_other: 'Otro navegador',
+      inst1_ok: 'Hecho: los pasos correctos ya est\u00e1n resaltados abajo.',
+      inst2_k: 'Extensi\u00f3n del navegador',
+      inst2_h: 'Instala Tampermonkey',
+      inst2_p: 'Tampermonkey es la extensi\u00f3n que permite a Banana Roll a\u00f1adir su panel dentro de Roll20.',
+      inst2_chromium_p: 'Primero, instala Tampermonkey:',
+      inst2_chrome_btn: 'Instalar Tampermonkey para Chrome',
+      inst2_edge_btn: 'Instalar Tampermonkey para Edge',
+      inst2_firefox_p: 'Firefox no necesita el permiso extra para user scripts.',
+      inst2_firefox_btn: 'Instalar Tampermonkey para Firefox',
+      inst2_other_h: 'Banana Roll funciona mejor en Chrome, Edge o Firefox con Tampermonkey instalado.',
+      inst2_other_p: 'Si luego no aparece el panel de Roll20, prueba con Chrome, Edge o Firefox.',
+      inst2_other_btn: 'Instalar Tampermonkey',
+      inst2_other_continue: 'Continuar igualmente',
+      inst2_ok: 'Hecho: Tampermonkey ya est\u00e1 instalado en tu navegador.',
+      inst3_k: 'Obligatorio en Chrome y Edge',
+      inst3_h: 'Activa los user scripts',
+      inst3_intro: 'Chrome y Edge necesitan un permiso extra antes de que Banana Roll funcione.',
+      inst3_l1: 'Abre la p\u00e1gina de extensiones de tu navegador.',
+      inst3_l2: 'Abre los detalles de Tampermonkey.',
+      inst3_l3: 'Activa <b>Permitir User Scripts</b>.',
+      inst3_l4: 'Recarga tu pesta\u00f1a de Roll20.',
+      inst3_shots: 'Ens\u00e9\u00f1ame capturas',
+      inst3_shots_note: 'Usa la gu\u00eda oficial de Tampermonkey si quieres ayuda captura por captura.',
+      inst3_shots_btn: 'Abrir gu\u00eda con capturas',
+      inst3_shot1_t: 'Chrome',
+      inst3_shot1_b: 'Placeholder de captura: abre <span class="mono">chrome://extensions</span> y activa <b>Permitir User Scripts</b> en Tampermonkey.',
+      inst3_shot2_t: 'Edge',
+      inst3_shot2_b: 'Placeholder de captura: abre <span class="mono">edge://extensions</span>, entra en los detalles de Tampermonkey y activa <b>Permitir User Scripts</b>.',
+      inst3_ok: 'Hecho: Permitir User Scripts est\u00e1 activado y Roll20 se ha recargado.',
+      inst3_other_k: 'Antes de continuar',
+      inst3_other_h: 'Los navegadores compatibles funcionan mejor',
+      inst3_other_intro: 'Banana Roll funciona mejor en Chrome, Edge o Firefox con Tampermonkey instalado.',
+      inst3_other_p: 'Si el panel de Roll20 no aparece despu\u00e9s de instalar Banana Roll, cambia a uno de esos navegadores y vuelve a probar.',
+      inst3_other_ok: 'Hecho: ya sabes qu\u00e9 probar si el panel no aparece.',
+      inst4_k: 'A\u00f1ade Banana Roll a Roll20',
+      inst4_h: 'Instala Banana Roll',
+      inst4_p: 'Haz clic abajo. Tampermonkey abrir\u00e1 la p\u00e1gina de instalaci\u00f3n. Pulsa <b>Instalar</b>.',
+      inst4_btn: 'Instalar Banana Roll',
+      inst4_note: 'No tienes que configurar nada. Solo inst\u00e1lalo y recarga Roll20.',
+      inst4_ok: 'Hecho: Tampermonkey dice que el script ya est\u00e1 instalado.',
+      inst4_adv: 'Instalaci\u00f3n manual avanzada',
+      inst4_adv_p: 'Si el bot\u00f3n no funciona, copia la URL del script y p\u00e9gala en Tampermonkey &rarr; <span class="mono">Utilidades &rarr; Instalar desde URL</span>.',
+      inst4_adv_note: 'La URL alojada ya incluye la direcci\u00f3n correcta del servidor y se mantiene actualizada.',
+      inst5_k: 'Comprueba Roll20',
+      inst5_h: 'Abre Roll20',
+      inst5_p: 'Abre tu partida de Roll20 y recarga la p\u00e1gina.',
+      inst5_result: 'Deber\u00edas ver un panel Banana Roll / OBS Overlay en la esquina inferior derecha.',
+      inst5_live: 'Panel visible = Banana Roll est\u00e1 funcionando.',
+      inst5_visual_t: 'Vista previa del panel de Roll20',
+      inst5_visual_b: 'Placeholder de captura o GIF: el panel de Banana Roll aparece en la esquina inferior derecha de Roll20.',
+      inst5_ok: 'Hecho: el panel ya se ve dentro de Roll20.',
+      inst6_k: 'Ll\u00e9valo a OBS',
+      inst6_h: 'A\u00f1ade el overlay a OBS',
+      inst6_p: 'En el panel de Banana Roll, copia la URL del overlay y a\u00f1\u00e1dela como fuente Navegador / fuente web en OBS.',
+      inst6_path: 'Fuentes &rarr; + &rarr; Navegador &rarr; pega la URL &rarr; tama\u00f1o 1920 &times; 1080',
+      inst6_note: 'El fondo es transparente, as\u00ed que en stream solo aparecen los dados y la placa.',
+      inst6_player: '\u00bfQuieres overlays por jugador? El panel tambi\u00e9n te da una URL de overlay por persona.',
+      inst6_visual_t: 'Vista previa de OBS',
+      inst6_visual_b: 'Placeholder de captura o GIF: crea una fuente Navegador, pega la URL y deja el fondo transparente.',
+      inst6_ok: 'Hecho: solo la placa y los dados aparecen encima de tu escena.',
+      inst7_k: 'Resoluci\u00f3n de problemas',
+      inst7_h: '\u00bfNo aparece el panel?',
+      inst7_p: 'Revisa esto primero:',
+      inst7_c1: 'Tampermonkey est\u00e1 instalado',
+      inst7_c2: 'El script de Banana Roll est\u00e1 instalado',
+      inst7_c3: 'Chrome/Edge: Permitir User Scripts est\u00e1 activado',
+      inst7_c4: 'Roll20 se recarg\u00f3 despu\u00e9s de instalar',
+      inst7_c5: 'La tirada es p\u00fablica, no privada ni solo para el GM',
+      inst7_guide: 'Abrir gu\u00eda de resoluci\u00f3n',
+      inst7_guide_p: 'Si el panel sigue sin aparecer, recarga Roll20 por completo, confirma que Tampermonkey est\u00e1 activo en ese sitio y revisa otra vez el permiso de Chrome/Edge. Si la tirada de prueba es privada, el overlay no mostrar\u00e1 nada a prop\u00f3sito.',
+      inst7_ok: 'Hecho: cuando aparezca el panel, ya puedes copiar la URL del overlay.',
+    });
+
     function detectLang() {
       const saved = localStorage.getItem('br_lang');
       if (saved === 'en' || saved === 'es') return saved;
@@ -801,6 +1322,7 @@
       });
       document.querySelectorAll('[data-lang]').forEach((b) =>
         b.setAttribute('aria-pressed', String(b.dataset.lang === lang)));
+      if (typeof refreshFlow === 'function') refreshFlow();
     }
     function setLang(l) { lang = l; try { localStorage.setItem('br_lang', l); } catch (e) {} applyLang(); }
     document.querySelectorAll('[data-lang]').forEach((b) =>
@@ -817,6 +1339,95 @@
         setTimeout(() => { b.textContent = dict().copy; }, 1200);
       });
     });
+
+    /* ════════════════ INSTALL FLOW (Option A — guided focus) ════════════════ */
+    const BROWSER_KEY = 'br_browser_choice';
+    function detectBrowser() {
+      const ua = navigator.userAgent || '';
+      if (/firefox|fxios/i.test(ua)) return 'firefox';
+      if (/edg\//i.test(ua) || /\bchrome\//i.test(ua) || /chromium|crios|opr\/|brave/i.test(ua)) return 'chromium';
+      return 'other';
+    }
+    function getBrowser() {
+      try { const v = localStorage.getItem(BROWSER_KEY); if (v === 'chromium' || v === 'firefox' || v === 'other') return v; } catch (e) {}
+      return detectBrowser();
+    }
+    function setBrowser(v) { try { localStorage.setItem(BROWSER_KEY, v); } catch (e) {} }
+
+    let refreshFlow = function () {};
+    (function initInstallFlow() {
+      const host = document.getElementById('install-flow');
+      if (!host) return;
+      const root = host.querySelector('[data-flow]');
+      const bodies = Array.from(root.querySelectorAll('.fbody'));
+      const order = bodies.map((s) => s.dataset.stepId);
+      const done = new Set();
+      let current = order[0];
+
+      const isVisible = (id) => {
+        const body = root.querySelector('.fbody[data-step-id="' + id + '"]');
+        const bs = body && body.dataset.browserShow;
+        return !bs || bs.split(/\s+/).includes(getBrowser());
+      };
+      const visIds = () => order.filter(isVisible);
+      const elsFor = (id) => Array.from(root.querySelectorAll('[data-step-id="' + id + '"]'));
+
+      function applyBrowserUI() {
+        root.querySelectorAll('[data-store-panel]').forEach((p) => { p.hidden = p.dataset.storePanel !== getBrowser(); });
+        root.querySelectorAll('[data-browser-choice]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.browserChoice === getBrowser())));
+        root.querySelectorAll('.rstep[data-browser-show]').forEach((el) => { el.hidden = !el.dataset.browserShow.split(/\s+/).includes(getBrowser()); });
+      }
+
+      function render() {
+        const v = visIds();
+        if (!v.includes(current)) current = v[0];
+        const N = v.length;
+        const ai = v.indexOf(current);
+        const d = dict();
+        v.forEach((id, i) => {
+          const num = i + 1;
+          const isActive = id === current;
+          const isDone = done.has(id);
+          elsFor(id).forEach((el) => { el.classList.toggle('is-active', isActive); el.classList.toggle('is-done', isDone); });
+          root.querySelectorAll('.fnode[data-step-id="' + id + '"] .fnum').forEach((n) => { n.textContent = num; });
+          const body = root.querySelector('.fbody[data-step-id="' + id + '"]');
+          if (body) {
+            body.classList.toggle('is-active', isActive);
+            const c = body.querySelector('[data-counter]');
+            if (c) c.textContent = (d.word_step || 'Step') + ' ' + num + ' ' + (d.word_of || 'of') + ' ' + N;
+          }
+        });
+        const pct = N <= 1 ? 100 : (ai / (N - 1)) * 100;
+        root.querySelectorAll('.ffill').forEach((f) => { f.style.height = pct + '%'; });
+        const allDone = v.every((id) => done.has(id));
+        root.classList.toggle('is-complete', allDone);
+        host.classList.toggle('is-complete', allDone);
+      }
+
+      function setActive(id) { if (!visIds().includes(id)) return; current = id; render(); }
+      function advanceFrom(id) {
+        done.add(id);
+        const v = visIds();
+        const i = v.indexOf(id);
+        current = (i >= 0 && i < v.length - 1) ? v[i + 1] : id;
+        render();
+      }
+      function back() { const v = visIds(); const i = v.indexOf(current); if (i > 0) { current = v[i - 1]; render(); } }
+
+      root.querySelectorAll('[data-jump]').forEach((j) => j.addEventListener('click', () => setActive(j.dataset.jump)));
+      root.querySelectorAll('[data-advance]').forEach((b) => b.addEventListener('click', () => {
+        const body = b.closest('.fbody'); advanceFrom(body ? body.dataset.stepId : current);
+      }));
+      root.querySelectorAll('[data-back]').forEach((b) => b.addEventListener('click', back));
+      host.querySelectorAll('[data-restart]').forEach((b) => b.addEventListener('click', () => { done.clear(); current = visIds()[0]; render(); }));
+      root.querySelectorAll('[data-browser-choice]').forEach((b) => b.addEventListener('click', () => {
+        setBrowser(b.dataset.browserChoice); applyBrowserUI(); render();
+      }));
+
+      applyBrowserUI();
+      render();
+      refreshFlow = render;
+    })();
 
     applyLang();
 
