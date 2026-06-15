@@ -118,6 +118,11 @@
     .field-label .tagpill { font-family: var(--mono); font-size: 10px; letter-spacing: .5px; text-transform: uppercase;
       color: var(--blue); border: 1px solid rgba(125,184,255,.35); border-radius: 5px; padding: 1px 7px; font-weight: 700; }
 
+    /* sub-section divider inside a card (per-player block under the all-players URL) */
+    .subhead { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line-soft); }
+    .subhead .field-label { margin-bottom: 4px; }
+    .sublabel { color: var(--muted); font-size: 13px; margin: 0 0 6px; }
+
     /* url row */
     .url { display: flex; gap: 9px; align-items: center; }
     .url input {
@@ -147,11 +152,28 @@
       display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center;
       padding: 13px 4px; border-bottom: 1px solid var(--line-soft);
     }
+    .prow.compact { grid-template-columns: 1fr auto; }
     .prow:last-child { border-bottom: 0; }
-    .pwho { display: flex; align-items: center; gap: 11px; min-width: 0; }
-    .pdot { flex: 0 0 auto; width: 9px; height: 9px; border-radius: 50%; background: #888; box-shadow: 0 0 0 3px rgba(255,255,255,.04); }
-    .pname { font-weight: 700; font-size: 14.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .pstatus { font-family: var(--mono); font-size: 10.5px; letter-spacing: .5px; text-transform: uppercase; color: var(--muted-2); }
+    .pwho { display: flex; align-items: center; gap: 13px; min-width: 0; }
+    .pavatar {
+      position: relative; flex: 0 0 auto; width: 48px; height: 48px; border-radius: 12px; overflow: hidden;
+      background: linear-gradient(180deg, #20202e, #16161f); display: grid; place-items: center;
+      box-shadow: 0 0 0 2px var(--ring, #888), inset 0 0 0 1px rgba(0,0,0,.5), 0 3px 10px rgba(0,0,0,.45);
+    }
+    .pavatar.off { box-shadow: 0 0 0 2px color-mix(in srgb, var(--ring, #888) 45%, #2a2a3a), inset 0 0 0 1px rgba(0,0,0,.5); filter: saturate(.6); }
+    .pavatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .pavatar .pinitial { font-family: var(--serif); font-weight: 800; font-size: 17px; line-height: 1; }
+    .pavatar .sdot { position: absolute; right: -3px; bottom: -3px; width: 14px; height: 14px; border-radius: 50%;
+      background: #6b6b80; border: 3px solid var(--card); box-sizing: content-box; }
+    .pavatar .sdot.on { background: var(--green); box-shadow: 0 0 8px rgba(107,210,138,.7); }
+    .pmeta { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+    .pchar { font-family: var(--serif); font-weight: 700; font-size: 15.5px; letter-spacing: .3px; color: var(--ink);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .psub { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .pname { font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .psub .sep { width: 3px; height: 3px; border-radius: 50%; background: var(--muted-2); flex: 0 0 auto; }
+    .pstatus { font-family: var(--mono); font-size: 10px; letter-spacing: .5px; text-transform: uppercase; color: var(--muted-2); flex: 0 0 auto; }
+    .pstatus.on { color: var(--green); }
     .purl {
       min-width: 0; padding: 8px 11px; border-radius: 8px; border: 1px solid var(--line);
       background: #0a0a12; color: var(--gold); font-family: var(--mono); font-size: 12px; width: 100%;
@@ -233,7 +255,7 @@
       .main-inner { padding: 28px 20px 70px; }
     }
     @media (max-width: 560px) {
-      .prow { grid-template-columns: 1fr; gap: 9px; }
+      .prow, .prow.compact { grid-template-columns: 1fr; gap: 9px; }
       .pacts { justify-content: flex-start; }
       .setrow { flex-direction: column; align-items: flex-start; gap: 10px; }
       .brand .bs { display: none; }
@@ -255,9 +277,9 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.8 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.8-1.7"/></svg>
         <span data-i18n="nav_links">Overlay links</span>
       </a>
-      <a href="#players" data-nav="players">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        <span data-i18n="nav_players">Players</span>
+      <a href="#customize" data-nav="customize">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21 8 14 2 9.4h7.6z"/></svg>
+        <span data-i18n="nav_customize">Customization</span>
       </a>
       <a href="#settings" data-nav="settings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -298,38 +320,44 @@
         <p data-i18n="secret"><b>Keep these links private.</b> Anyone with a URL below can view or feed your overlay. Don't put them in your stream description or chat.</p>
       </div>
 
-      <!-- ░░ OVERLAY LINKS ░░ -->
+      <!-- ░░ OVERLAY LINKS (all-players + per-player, all in one card) ░░ -->
       <section class="section" id="links">
         <div class="section-head">
           <span class="ix"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.8 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.8-1.7"/></svg></span>
-          <div><h2 data-i18n="s1_h">All-players overlay</h2><p class="desc" data-i18n="s1_desc">One source showing every player's rolls</p></div>
+          <div><h2 data-i18n="s1_h">Overlay links</h2><p class="desc" data-i18n="s1_desc">OBS browser sources — one for the whole table, one per player</p></div>
         </div>
         <div class="card">
-          <div class="field-label" data-i18n="s1_label">Overlay URL</div>
+          <div class="field-label" data-i18n="s1_label">All-players overlay URL</div>
           <div class="url">
             <input id="overlayUrl" readonly />
             <button class="btn btn-gold" id="copyBtn" data-copy="overlayUrl" data-i18n="copy">Copy</button>
             <a class="btn btn-ghost" id="overlayOpen" href="#" target="_blank" rel="noopener" data-i18n="open">Open</a>
           </div>
           <p class="hintline" data-i18n="s1_note">In OBS: <span class="mono">Sources → + → Browser</span>, paste this URL, and set the size to your canvas (e.g. <span class="mono">1920 × 1080</span>). The background is transparent. Open it in a tab and press <span class="kbd">T</span> for a test roll.</p>
+
+          <div class="subhead">
+            <div class="field-label" data-i18n="links_players_h">Per-player overlays</div>
+            <p class="sublabel" data-i18n="links_players_p">A separate source for each player — place them anywhere.</p>
+          </div>
+          <div id="linkPlayers" class="roster"></div>
         </div>
       </section>
 
-      <!-- ░░ PLAYERS ░░ -->
-      <section class="section" id="players-sec">
+      <!-- ░░ CUSTOMIZATION (dice + plaque, per player + default) ░░ -->
+      <section class="section" id="customize">
         <div class="section-head">
-          <span class="ix"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
-          <div><h2 data-i18n="s2_h">Per-player overlays</h2><p class="desc" data-i18n="s2_desc">A separate source for each player — place them anywhere</p></div>
+          <span class="ix"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21 8 14 2 9.4h7.6z"/></svg></span>
+          <div><h2 data-i18n="s2_h">Dice &amp; plaque customization</h2><p class="desc" data-i18n="s2_desc">Give each player their own dice + plaque look</p></div>
         </div>
         <div class="card">
-          <div id="players" class="roster"></div>
+          <div id="custPlayers" class="roster"></div>
           <div class="defaultrow">
             <div class="dtxt">
-              <b data-i18n="default_h">Default dice style</b>
-              <p data-i18n="default_p">The look used for anyone without their own saved style.</p>
+              <b data-i18n="default_h">Default look</b>
+              <p data-i18n="default_p">The dice + plaque used for anyone without their own saved style.</p>
             </div>
             <a class="ibtn gold" id="defaultCustomize" href="#" target="_blank" rel="noopener">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21 8 14 2 9.4h7.6z"/></svg>
               <span data-i18n="customize">Customize</span>
             </a>
           </div>
@@ -397,14 +425,15 @@
   const I18N = {
     en: {
       doc_title: 'Room control panel — Banana Roll',
-      console: 'Control Panel', nav_lab: 'Room', nav_links: 'Overlay links', nav_players: 'Players', nav_settings: 'Room settings',
+      console: 'Control Panel', nav_lab: 'Room', nav_links: 'Overlay links', nav_customize: 'Customization', nav_settings: 'Room settings',
       eyebrow: 'Room control panel', room: 'Room',
       h1: 'Your overlay is ready',
       intro: "Drop these sources into OBS and your table's rolls go live. Everything here is scoped to this one room.",
       secret: "<b>Keep these links private.</b> Anyone with a URL below can view or feed your overlay. Don't put them in your stream description or chat.",
-      s1_h: 'All-players overlay', s1_desc: "One source showing every player's rolls", s1_label: 'Overlay URL',
+      s1_h: 'Overlay links', s1_desc: 'OBS browser sources — one for the whole table, one per player', s1_label: 'All-players overlay URL',
       s1_note: 'In OBS: <span class="mono">Sources → + → Browser</span>, paste this URL, and set the size to your canvas (e.g. <span class="mono">1920 × 1080</span>). The background is transparent. Open it in a tab and press <span class="kbd">T</span> for a test roll.',
-      s2_h: 'Per-player overlays', s2_desc: 'A separate source for each player — place them anywhere',
+      links_players_h: 'Per-player overlays', links_players_p: 'A separate source for each player — place them anywhere.',
+      s2_h: 'Dice & plaque customization', s2_desc: 'Give each player their own dice + plaque look',
       default_h: 'Default look', default_p: 'The dice + plaque used for anyone without their own saved style.',
       s3_h: 'Room settings', s3_desc: 'Tune how rolls behave on this overlay',
       set_dur_h: 'Result display time', set_dur_p: 'How long the Arcane Plaque stays on screen after a roll.',
@@ -418,14 +447,15 @@
     },
     es: {
       doc_title: 'Panel de control de sala — Banana Roll',
-      console: 'Panel', nav_lab: 'Sala', nav_links: 'Enlaces del overlay', nav_players: 'Jugadores', nav_settings: 'Ajustes de sala',
+      console: 'Panel', nav_lab: 'Sala', nav_links: 'Enlaces del overlay', nav_customize: 'Personalización', nav_settings: 'Ajustes de sala',
       eyebrow: 'Panel de control de sala', room: 'Sala',
       h1: 'Tu overlay está listo',
       intro: 'Pon estas fuentes en OBS y las tiradas de tu mesa salen en directo. Todo aquí pertenece solo a esta sala.',
       secret: '<b>Mantén estos enlaces en privado.</b> Cualquiera con una URL de abajo puede ver o alimentar tu overlay. No los pongas en la descripción de tu stream ni en el chat.',
-      s1_h: 'Overlay de todos', s1_desc: 'Una fuente con las tiradas de todos los jugadores', s1_label: 'URL del overlay',
+      s1_h: 'Enlaces del overlay', s1_desc: 'Fuentes de navegador para OBS — una para toda la mesa, una por jugador', s1_label: 'URL del overlay de todos',
       s1_note: 'En OBS: <span class="mono">Fuentes → + → Navegador</span>, pega esta URL y ajusta el tamaño a tu lienzo (p. ej. <span class="mono">1920 × 1080</span>). El fondo es transparente. Ábrela en una pestaña y pulsa <span class="kbd">T</span> para una tirada de prueba.',
-      s2_h: 'Overlays por jugador', s2_desc: 'Una fuente separada para cada jugador — colócalas donde quieras',
+      links_players_h: 'Overlays por jugador', links_players_p: 'Una fuente separada para cada jugador — colócalas donde quieras.',
+      s2_h: 'Personalización de dados y placa', s2_desc: 'Dale a cada jugador su propio aspecto de dados + placa',
       default_h: 'Aspecto por defecto', default_p: 'Los dados + placa que se usan para quien no tenga su propio estilo guardado.',
       s3_h: 'Ajustes de sala', s3_desc: 'Ajusta cómo se comportan las tiradas en el overlay',
       set_dur_h: 'Tiempo en pantalla', set_dur_p: 'Cuánto se queda la Placa Arcana tras una tirada.',
@@ -460,46 +490,104 @@
   function svgIcon(paths) {
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + paths + '</svg>';
   }
+  // Initials for the avatar placeholder — same rule as the overlay plaque (first +
+  // last initial, or the first two letters of a single name).
+  function initials(name) {
+    const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return '?';
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
 
-  function renderPlayers() {
-    const wrap = document.getElementById('players');
-    wrap.textContent = '';
-    if (!players.length) {
-      const e = document.createElement('div');
-      e.className = 'empty';
-      const d = document.createElement('div'); d.className = 'ed pulse';
-      d.innerHTML = svgIcon('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>');
-      const p = document.createElement('p'); p.textContent = dict().empty;
-      e.append(d, p); wrap.appendChild(e);
-      return;
+  // The roster (GET /players) is enriched server-side with the character name + token
+  // portrait from each player's last roll (absent until they've rolled once). Prefer the
+  // character identity; fall back to the Roll20 player name.
+  function charNameOf(p) { return p.charName || p.name || '—'; }
+
+  // Build the avatar tile: the character portrait when we have one, otherwise an
+  // initials disc ringed in the player's color (mirrors the overlay plaque fallback).
+  function avatarEl(p) {
+    const color = p.color || '#888';
+    const charName = charNameOf(p);
+    const avatar = document.createElement('div'); avatar.className = 'pavatar' + (p.online ? '' : ' off');
+    avatar.style.setProperty('--ring', color);
+    const setInitial = () => {
+      const old = avatar.querySelector('img'); if (old) old.remove();
+      if (!avatar.querySelector('.pinitial')) {
+        const ini = document.createElement('span'); ini.className = 'pinitial';
+        ini.textContent = initials(charName); ini.style.color = color;
+        avatar.insertBefore(ini, avatar.firstChild);
+      }
+    };
+    if (p.avatar) {
+      const img = document.createElement('img'); img.src = p.avatar; img.alt = charName; img.loading = 'lazy';
+      img.onerror = setInitial;                 // broken/blocked image → initials disc
+      avatar.appendChild(img);
+    } else { setInitial(); }
+    const sdot = document.createElement('span'); sdot.className = 'sdot' + (p.online ? ' on' : '');
+    avatar.appendChild(sdot);
+    return avatar;
+  }
+  // Avatar + character/player name + online status (shared by both cards' rows).
+  function whoEl(p) {
+    const who = document.createElement('div'); who.className = 'pwho';
+    const charName = charNameOf(p);
+    const playerName = p.name || '';
+    const meta = document.createElement('div'); meta.className = 'pmeta';
+    const cn = document.createElement('div'); cn.className = 'pchar'; cn.textContent = charName; cn.title = charName;
+    const sub = document.createElement('div'); sub.className = 'psub';
+    if (playerName && playerName !== charName) {
+      const pn = document.createElement('span'); pn.className = 'pname'; pn.textContent = playerName; pn.title = playerName;
+      const sep = document.createElement('span'); sep.className = 'sep';
+      sub.append(pn, sep);
     }
+    const st = document.createElement('span'); st.className = 'pstatus' + (p.online ? ' on' : '');
+    st.textContent = p.online ? dict().online : dict().offline;
+    sub.appendChild(st);
+    meta.append(cn, sub);
+    who.append(avatarEl(p), meta);
+    return who;
+  }
+  function emptyEl() {
+    const e = document.createElement('div'); e.className = 'empty';
+    const d = document.createElement('div'); d.className = 'ed pulse';
+    d.innerHTML = svgIcon('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>');
+    const p = document.createElement('p'); p.textContent = dict().empty;
+    e.append(d, p); return e;
+  }
+
+  // Two cards share the same roster: the Links card lists per-player overlay URLs
+  // (copy/open); the Customization card lists a Customize button per player.
+  function renderPlayers() {
+    const linkWrap = document.getElementById('linkPlayers');
+    const custWrap = document.getElementById('custPlayers');
+    linkWrap.textContent = ''; custWrap.textContent = '';
+    if (!players.length) { linkWrap.appendChild(emptyEl()); custWrap.appendChild(emptyEl()); return; }
+
     for (const p of players) {
       const url = playerUrl(p.id);
-      const row = document.createElement('div'); row.className = 'prow';
 
-      const who = document.createElement('div'); who.className = 'pwho';
-      const dot = document.createElement('span'); dot.className = 'pdot';
-      dot.style.background = p.color || '#888'; dot.style.opacity = p.online ? '1' : '.4';
-      const nb = document.createElement('div'); nb.style.minWidth = '0';
-      const name = document.createElement('div'); name.className = 'pname'; name.textContent = p.name; name.title = p.name;
-      const st = document.createElement('div'); st.className = 'pstatus'; st.textContent = p.online ? dict().online : dict().offline;
-      nb.append(name, st);
-      who.append(dot, nb);
-
+      // — Links card row: avatar/name · URL · copy/open —
+      const lrow = document.createElement('div'); lrow.className = 'prow';
       const input = document.createElement('input'); input.className = 'purl'; input.readOnly = true; input.value = url;
-
       const acts = document.createElement('div'); acts.className = 'pacts';
       const copyBtn = document.createElement('button'); copyBtn.className = 'ibtn';
       copyBtn.innerHTML = svgIcon('<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>') + '<span>' + dict().copy + '</span>';
       copyBtn.onclick = () => { input.select(); copyText(url, copyBtn.querySelector('span')); };
       const open = document.createElement('a'); open.className = 'ibtn'; open.href = url; open.target = '_blank'; open.rel = 'noopener';
       open.innerHTML = svgIcon('<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>') + '<span>' + dict().open + '</span>';
-      const custom = document.createElement('a'); custom.className = 'ibtn gold'; custom.href = customizeUrl(p.id); custom.target = '_blank'; custom.rel = 'noopener'; custom.title = dict().customize;
-      custom.innerHTML = svgIcon('<path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>');
-      acts.append(copyBtn, open, custom);
+      acts.append(copyBtn, open);
+      lrow.append(whoEl(p), input, acts);
+      linkWrap.appendChild(lrow);
 
-      row.append(who, input, acts);
-      wrap.appendChild(row);
+      // — Customization card row: avatar/name · Customize —
+      const crow = document.createElement('div'); crow.className = 'prow compact';
+      const cact = document.createElement('div'); cact.className = 'pacts';
+      const custom = document.createElement('a'); custom.className = 'ibtn gold'; custom.href = customizeUrl(p.id); custom.target = '_blank'; custom.rel = 'noopener';
+      custom.innerHTML = svgIcon('<path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21 8 14 2 9.4h7.6z"/>') + '<span>' + dict().customize + '</span>';
+      cact.append(custom);
+      crow.append(whoEl(p), cact);
+      custWrap.appendChild(crow);
     }
   }
 
@@ -585,7 +673,7 @@
   }
 
   // ── scrollspy for sidebar ──
-  const navMap = { links: 'links', 'players-sec': 'players', settings: 'settings' };
+  const navMap = { links: 'links', customize: 'customize', settings: 'settings' };
   const spy = new IntersectionObserver((entries) => {
     entries.forEach((en) => {
       if (en.isIntersecting) {
@@ -594,7 +682,7 @@
       }
     });
   }, { rootMargin: '-30% 0px -60% 0px' });
-  ['links', 'players-sec', 'settings'].forEach((id) => { const el = document.getElementById(id); if (el) spy.observe(el); });
+  ['links', 'customize', 'settings'].forEach((id) => { const el = document.getElementById(id); if (el) spy.observe(el); });
 
   applyLang();
   fetchPlayers();
