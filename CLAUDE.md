@@ -57,7 +57,7 @@ Roll20 tab (userscript: relay raw chat records) --HTTP POST--> Node server (pars
 | GET  | `/room/:id/setup` | room id | Human setup page |
 | GET  | `/room/:id/styles` | room id | Read the per-player dice styles map `{ styles, defaultStyle }` (drives the customize page) |
 | POST | `/room/:id/styles?player=<pid\|default>` | room id | Set one player's dice style (or the room default); body `{ style }`. Cosmetic, validated, rate-limited. A real `pid` is mirrored to that player's cross-room profile |
-| GET  | `/room/:id/templates` | room id | List seeded plaque templates (frame art + default zones + editable color map) for the customizer |
+| GET  | `/room/:id/templates` | none | List seeded plaque templates (frame art + default zones + editable color map) for the customizer. **Not room-gated** — global, public seed data (also shipped in `customizer/data.js`); lets the landing-page demo (`/room/demo/…`, no real room) read it too |
 | GET  | `/room/:id/plaque` | room id | Read the per-player plaque configs `{ plaques, defaultPlaque }` |
 | POST | `/room/:id/plaque?player=<pid\|default>` | room id | Set one player's plaque config (or the room default); body is the plaque config (`{ templateId, colors, zones, background }`). Validated (`validatePlaque` in `src/templates.js`), larger body cap for the inline base64 PNG background, rate-limited. A real `pid` is mirrored to the cross-room profile |
 | GET  | `/room/:id/profile?player=<pid>` | room id | Read a player's cross-room profile `{ style, plaque }` (what they saved in any previous room); seeds the customizer when this room has nothing yet |

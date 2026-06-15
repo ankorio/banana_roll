@@ -535,10 +535,10 @@ function handlePlaquePost(req, res, id, query) {
 }
 
 // Seeded plaque templates (frame art + default zone layout + editable color map). Lets
-// new frames ship server-side without a client redeploy. Room-id only.
+// new frames ship server-side without a client redeploy. Global, public seed data (the
+// same list is shipped to every browser in customizer/data.js), so it's NOT room-gated —
+// this also lets the landing-page demo (`/room/demo/...`, no real room) read templates.
 function handleTemplatesGet(req, res, id) {
-  const room = rooms.getRoom(id);
-  if (!room) return sendJson(res, 404, { error: 'unknown room' });
   sendJson(res, 200, { templates: templates.TEMPLATES });
 }
 
