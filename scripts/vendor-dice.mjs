@@ -8,7 +8,7 @@
 // Then run `npm run dice:build` (chained by the dice:vendor npm script) to inject custom
 // textures + regenerate the manifest.
 //
-// Pin/override the tag:  DICE_TAG=v0.1.2 npm run dice:vendor
+// Pin/override the tag:  DICE_TAG=v0.1.3 npm run dice:vendor
 // Keep DICE_TAG in sync with the jsdelivr /gh fallback URLs in overlay/customize/playground.
 
 import { writeFileSync, mkdirSync } from 'node:fs';
@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const REPO = process.env.DICE_FORK || 'ankorio/dice-box-threejs';
-const TAG = process.env.DICE_TAG || 'v0.1.2';
+const TAG = process.env.DICE_TAG || 'v0.1.3';
 const BASE = `https://cdn.jsdelivr.net/gh/${REPO}@${TAG}`;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

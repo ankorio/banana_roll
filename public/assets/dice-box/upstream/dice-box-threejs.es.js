@@ -5994,25 +5994,76 @@ var Jn = { type: "postStep" }, Yn = { type: "preStep" }, K = {
 				if (a.body.sleepState < n && !t) return !1;
 				if (a.body.sleepState == n || t) {
 					if (a.body.type === k.KINEMATIC) continue;
-					let e = !1;
-					if (a.result.length == 0 ? (a.storeRolledValue(a.resultReason), e = this.checkForRethrow(a)) : a.result.length > 0 && a.rerolling && (a.rerolling = !1, a.storeRolledValue("reroll"), e = this.checkForRethrow(a)), e) return a.rerolls += 1, a.rerolling = !0, a.body.wakeUp(), a.body.type = k.DYNAMIC, a.body.angularVelocity = new r(25, 25, 25), a.body.velocity = new r(0, 0, 3e3), !1;
+					let t = !1;
+					if (a.result.length == 0) {
+						a.storeRolledValue(a.resultReason);
+						let n = e.notationVectors && e.notationVectors.result && e.notationVectors.result[i];
+						n != null && a.getLastValue().value != n && (this.swapDiceFace(a, n), a.storeRolledValue("forced")), t = this.checkForRethrow(a);
+					} else a.result.length > 0 && a.rerolling && (a.rerolling = !1, a.storeRolledValue("reroll"), t = this.checkForRethrow(a));
+					if (t) return a.rerolls += 1, a.rerolling = !0, a.body.wakeUp(), a.body.type = k.DYNAMIC, a.body.angularVelocity = new r(25, 25, 25), a.body.velocity = new r(0, 0, 3e3), !1;
 					a.rerolling = !1, a.body.type = k.KINEMATIC;
 				}
 			}
 		}
 		return !0;
 	}
-	simulateGroup(e) {
-		let t = this.animstate;
-		this.animstate = "simulate";
-		let n = [];
-		for (let t = 0, r = this.diceList.length; t < r; ++t) {
-			let r = this.diceList[t];
-			!r || !r.body || r._group !== e && (this.world.removeBody(r.body), n.push(r.body));
+	snapshotWorld() {
+		return {
+			time: this.world.time,
+			stepnumber: this.world.stepnumber,
+			bodies: this.world.bodies.map((e) => ({
+				body: e,
+				position: e.position.clone(),
+				quaternion: e.quaternion.clone(),
+				velocity: e.velocity.clone(),
+				angularVelocity: e.angularVelocity.clone(),
+				sleepState: e.sleepState,
+				timeLastSleepy: e.timeLastSleepy,
+				type: e.type
+			}))
+		};
+	}
+	restoreWorld(e) {
+		this.world.time = e.time, this.world.stepnumber = e.stepnumber;
+		for (let t of e.bodies) {
+			let e = t.body;
+			e.position.copy(t.position), e.quaternion.copy(t.quaternion), e.velocity.copy(t.velocity), e.angularVelocity.copy(t.angularVelocity), e.previousPosition.copy(t.position), e.interpolatedPosition.copy(t.position), e.interpolatedQuaternion.copy(t.quaternion), e.force.setZero(), e.torque.setZero(), e.vlambda.setZero(), e.wlambda.setZero(), e.sleepState = t.sleepState, e.timeLastSleepy = t.timeLastSleepy, e.type = t.type, e.aabbNeedsUpdate = !0;
 		}
-		for (e.iteration = 0; !this.groupFinished(e);) ++e.iteration, this.world.step(this.framerate);
-		for (let e = 0; e < n.length; e++) this.world.addBody(n[e]);
-		this.animstate = t;
+	}
+	predictAndRelabelAll() {
+		let e = k.SLEEPING, t = k.KINEMATIC, n = [], r = [];
+		for (let e of this.groups.values()) {
+			if (e.state !== "animating" && e.state !== "spawning") continue;
+			let i = e.notationVectors && e.notationVectors.result || null;
+			for (let a = 0; a < e.meshes.length; a++) {
+				let o = e.meshes[a];
+				!o || !o.body || o.body.type !== t && (n.push(o), i && i[a] != null && r.push({
+					mesh: o,
+					target: i[a]
+				}));
+			}
+		}
+		if (!r.length) return;
+		let i = this.animstate;
+		this.animstate = "simulate";
+		let a = this.snapshotWorld();
+		for (let { mesh: e } of r) {
+			let t = this.DiceFactory.geometries[e.notation.type];
+			t && (e.geometry = t), e.result = [];
+		}
+		let o = 0, s = this.iterationLimit || 1e3, c = () => {
+			for (let r of n) if (r.body.type !== t && r.body.sleepState !== e) return !1;
+			return !0;
+		};
+		for (; o++ < s && !c();) {
+			this.world.step(this.framerate);
+			for (let r of n) r.body.sleepState === e && r.body.type !== t && (r.body.type = t);
+		}
+		for (let { mesh: e, target: t } of r) {
+			let n = e.getFaceValue();
+			n && n.value != t && (e.result = [n], this.swapDiceFace(e, t)), e.result = [];
+		}
+		this.restoreWorld(a), this.animstate = i;
 	}
 	startClickThrow(e, t) {
 		let n, r = this.display.currentWidth, i = this.display.currentHeight;
@@ -6143,12 +6194,7 @@ var Jn = { type: "postStep" }, Yn = { type: "preStep" }, K = {
 			let t = this.diceList.length;
 			this.spawnDice(a.vectors[e], !1, o), this.diceList.length > t && o.meshes.push(this.diceList[this.diceList.length - 1]);
 		}
-		this.simulateGroup(o);
-		for (let e = 0; e < o.meshes.length; e++) this.spawnDice(a.vectors[e], o.meshes[e], o);
-		if (a.result && a.result.length > 0) for (let e = 0; e < a.result.length; e++) {
-			let t = o.meshes[e];
-			t && t.getLastValue().value != a.result[e] && this.swapDiceFace(t, a.result[e]);
-		}
+		this.predictAndRelabelAll();
 		for (let e of o.meshes) e.body && e.body.wakeUp();
 		return o.iteration = 0, o.state = "animating", this.rolling = !0, this._lastStepTime = 0, this._continuousRunning || this.start(), s;
 	}
