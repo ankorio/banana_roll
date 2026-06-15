@@ -677,6 +677,66 @@
     es.onerror = () => { statusEl.textContent = t('statusReconnecting'); };
   }
 
+  // ── test/demo look pool ──────────────────────────────────────────────────────
+  // Building a brand-new dice look is expensive and synchronous: DiceFactory bakes a
+  // canvas + GPU texture per face (~21 for a d20), keyed by colors+texture, so a never-
+  // seen style is a guaranteed cache miss → main-thread freeze. Both the overlay's Test
+  // button and the landing-page demo therefore reuse SIX fixed (dice, plaque) pairs that
+  // we pre-bake while idle; each throw picks a random pair (and a random result), so it's
+  // always a cache hit. Shared here so both modes use the same pool + pre-bake.
+  const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+  const randInt = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
+  // HSL→hex so each random dice palette stays coherent: light numbers, saturated body, dark edge.
+  function hslHex(h, s, l) {
+    s /= 100; l /= 100;
+    const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = l - c / 2;
+    const [r, g, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x]
+      : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+    const hx = (v) => Math.round((v + m) * 255).toString(16).padStart(2, '0');
+    return '#' + hx(r) + hx(g) + hx(b);
+  }
+  const TEST_TEX = ['marble', 'fire', 'ice', 'metal', 'stars', 'astral', 'glitter', 'dragon', 'water', 'speckles', 'stainedglass', 'none'];
+  const TEST_MAT = ['glass', 'metal', 'plastic', 'wood', 'none'];
+  function randomDiceStyle() {
+    const h = randInt(0, 359);
+    return {
+      texture: pick(TEST_TEX),
+      material: pick(TEST_MAT),
+      foreground: hslHex((h + randInt(20, 40)) % 360, 70, 85),
+      background: hslHex(h, randInt(55, 80), randInt(28, 45)),
+      edge: hslHex(h, 50, 12),
+    };
+  }
+  // A random plaque template from whatever's loaded; null → the default/builtin plaque
+  // (e.g. before /templates lands, or running without a room).
+  function randomTemplate() {
+    const ids = Object.keys(templatesById);
+    if (!ids.length) return null;
+    const tp = templatesById[pick(ids)];
+    return { templateId: tp.id, colors: tp.colors, zones: tp.zones, background: null };
+  }
+  const TEST_PAIRS = 6;
+  let testPairs = [];
+  function buildTestPairs() {
+    testPairs = Array.from({ length: TEST_PAIRS }, () => ({ style: randomDiceStyle(), plaque: randomTemplate() }));
+  }
+  // A precached pair (cache hit, no freeze); a fresh one only if the pool isn't ready yet.
+  const pickPair = () => testPairs.length ? pick(testPairs) : { style: randomDiceStyle(), plaque: randomTemplate() };
+  const nextFrame = () => new Promise((r) => (window.requestAnimationFrame ? requestAnimationFrame(() => r()) : setTimeout(r, 0)));
+  // Pre-bake one style's d20 face textures into the engine's material cache. Mirrors what
+  // rollGroup does (resolve colorData → applyColorSet → create a d20) minus the scene
+  // insertion, so the cachestring matches and the first real throw is a cache hit. The
+  // discarded mesh is GC'd; geometry/material caches persist on the factory.
+  async function prebakeStyle(style) {
+    if (!Box) return;
+    const colorData = await resolveStyle(style);   // warms texture image + colorset
+    const F = Box.DiceFactory;
+    if (!colorData || !F || typeof F.create !== 'function') return;
+    try { F.applyColorSet(colorData); F.create('d20'); } catch (e) { console.warn('[overlay] prebake failed', e); }
+  }
+  // Bake all six looks, yielding a frame between each so load stays smooth.
+  async function precacheTestPairs() { for (const p of testPairs) { await prebakeStyle(p.style); await nextFrame(); } }
+
   // ── boot ────────────────────────────────────────────────────────────────────
   await Promise.allSettled([initDice(), initConfetti()]);
 
@@ -687,14 +747,24 @@
   }
   // (Zone fonts + plaque sizing on resize are handled by relayout(), registered above.)
 
+  // Build the six-look pool (test button + demo) once templates load — they seed the
+  // plaques — then pre-bake every look so the first throw of each never stalls the thread.
+  buildTestPairs();
+  if (Box) (async () => { try { await loadTemplates(); } catch {} buildTestPairs(); precacheTestPairs(); })();
+
   if (DEMO) {
     // Embedded on the landing page: no room/SSE. The parent page sends rolls via
     // postMessage and we render them through the real pipeline (3D dice + plaque
-    // + particles), reporting ready/idle so it can drive buttons + auto-play.
+    // + particles), reporting ready/idle so it can drive buttons + auto-play. We stamp a
+    // random precached (dice, plaque) pair onto each roll the parent sends (unless it set
+    // its own), so the demo shows varied dice + frames without ever freezing.
     statusEl.style.display = 'none';
     window.addEventListener('message', (e) => {
       if (e.origin !== location.origin) return;
-      if (e.data && e.data.type === 'demo-roll' && e.data.roll) enqueue(e.data.roll);
+      if (!(e.data && e.data.type === 'demo-roll' && e.data.roll)) return;
+      const roll = e.data.roll;
+      if (!roll.style) { const p = pickPair(); roll.style = p.style; if (p.plaque) roll._plaque = p.plaque; }
+      enqueue(roll);
     });
     try { parent.postMessage({ type: 'demo-ready' }, location.origin); } catch {}
   } else {
@@ -736,39 +806,11 @@
     const testBtn = document.getElementById('testbtn');
     testBtn.hidden = false;
 
-    const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
-    const randInt = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
-    // HSL→hex so each random dice palette stays coherent: light numbers, saturated body, dark edge.
-    function hslHex(h, s, l) {
-      s /= 100; l /= 100;
-      const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = l - c / 2;
-      const [r, g, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x]
-        : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
-      const hx = (v) => Math.round((v + m) * 255).toString(16).padStart(2, '0');
-      return '#' + hx(r) + hx(g) + hx(b);
-    }
-    const TEST_TEX = ['marble', 'fire', 'ice', 'metal', 'stars', 'astral', 'glitter', 'dragon', 'water', 'speckles', 'stainedglass', 'none'];
-    const TEST_MAT = ['glass', 'metal', 'plastic', 'wood', 'none'];
-    function randomDiceStyle() {
-      const h = randInt(0, 359);
-      return {
-        texture: pick(TEST_TEX),
-        material: pick(TEST_MAT),
-        foreground: hslHex((h + randInt(20, 40)) % 360, 70, 85),
-        background: hslHex(h, randInt(55, 80), randInt(28, 45)),
-        edge: hslHex(h, 50, 12),
-      };
-    }
-    // A random plaque template from whatever the relay has loaded; null → the default/
-    // builtin plaque (e.g. before /templates lands, or when running without a room).
-    function randomTemplate() {
-      const ids = Object.keys(templatesById);
-      if (!ids.length) return null;
-      const tp = templatesById[pick(ids)];
-      return { templateId: tp.id, colors: tp.colors, zones: tp.zones, background: null };
-    }
+    // Look pool (six precached dice+plaque pairs) + helpers are shared above; here we only
+    // add the test-roll's random who/result on top of a picked pair.
     const TEST_WHO = ['Seraphina', 'Thorne', 'Lyra', 'Grimm', 'Vesper', 'Kael', 'Mara', 'Orin', 'Sable', 'Quill'];
     const TEST_RNAME = ['Longsword Attack', 'Fire Bolt', 'Stealth Check', 'Perception', 'Wisdom Save', 'Eldritch Blast', 'Sacred Flame', 'Arcana', 'Athletics', 'Initiative'];
+
     let testN = 0;
     function randomTestRoll() {
       testN++;
@@ -776,11 +818,12 @@
       const ev = pick(['normal', 'normal', 'normal', 'advantage', 'disadvantage', 'crit', 'fumble']);
       const mod = randInt(0, 9);
       const d20 = (v) => ({ sides: '20', value: v, crit: v === 20, fumble: v === 1 });
+      const pair = pickPair();   // precached look (cache hit, no freeze)
       const base = {
         id: 'test' + testN + '_' + Math.random().toString(36).slice(2, 6),
-        who: pick(TEST_WHO), style: randomDiceStyle(), ts: Date.now(),
+        who: pick(TEST_WHO), style: pair.style, ts: Date.now(),
       };
-      const tpl = randomTemplate(); if (tpl) base._plaque = tpl;
+      if (pair.plaque) base._plaque = pair.plaque;
       const rname = pick(TEST_RNAME);
       if (ev === 'advantage' || ev === 'disadvantage') {
         const a = randInt(1, 20), b = randInt(1, 20), adv = ev === 'advantage';
