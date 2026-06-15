@@ -154,18 +154,20 @@
     }
     .prow.compact { grid-template-columns: 1fr auto; }
     .prow:last-child { border-bottom: 0; }
-    .pwho { display: flex; align-items: center; gap: 13px; min-width: 0; }
+    .pwho { display: flex; align-items: center; gap: 11px; min-width: 0; }
+    /* The token already carries its own art border, so no surrounding box — just clip
+       the image. The initials fallback re-adds a coloured disc via .placeholder. */
     .pavatar {
       position: relative; flex: 0 0 auto; width: 48px; height: 48px; border-radius: 12px; overflow: hidden;
-      background: linear-gradient(180deg, #20202e, #16161f); display: grid; place-items: center;
-      box-shadow: 0 0 0 2px var(--ring, #888), inset 0 0 0 1px rgba(0,0,0,.5), 0 3px 10px rgba(0,0,0,.45);
+      display: grid; place-items: center;
     }
-    .pavatar.off { box-shadow: 0 0 0 2px color-mix(in srgb, var(--ring, #888) 45%, #2a2a3a), inset 0 0 0 1px rgba(0,0,0,.5); filter: saturate(.6); }
+    .pavatar.placeholder {
+      background: linear-gradient(180deg, #20202e, #16161f);
+      box-shadow: 0 0 0 2px var(--ring, #888), inset 0 0 0 1px rgba(0,0,0,.5);
+    }
+    .pavatar.off { filter: saturate(.55) brightness(.9); opacity: .82; }
     .pavatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .pavatar .pinitial { font-family: var(--serif); font-weight: 800; font-size: 17px; line-height: 1; }
-    .pavatar .sdot { position: absolute; right: -3px; bottom: -3px; width: 14px; height: 14px; border-radius: 50%;
-      background: #6b6b80; border: 3px solid var(--card); box-sizing: content-box; }
-    .pavatar .sdot.on { background: var(--green); box-shadow: 0 0 8px rgba(107,210,138,.7); }
     .pmeta { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
     .pchar { font-family: var(--serif); font-weight: 700; font-size: 15.5px; letter-spacing: .3px; color: var(--ink);
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -504,6 +506,10 @@
   // character identity; fall back to the Roll20 player name.
   function charNameOf(p) { return p.charName || p.name || '—'; }
 
+  // Hard cap a display name at 25 chars + ellipsis (the CSS also clips on overflow,
+  // but this keeps a long name from ever dominating the row).
+  function truncate(s, n) { s = (s || '').trim(); return s.length > n ? s.slice(0, n) + '…' : s; }
+
   // Build the avatar tile: the character portrait when we have one, otherwise an
   // initials disc ringed in the player's color (mirrors the overlay plaque fallback).
   function avatarEl(p) {
@@ -513,6 +519,7 @@
     avatar.style.setProperty('--ring', color);
     const setInitial = () => {
       const old = avatar.querySelector('img'); if (old) old.remove();
+      avatar.classList.add('placeholder');     // re-add the coloured disc behind initials
       if (!avatar.querySelector('.pinitial')) {
         const ini = document.createElement('span'); ini.className = 'pinitial';
         ini.textContent = initials(charName); ini.style.color = color;
@@ -524,8 +531,6 @@
       img.onerror = setInitial;                 // broken/blocked image → initials disc
       avatar.appendChild(img);
     } else { setInitial(); }
-    const sdot = document.createElement('span'); sdot.className = 'sdot' + (p.online ? ' on' : '');
-    avatar.appendChild(sdot);
     return avatar;
   }
   // Avatar + character/player name + online status (shared by both cards' rows).
@@ -534,10 +539,10 @@
     const charName = charNameOf(p);
     const playerName = p.name || '';
     const meta = document.createElement('div'); meta.className = 'pmeta';
-    const cn = document.createElement('div'); cn.className = 'pchar'; cn.textContent = charName; cn.title = charName;
+    const cn = document.createElement('div'); cn.className = 'pchar'; cn.textContent = truncate(charName, 25); cn.title = charName;
     const sub = document.createElement('div'); sub.className = 'psub';
     if (playerName && playerName !== charName) {
-      const pn = document.createElement('span'); pn.className = 'pname'; pn.textContent = playerName; pn.title = playerName;
+      const pn = document.createElement('span'); pn.className = 'pname'; pn.textContent = truncate(playerName, 25); pn.title = playerName;
       const sep = document.createElement('span'); sep.className = 'sep';
       sub.append(pn, sep);
     }

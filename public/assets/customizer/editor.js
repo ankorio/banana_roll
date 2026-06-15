@@ -259,15 +259,10 @@
       st.dice.material === p.material && st.dice.texture === p.texture;
   }
 
-  // ---- LEFT FLYOUT: preconfigured dice presets (random subset, chosen once per load) ----
-  let presetSubset = null;
+  // ---- LEFT FLYOUT: preconfigured dice presets (the full list) ----
+  const presetSubset = (BR.DICE_PRESETS || []).slice();
   function buildDicePresets() {
     const wrap = $('#dicePresets'); if (!wrap) return;
-    if (!presetSubset) {
-      const pool = (BR.DICE_PRESETS || []).slice();
-      for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
-      presetSubset = pool.slice(0, 8);
-    }
     wrap.innerHTML = '';
     presetSubset.forEach((p) => {
       const t = document.createElement('button'); t.className = 'preset' + (presetActive(p) ? ' on' : '');

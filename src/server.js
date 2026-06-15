@@ -378,6 +378,9 @@ function validatePlayers(arr) {
     // Stable Roll20 account id (d20userid): the cross-campaign key for saved
     // customizations. Optional — older userscripts don't send it.
     userid: typeof p.userid === 'string' && /^[\w-]{1,100}$/.test(p.userid) ? p.userid : '',
+    // Player's character token/avatar (resolved by the userscript from Campaign at
+    // load) so the setup/customize portrait shows before anyone rolls. http(s) only.
+    avatar: typeof p.avatar === 'string' && /^https?:\/\//.test(p.avatar) ? p.avatar.slice(0, 600) : '',
   })).filter((p) => p.id);
 }
 
@@ -431,13 +434,17 @@ async function seedProfiles(room, players) {
 function handlePlayersGet(req, res, id) {
   const room = rooms.getRoom(id);
   if (!room) return sendJson(res, 404, { error: 'unknown room' });
-  // Enrich the roster with the character name/portrait captured from each player's
-  // last roll (used by the customize editor's preview; absent until they've rolled).
+  // Enrich the roster with the character name/portrait. The portrait prefers the
+  // roster avatar the userscript resolved from Campaign at load (shows before anyone
+  // rolls); the name and a fallback portrait come from each player's last roll
+  // (room.charInfo, absent until they've rolled).
   const ci = room.charInfo || {};
   const players = (room.players || []).map((p) => {
     const c = ci[p.id];
-    if (!c) return p;
-    return { ...p, charName: c.who || undefined, avatar: c.avatar || undefined };
+    const avatar = p.avatar || (c && c.avatar) || undefined;
+    const charName = (c && c.who) || undefined;
+    if (!avatar && !charName) return p;
+    return { ...p, charName, avatar };
   });
   sendJson(res, 200, { players });
 }

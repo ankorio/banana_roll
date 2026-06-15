@@ -1,6 +1,6 @@
 {
-  "latest": "0.8.1",
-  "minSupported": "0.8.0",
-  "notes": "Cross-campaign player identity (d20userid) + built-in update checks. Older scripts can't carry customizations between games.",
+  "latest": "0.10.0",
+  "minSupported": "0.10.0",
+  "notes": "New: 'Show overlay on the map' — preview the overlay directly on the Roll20 canvas, click-through so the game stays fully interactive (toggle in the panel). Portraits use the character's default token.",
   "url": "https://github.com/ankorio/banana_roll/releases"
 }

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Roll20 → OBS Overlay Capture
 // @namespace    roll20-obs-overlay
-// @version      0.8.1
+// @version      0.10.0
 // @description  Capture Roll20 dice rolls from the Firebase transport and POST them to your overlay relay.
 // @match        https://app.roll20.net/editor*
 // @match        https://app.roll20.net/campaigns/*
@@ -40,7 +40,7 @@
 
   // Our own version, read from the userscript metadata (falls back to a literal if
   // GM_info is unavailable). Used by the update check below.
-  const CURRENT_VERSION = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version) || '0.8.1';
+  const CURRENT_VERSION = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version) || '0.10.0';
 
   // Loud, first-thing-that-runs banner so you can confirm injection in DevTools.
   // If you DON'T see this in the Roll20 tab's console, the script isn't matching
@@ -114,6 +114,10 @@
             '<div style="opacity:.7;margin-bottom:3px">Per-player overlays:</div>' +
             '<div id="ov-plist" style="display:flex;flex-direction:column;gap:3px;max-height:170px;overflow:auto"></div>' +
           '</div>' +
+          '<label id="ov-canvas-row" style="display:flex;align-items:center;gap:7px;margin-top:9px;cursor:pointer;user-select:none">' +
+            '<input type="checkbox" id="ov-canvas-toggle" style="cursor:pointer;margin:0">' +
+            '<span>Show overlay on the map <span style="opacity:.55">(click-through)</span></span>' +
+          '</label>' +
           '<div id="ov-last" style="margin-top:6px;opacity:.6">no rolls captured yet</div>' +
         '</div>';
       (document.body || document.documentElement).appendChild(root);
@@ -128,6 +132,9 @@
       minBtn = root.querySelector('#ov-min');
       root.querySelector('#ov-x').onclick = () => root.remove();
       root.querySelector('#ov-copy').onclick = () => copy(urlInput.value, urlInput);
+      const canvasToggle = root.querySelector('#ov-canvas-toggle');
+      canvasToggle.checked = canvasOverlayWanted;
+      canvasToggle.onchange = () => setCanvasOverlay(canvasToggle.checked);
       minBtn.onclick = () => setCollapsed(!collapsed);
       root.querySelector('#ov-icon').onclick = () => setCollapsed(!collapsed);
       makeDraggable(root, root.querySelector('#ov-head'));
@@ -251,6 +258,74 @@
     return api;
   })();
 
+  // ── in-editor overlay preview (inject the overlay onto the Roll20 map) ───────
+  // Mounts the live overlay as a transparent, CLICK-THROUGH iframe positioned over
+  // the play area (#editor-wrapper — the WebGL game canvas) so rolls render right on
+  // the map. pointer-events:none means every click/drag still lands on the canvas
+  // underneath: the overlay never intercepts the game. Opt-in via the panel checkbox;
+  // the choice is persisted. z-index sits above the canvas (z:5) but below Roll20's
+  // side panels (z:100) and our control panel (max z).
+  let canvasOverlayWanted = (() => { try { return GM_getValue('canvas_overlay', '') === '1'; } catch { return false; } })();
+  let canvasFrame = null, canvasPosTimer = null, canvasRO = null;
+
+  function canvasTarget() {
+    const d = (PAGE && PAGE.document) || document;
+    return d.getElementById('editor-wrapper') || d.getElementById('babylonCanvas') || d.querySelector('.canvas-container');
+  }
+  function positionCanvasFrame() {
+    if (!canvasFrame) return;
+    const t = canvasTarget();
+    if (!t) return;
+    const r = t.getBoundingClientRect();
+    canvasFrame.style.left = Math.max(0, r.left) + 'px';
+    canvasFrame.style.top = Math.max(0, r.top) + 'px';
+    canvasFrame.style.width = Math.max(0, r.width) + 'px';
+    canvasFrame.style.height = Math.max(0, r.height) + 'px';
+  }
+  function mountCanvasFrame() {
+    if (!CREDS) return;
+    const src = `${SERVER}/room/${CREDS.room}/overlay`;
+    if (canvasFrame) { // already mounted — keep the src pointed at the current room
+      if (canvasFrame.dataset.room !== CREDS.room) { canvasFrame.dataset.room = CREDS.room; canvasFrame.src = src; }
+      positionCanvasFrame();
+      return;
+    }
+    const f = document.createElement('iframe');
+    f.id = 'ov-canvas-overlay';
+    f.dataset.room = CREDS.room;
+    f.setAttribute('allowtransparency', 'true');
+    f.setAttribute('scrolling', 'no');
+    f.style.cssText = [
+      'position:fixed', 'left:0', 'top:0', 'width:0', 'height:0',
+      'border:0', 'margin:0', 'padding:0', 'background:transparent',
+      'pointer-events:none',   // click-through: the game canvas stays fully interactive
+      'z-index:50',            // above the WebGL canvas, below Roll20's side panels + our panel
+    ].join(';');
+    f.src = src;
+    (document.body || document.documentElement).appendChild(f);
+    canvasFrame = f;
+    positionCanvasFrame();
+    window.addEventListener('resize', positionCanvasFrame, true);
+    canvasPosTimer = setInterval(positionCanvasFrame, 1000); // track zoom / sidebar / layout shifts
+    try { const t = canvasTarget(); if (t && window.ResizeObserver) { canvasRO = new ResizeObserver(positionCanvasFrame); canvasRO.observe(t); } } catch {}
+    console.log('[overlay] map overlay ON →', src);
+  }
+  function unmountCanvasFrame() {
+    if (canvasPosTimer) { clearInterval(canvasPosTimer); canvasPosTimer = null; }
+    if (canvasRO) { try { canvasRO.disconnect(); } catch {} canvasRO = null; }
+    window.removeEventListener('resize', positionCanvasFrame, true);
+    if (canvasFrame) { canvasFrame.remove(); canvasFrame = null; console.log('[overlay] map overlay OFF'); }
+  }
+  function applyCanvasOverlay() {
+    if (canvasOverlayWanted && CREDS) mountCanvasFrame();
+    else unmountCanvasFrame();
+  }
+  function setCanvasOverlay(on) {
+    canvasOverlayWanted = !!on;
+    try { GM_setValue('canvas_overlay', on ? '1' : '0'); } catch {}
+    applyCanvasOverlay();
+  }
+
   // Build the panel as soon as the DOM is usable.
   if (document.body) ui.status('starting…', null);
   else document.addEventListener('DOMContentLoaded', () => ui.status('starting…', null), { once: true });
@@ -278,6 +353,7 @@
     ui.setRoom(creds.room);
     ui.status('watching rolls', true);
     renderPlayers(); // links need the room id
+    applyCanvasOverlay(); // mount the in-editor map overlay if the user enabled it
     while (chatBuffer.length) postChat(creds, chatBuffer.shift());
     startHeartbeat();
     console.log('[overlay] capturing for room', creds.room, '→ overlay:', `${SERVER}/room/${creds.room}/overlay`);
@@ -463,6 +539,7 @@
   // the relay can key saved dice/plaque customizations to it and have them follow the
   // player into any game.
   const roster = new Map(); // playerid -> { id, name, color, online, userid }
+  const playerAvatar = new Map(); // playerid -> character token/avatar url (from Campaign, below)
 
   function playerFrom(pid, rec) {
     return {
@@ -476,6 +553,7 @@
 
   function renderPlayers() {
     const list = Array.from(roster.values())
+      .map((p) => { const av = playerAvatar.get(p.id); return av ? { ...p, avatar: av } : p; })
       .sort((a, b) => (Number(b.online) - Number(a.online)) || a.name.localeCompare(b.name));
     ui.setPlayers(list, CREDS && CREDS.room);
     syncPlayers(list);
@@ -486,7 +564,7 @@
   let playersTimer = null, lastPlayersJson = '';
   function syncPlayers(list) {
     if (!CREDS || updateHalt) return;
-    const payload = JSON.stringify(list.map((p) => ({ id: p.id, name: p.name, color: p.color, online: p.online, userid: p.userid })));
+    const payload = JSON.stringify(list.map((p) => ({ id: p.id, name: p.name, color: p.color, online: p.online, userid: p.userid, avatar: p.avatar || '' })));
     if (payload === lastPlayersJson) return; // nothing changed
     if (playersTimer) return;
     playersTimer = setTimeout(() => {
@@ -551,7 +629,13 @@
     let s = src.trim();
     if (!s) return '';
     if (s.startsWith('//')) s = 'https:' + s;
-    return /^https?:\/\//.test(s) ? s : '';
+    if (!/^https?:\/\//.test(s)) return '';
+    // When Roll20 runs inside the Discord embedded client, image URLs come back
+    // wrapped in Discord's activity proxy (…discordsays.com/.proxy/amazonaws/[s3/]
+    // files.d20.io/…). That host is origin-locked and won't load in an OBS browser
+    // source, so rewrite it back to the direct d20 CDN.
+    s = s.replace(/^https?:\/\/[^/]*\.discordsays\.com\/\.proxy\/amazonaws\/(?:s3\/)?(files\.d20\.io\/)/i, 'https://$1');
+    return s;
   }
   function characterImg(rec) {
     // Default token first (each character personalises it), then the avatar image.
@@ -597,6 +681,138 @@
     const who = clean(msg.who).toLowerCase();
     if (who && charByName.has(who)) return charByName.get(who);
     return '';
+  }
+
+  // ── Roll20 in-page state (Backbone) — authoritative roster + portraits ───────
+  // The roster used to appear only AFTER the first roll: it was built solely from
+  // Firebase /players frames, but our SDK .on hook installs after Roll20 already
+  // subscribed (we poll for window.firebase), so we miss the initial snapshot and
+  // only catch the next update — which a roll triggers. Roll20 keeps the canonical
+  // state in page Backbone collections (Campaign.players / Campaign.characters),
+  // hydrated on load, so read those directly: the roster + portraits are then live
+  // immediately, no roll required. The Firebase path stays as a live-update channel.
+  //
+  // Portraits: the chat record has no image, so we resolve each player's character
+  // via player.speakingas ("character|<charid>") to that character's DEFAULT TOKEN
+  // (the piece used in play), preferring it over the bio avatar.
+  //
+  // The token URL lives in the character's default-token BLOB, which Roll20 fetches
+  // lazily — at load the blob cache is empty, so the sync getters (getTokenURL /
+  // getDefaultTokenImg) return "" and we'd fall back to the avatar forever. So we
+  // also kick off the async getDefaultToken() fetch per roster character; when it
+  // resolves we cache the real token imgsrc and re-read so the portrait upgrades from
+  // avatar → token. normImg de-proxies Discord-wrapped URLs (embedded Roll20).
+  const tokenByCid = new Map(); // characterid -> resolved default-token url ('' = no token, cached miss)
+
+  function syncTokenImg(c) {
+    try { if (typeof c.getDefaultTokenImg === 'function') { const u = normImg(c.getDefaultTokenImg()); if (u) return u; } } catch {}
+    try { if (typeof c.getTokenURL === 'function') { const u = normImg(c.getTokenURL()); if (u) return u; } } catch {}
+    return '';
+  }
+  function campaignCharImg(c) {
+    if (c && c.id && tokenByCid.get(c.id)) return tokenByCid.get(c.id); // resolved token wins
+    return syncTokenImg(c) || normImg(c.attributes && c.attributes.avatar);
+  }
+
+  // Fetch a character's default-token blob once (populates the lazy cache the sync
+  // getters read). On resolve, cache the token url and re-render so the roster + any
+  // saved profile pick up the token instead of the bio avatar.
+  function ensureToken(c) {
+    if (!c || !c.id || tokenByCid.has(c.id)) return;        // already resolved / in-flight
+    if (typeof c.getDefaultToken !== 'function') { tokenByCid.set(c.id, ''); return; }
+    let p; try { p = c.getDefaultToken(); } catch { return; }
+    if (!p || typeof p.then !== 'function') { tokenByCid.set(c.id, syncTokenImg(c)); return; }
+    tokenByCid.set(c.id, ''); // mark in-flight (cached miss until it resolves) to avoid refetch loops
+    p.then((blob) => {
+      const src = blob && (typeof blob.get === 'function' ? blob.get('imgsrc') : (blob.imgsrc || (blob.attributes && blob.attributes.imgsrc)));
+      const url = normImg(src) || syncTokenImg(c);
+      if (url) {
+        tokenByCid.set(c.id, url);
+        charById.set(c.id, url);
+        const nm = clean(c.attributes && c.attributes.name);
+        if (nm) charByName.set(nm.toLowerCase(), url);
+        readCampaignRoster(); // recompute playerAvatar from charById, then render + sync
+      }
+    }).catch(() => {});
+  }
+
+  function indexCampaignCharacters(C) {
+    const chars = C && C.characters;
+    if (!chars || typeof chars.each !== 'function') return;
+    chars.each((c) => {
+      const img = campaignCharImg(c);
+      if (!img) return;
+      if (c.id) charById.set(c.id, img);
+      const nm = clean(c.attributes && c.attributes.name);
+      if (nm) charByName.set(nm.toLowerCase(), img);
+    });
+  }
+
+  function avatarForPlayer(a) {
+    const sa = String(a.speakingas || '');
+    if (sa.startsWith('character|')) {
+      const cid = sa.slice('character|'.length);
+      // Lazily fetch this character's token blob so the portrait upgrades to the token.
+      const c = PAGE.Campaign && PAGE.Campaign.characters && PAGE.Campaign.characters.get(cid);
+      if (c) ensureToken(c);
+      if (charById.has(cid)) return charById.get(cid);
+    }
+    return '';
+  }
+
+  // Read Campaign.players → roster (+ playerAvatar). Returns false until the
+  // collection has hydrated, so the poller below keeps trying.
+  function readCampaignRoster() {
+    const C = PAGE.Campaign;
+    const players = C && C.players;
+    if (!players || typeof players.each !== 'function' || !players.length) return false;
+    indexCampaignCharacters(C);
+    roster.clear();
+    players.each((p) => {
+      const a = p && p.attributes;
+      if (!a || !a.id) return;
+      roster.set(a.id, {
+        id: a.id,
+        name: clean(a.displayname) || 'Player',
+        color: typeof a.color === 'string' ? a.color : '#888',
+        online: !!a.online,
+        userid: clean(a.d20userid) || '',
+      });
+      // Clear a stale portrait when a player switches to a character with no image
+      // (or stops speaking as anyone), so the overlay falls back to the initials disc.
+      const av = avatarForPlayer(a);
+      if (av) playerAvatar.set(a.id, av); else playerAvatar.delete(a.id);
+    });
+    renderPlayers();
+    return true;
+  }
+
+  // Read the roster from Campaign immediately, then stay current two ways: (1) bind
+  // Backbone change events so a player flipping online or changing WHO THEY SPEAK AS
+  // (→ their portrait) re-reads instantly; (2) a slow safety poll for late hydration
+  // or environments where events don't fire. renderPlayers → syncPlayers dedups by
+  // payload, so redundant re-reads cost nothing.
+  function startCampaignReader() {
+    let ready = false, bound = false;
+    const read = () => {
+      const ok = readCampaignRoster();
+      if (ok && !ready) { ready = true; console.log('[overlay] roster from Campaign:', roster.size, 'players'); }
+      return ok;
+    };
+    function bindOnce() {
+      if (bound) return;
+      const C = PAGE.Campaign;
+      const players = C && C.players;
+      if (!players || typeof players.on !== 'function') return;
+      players.on('add remove reset change:speakingas change:online change:displayname change:color change:d20userid', read);
+      const chars = C.characters;
+      if (chars && typeof chars.on === 'function') chars.on('add remove reset change:avatar change:defaulttoken', read);
+      bound = true;
+      console.log('[overlay] Campaign listeners bound');
+    }
+    const tick = () => { if (read()) bindOnce(); };
+    tick();
+    setInterval(tick, 5000);
   }
 
   // ── the single capture pipeline ──────────────────────────────────────────────
@@ -827,6 +1043,7 @@
   try {
     installWebSocketHook();   // must win the race against Roll20 opening its socket
     startFirebaseSdkHooker(); // polls until window.firebase exists
+    startCampaignReader();    // read roster + portraits from Roll20's Backbone state (no roll needed)
     checkForUpdate();         // GitHub version manifest → optional notice / mandatory halt
     setInterval(checkForUpdate, UPDATE_CHECK_MS); // re-check long-lived tabs
   } catch (e) {
