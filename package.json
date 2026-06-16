@@ -6,6 +6,7 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
+    "playground": "node scripts/playground.mjs",
     "dev": "node scripts/build-dice.mjs && node --env-file=.env src/server.js",
     "prestart": "node scripts/build-dice.mjs",
     "dice:build": "node scripts/build-dice.mjs",

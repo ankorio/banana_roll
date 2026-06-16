@@ -16,12 +16,23 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'https://esm.sh/three@0.182.0/examples/jsm/loaders/GLTFLoader.js?external=three';
 import { clone as skeletonClone } from 'https://esm.sh/three@0.182.0/examples/jsm/utils/SkeletonUtils.js?external=three';
 
-const WIZ = '/assets/fx/Wizard.glb';
-const RAB = '/assets/fx/Rabbit.glb';
+const WIZ = '/assets/fx/models/Wizard.glb';
+const RAB = '/assets/fx/models/Rabbit.glb';
+
+// Wizard apparition sprite (6×3 = 17-frame atlas, FootageCrate). Played forward as the
+// mage materialises (entrance) and REVERSED as he vanishes (exit).
+const APPAR_URL = '/assets/fx/textures/VFX_cgheven/Wizard_Apparition_6x3.webp';
+const APP_COLS = 6, APP_ROWS = 3, APP_FRAMES = 17;
 
 const loader = new GLTFLoader();
 const cache = {};
 const loadGLB = (url) => cache[url] || (cache[url] = new Promise((res, rej) => loader.load(url, res, undefined, rej)));
+const texLoader = new THREE.TextureLoader();
+let _apparTex = null;
+const loadAppar = () => _apparTex || (_apparTex = new Promise((res, rej) => texLoader.load(APPAR_URL, (t) => {
+  t.colorSpace = THREE.SRGBColorSpace; t.generateMipmaps = false;
+  t.minFilter = THREE.LinearFilter; t.magFilter = THREE.LinearFilter; t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; res(t);
+}, undefined, rej)));
 const clip = (anims, name) => THREE.AnimationClip.findByName(anims, name) || anims.find((a) => a.name.includes(name));
 
 // Center `model` on all axes at its own origin and return the scale factor that
@@ -67,6 +78,7 @@ const faceZ = (from, to) => Math.atan2(to.y - from.y, to.x - from.x) + Math.PI /
 const MAGE_H = 380, RAB_H = 150;     // top-down character heights
 const MAGE_OFFX = 420, MAGE_OFFY = -40;  // mage offset from the die
 const VIS_HALF = 1400;               // ~ half the visible width (run exit point)
+const APP_SIZE = 560;                // apparition billboard size (engulfs the mage)
 
 defineEffect('mageRabbit', async (ctx) => {
   const scene = ctx.scene;
@@ -93,6 +105,21 @@ defineEffect('mageRabbit', async (ctx) => {
   mageRig.visible = false;
   scene.add(mageRig);
 
+  // ── wizard apparition: a billboard burst centred on the mage, plays forward on
+  //    entrance and reversed on exit (he materialises from / dissolves into it) ──
+  const apparTex = (await loadAppar()).clone(); apparTex.needsUpdate = true;
+  apparTex.repeat.set(1 / APP_COLS, 1 / APP_ROWS);
+  const appar = new THREE.Mesh(new THREE.PlaneGeometry(APP_SIZE, APP_SIZE),
+    new THREE.MeshBasicMaterial({ map: apparTex, transparent: true, opacity: 1,
+      depthWrite: false, depthTest: false, side: THREE.DoubleSide, toneMapped: false }));
+  appar.position.set(mageP.x, mageP.y, mageP.z);   // exact mage depth → billboard stays centred on him
+  appar.renderOrder = 30;                           // depthTest off + high order → always drawn over the mage
+  appar.visible = false;
+  scene.add(appar);
+  const apparFrame = (f) => { const cc = ((f % APP_FRAMES) + APP_FRAMES) % APP_FRAMES, col = cc % APP_COLS, row = (cc / APP_COLS) | 0;
+    apparTex.offset.set(col / APP_COLS, 1 - (row + 1) / APP_ROWS); };
+  apparFrame(0);
+
   const SLOW = (typeof window !== 'undefined' && window.__MAGE_SLOW) || 1;  // debug: stretch the scene
   const mMix = new THREE.AnimationMixer(mage); mMix.timeScale = 1 / SLOW;
   const spell = clip(wizG.animations, 'Spell1');
@@ -107,20 +134,23 @@ defineEffect('mageRabbit', async (ctx) => {
   const T_SWAP = T_SPELL + spellDur * SLOW;    // die → rabbit, at the spell's end
   const T_RUN = T_SWAP + 0.35 * SLOW;
   const RUN_DUR = 1.7 * SLOW;
-  const total = T_RUN + RUN_DUR + 0.4 * SLOW;
+  const APP_DUR = 0.6 * SLOW;                   // apparition play length (entrance / exit)
+  const T_MAGE_OUT = T_SWAP + 0.5 * SLOW;       // the mage dissolves shortly after the swap
+  const total = Math.max(T_RUN + RUN_DUR, T_MAGE_OUT + APP_DUR) + 0.4 * SLOW;
 
   return timeline()
-    // 1) cloud + the mage rising out of it
-    .call(0, () => { for (let i = 0; i < 3; i++) ctx.fx('smoke', { worldPos: mageP, color: 0xb9b9c6, intensity: 1.2 }); })
+    // 1) the mage materialises out of the apparition (driven in the .drive loop)
     .call(T_MAGE_IN, () => { mageRig.visible = true; })
     .tween(mageRig.scale, { x: S, y: S, z: S }, { from: { x: 0, y: 0, z: 0 }, at: T_MAGE_IN, dur: 0.45, ease: 'easeOut' })
+    // EXIT: the mage dissolves back into a reversed apparition after his work is done
+    .tween(mageRig.scale, { x: 0, y: 0, z: 0 }, { from: { x: S, y: S, z: S }, at: T_MAGE_OUT, dur: APP_DUR, ease: 'easeIn' })
+    .call(T_MAGE_OUT + APP_DUR, () => { mageRig.visible = false; })
     // 2) cast Spell1, aiming an arcane flourish at the die
     .call(T_SPELL, () => { spellAct.reset(); spellAct.play(); })
     .call(T_SPELL + spellDur * 0.5 * SLOW, () => ctx.fx('arcaneBurst', { worldPos: dieP, color: 0xb98bff, intensity: 1.1 }))
     // 3) SWAP: remove the die, poof, spawn the rabbit in its place
     .call(T_SWAP, () => {
       ctx.fx('arcaneBurst', { worldPos: dieP, color: 0xb98bff, intensity: 1.4 });
-      ctx.fx('smoke', { worldPos: dieP, color: 0xcfcfd8, intensity: 1.2 });
       ctx.removeDie(die);
       const rabbit = skeletonClone(rabG.scene);
       const rs = fitModel(rabbit, RAB_H);
@@ -142,14 +172,25 @@ defineEffect('mageRabbit', async (ctx) => {
         const p = Math.min(1, (t - T_RUN) / RUN_DUR);
         rabbitRig.position.x = runFromX + (runToX - runFromX) * p;
       }
+      // apparition: forward 0→16 on entrance, reversed 16→0 on exit, hidden between
+      if (t < APP_DUR) {
+        appar.visible = true;
+        apparFrame(Math.floor(Math.min(1, t / APP_DUR) * (APP_FRAMES - 1)));
+      } else if (t >= T_MAGE_OUT && t <= T_MAGE_OUT + APP_DUR) {
+        appar.visible = true;
+        apparFrame(Math.floor((1 - Math.min(1, (t - T_MAGE_OUT) / APP_DUR)) * (APP_FRAMES - 1)));
+      } else {
+        appar.visible = false;
+      }
     })
     .duration(total)
     .onEnd(() => {
-      [mageRig, rabbitRig, key, amb].forEach((o) => { if (o) try { scene.remove(o); } catch {} });
+      [mageRig, rabbitRig, key, amb, appar].forEach((o) => { if (o) try { scene.remove(o); } catch {} });
       [mageRig, rabbitRig].forEach((rig) => rig && rig.traverse((n) => {
         n.geometry?.dispose?.();
         const m = n.material; if (m) (Array.isArray(m) ? m : [m]).forEach((x) => x?.dispose?.());
       }));
+      try { appar.geometry.dispose(); apparTex.dispose(); appar.material.dispose(); } catch {}
     })
     .build();
 });

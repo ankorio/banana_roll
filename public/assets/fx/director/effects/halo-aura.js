@@ -13,8 +13,8 @@ import { defineEffect } from '../registry.js';
 import { timeline } from '../timeline.js';
 import * as THREE from 'three';
 
-const RING = '/assets/fx/auras_halos/HaloAnim1.png';   // 8×4 grid, 32 frames
-const GLOW = '/assets/fx/auras_halos/Halo3.png';       // soft glow disc
+const RING = '/assets/fx/textures/auras_halos/HaloAnim1.png';   // 8×4 grid, 32 frames
+const GLOW = '/assets/fx/textures/auras_halos/Halo3.png';       // soft glow disc
 const RING_COLS = 8, RING_ROWS = 4, RING_FRAMES = 32;
 
 const loader = new THREE.TextureLoader();

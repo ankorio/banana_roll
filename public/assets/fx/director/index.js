@@ -20,6 +20,7 @@ import './effects/crit-glow.js';
 import './effects/mage-rabbit.js';
 import './effects/void-dome.js';
 import './effects/halo-aura.js';
+import './effects/fumble-glow.js';
 
 let Box = null;
 let conductor = null;
@@ -45,7 +46,8 @@ export const Director = {
     const ctx = createContext(Box, BRFX, roll);
     for (const trig of TRIGGERS) {
       if (!trig.when(roll)) continue;
-      let inst = buildEffect(trig.play, ctx);
+      const playId = typeof trig.play === 'function' ? trig.play(roll) : trig.play;  // play may pick an id at random
+      let inst = buildEffect(playId, ctx);
       if (inst && typeof inst.then === 'function') inst = await inst;   // async recipe (model load)
       if (inst) conductor.spawn(inst);
     }

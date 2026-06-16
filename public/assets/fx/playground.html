@@ -7,8 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;800&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet" />
   <!-- one shared three (r182), vendored local-first: resolves the bare `three` for the
-       dice engine bundle, fx-layer.js, effects.js, three.quarks + LightningStrike (the
-       CDN addons are loaded ?external=three, so they bind to this same local instance) -->
+       dice engine bundle, fx-layer.js, effects.js, and the LightningStrike addon (the
+       CDN addon is loaded ?external=three, so it binds to this same local instance) -->
   <script type="importmap">
     { "imports": { "three": "/assets/three/three.module.js" } }
   </script>
@@ -20,8 +20,6 @@
     /* stage */
     .stage-wrap { position:relative; display:grid; place-items:center; overflow:hidden;
       background: radial-gradient(900px 600px at 50% 30%, rgba(255,210,74,.05), transparent 60%), #07070c; }
-    #plaque { height:min(78vh,560px); aspect-ratio:398/440; background:url('/assets/plaque_templates/arcane-plaque.png') center/contain no-repeat;
-      filter:drop-shadow(0 12px 40px rgba(0,0,0,.6)); }
     #dice { position:absolute; inset:0; z-index:1; }           /* the 3D dice canvas */
     #dice canvas { width:100% !important; height:100% !important; }
     #fx { position:absolute; inset:0; z-index:2; pointer-events:none; }   /* the FX canvas, on top */
@@ -73,7 +71,6 @@
 </head>
 <body>
   <div class="stage-wrap" id="stageWrap">
-    <div id="plaque"></div>
     <div id="dice"></div>
     <div id="fx"></div>
     <div class="hint">click the stage to aim · roll dice in the Rolls tab</div>
@@ -104,7 +101,7 @@
         <h2>Controls</h2>
         <div class="ctl"><span>Intensity</span><input type="range" id="intensity" min="0.3" max="2" step="0.1" value="1"><output id="intOut">1.0</output></div>
         <label class="chk"><input type="checkbox" id="tintOn"> Tint colour <input type="color" id="tint" value="#ffd24a" style="margin-left:auto"></label>
-        <h2>Effects (three.quarks particles)</h2>
+        <h2>Effects (sprite particles)</h2>
         <div class="grid" id="fxGrid"></div>
       </section>
 
@@ -122,7 +119,7 @@
           <button class="simbtn" id="rollNormal">🎲 Roll Normal</button>
           <button class="simbtn" id="rollRandom">🎲 Roll Random</button>
           <button class="simbtn" id="rollAdv">⚔️ Advantage → void loser</button>
-          <button class="simbtn" id="rollDis">🛡️ Disadvantage → void higher</button>
+          <button class="simbtn" id="rollDis">🛡️ Disadvantage → Mage / Void (random)</button>
           <button class="simbtn" id="mageScene" style="grid-column:1/-1">🪄 Fumble (1) → Mage turns die into a rabbit</button>
           <button class="simbtn" id="voidDome" style="grid-column:1/-1">🟣 Void Dome (bloom → hold → collapse)</button>
           <button class="simbtn" id="haloAura" style="grid-column:1/-1">😇 Halo Aura (on the last die)</button>
@@ -356,14 +353,20 @@
         const kept = mode === 'advantage' ? Math.max(a, b) : Math.min(a, b);
         const roll = { mode, total: kept, d20: { values: [a, b], keptIndex },
           dice: [{ sides: '20', value: kept }], isCrit: kept === 20, isFumble: kept === 1 };
-        $('#bindOut').textContent = `→ ${mode}: rolled [${a}, ${b}] · kept ${kept} (idx ${keptIndex}) · loser → void`;
+        $('#bindOut').textContent = `→ ${mode}: rolled [${a}, ${b}] · kept ${kept} (idx ${keptIndex})`;
         Director.onRoll(roll); // fire-and-forget; the Conductor animates independently
       } catch (e) { $('#err').textContent = 'roll failed: ' + e.message; }
       finally { rolling = false; }
     }
     $('#rollAdv').onclick = () => rollAdvDis('advantage');
     $('#rollDis').onclick = () => rollAdvDis('disadvantage');
-    $('#mageScene').onclick = () => roll(1);  // fumble → triggers the mageRabbit scene on the die
+    // mage scene is no longer the fumble trigger (that's fumbleGlow now) — roll a 1
+    // without firing the trigger, then play the mage scene directly.
+    $('#mageScene').onclick = async () => {
+      if (!Box || rolling) return; rolling = true;
+      try { Box.clearDice(); await Promise.race([Box.roll('1d20@1'), new Promise((r) => setTimeout(r, 8000))]); Director.play('mageRabbit'); }
+      finally { rolling = false; }
+    };
     $('#voidDome').onclick = () => Director.play('voidDome');  // dark sphere + purple rim, bloom/hold/collapse
     $('#haloAura').onclick = () => Director.play('haloAura');  // glowing halo ring around the last die
   </script>

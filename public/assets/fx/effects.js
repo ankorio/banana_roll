@@ -25,8 +25,8 @@ export function makeTextures(THREE) {
   // Paths have spaces+parens → encodeURI. TextureLoader populates async; three
   // updates the material when each image lands, so preloading at attach is enough.
   const loader = new THREE.TextureLoader();
-  const PBASE = '/assets/fx/kenney_particle-pack/PNG (Transparent)/';
-  const LBASE = '/assets/fx/kenney_light-masks-1.0/Transparent/';
+  const PBASE = '/assets/fx/textures/kenney_particle-pack/PNG (Transparent)/';
+  const LBASE = '/assets/fx/textures/kenney_light-masks-1.0/Transparent/';
   const load = (base, file) => { const t = loader.load(encodeURI(base + file)); t.colorSpace = THREE.SRGBColorSpace; return t; };
   const k = {
     magic1: load(PBASE, 'magic_01.png'), magic4: load(PBASE, 'magic_04.png'), magic5: load(PBASE, 'magic_05.png'),
@@ -288,19 +288,6 @@ export const EFFECTS = {
       x: c.origin.x + rnd(-90, 90), y: c.origin.y + rnd(-40, 60), vx: rnd(-20, 20), vy: rnd(40, 110),
       grav: -30, ang: rnd(-3, 3), life: rnd(1, 1.9), sizeA: rnd(8, 18), sizeB: 2, fadeIn: .2, alpha: 1 });
   } },
-
-  // ── authored three.quarks presets (loaded via QuarksLoader, not the sprite engine) ──
-  // `scaleK` = fraction of min(canvas W,H) the prefab is scaled to (× intensity); tune to taste.
-  // `tiltX` = rotate the prefab about X so its authored view faces our −Z camera. The aura is
-  // built top-down (action in the XZ ground plane, Y = up), so −90° lays that plane onto the XY
-  // screen; without it it renders edge-on. Fireball is camera-facing billboards (no tilt needed).
-  fireball:   { label: 'Fireball ✦',   quarks: '/assets/fx/FireBall.json',     loop: false, life: 1.6, scaleK: 0.08 },
-  // keepMeshModes: render the aura's ring/runes as the authored ground-plane MESH (don't
-  // flatten to billboards) so it tilts in 3D and lies on the floor under the die, instead of
-  // facing the camera as a flat disc. tiltX then sets the floor angle: −Math.PI/2 (−90°) is
-  // dead-flat facing the camera; smaller magnitude tips it toward the viewer into the
-  // foreshortened ellipse (vertical particles become visible). Nudge ~−0.8…−1.2 to taste.
-  playerAura: { label: 'Player Aura ✦', quarks: '/assets/fx/Player%20aura.json', loop: true,  life: 5,   scaleK: 0.34, tiltX: -1.35, keepMeshModes: true },
 };
 
 // shared "falling from the top" emitter

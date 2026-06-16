@@ -26,7 +26,7 @@ import * as THREE from 'three';
 
 const MANIFEST = '/assets/fx/sprites-manifest.json';
 // default world size (height of the quad) per pack — the stage is ~2600 tall, dice ~120
-const SIZE_BY_PACK = { rpg: 360, explosions: 720, fire: 560, blood: 560, portal: 460, auras: 620 };
+const SIZE_BY_PACK = { rpg: 360, explosions: 720, fire: 560, blood: 560, portal: 460, auras: 620, cgheven: 720 };
 
 let Box = null, scene = null, camera = null, off = null, attached = false;
 let last = 0;
