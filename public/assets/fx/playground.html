@@ -124,6 +124,8 @@
           <button class="simbtn" id="rollAdv">⚔️ Advantage → void loser</button>
           <button class="simbtn" id="rollDis">🛡️ Disadvantage → void higher</button>
           <button class="simbtn" id="mageScene" style="grid-column:1/-1">🪄 Fumble (1) → Mage turns die into a rabbit</button>
+          <button class="simbtn" id="voidDome" style="grid-column:1/-1">🟣 Void Dome (bloom → hold → collapse)</button>
+          <button class="simbtn" id="haloAura" style="grid-column:1/-1">😇 Halo Aura (on the last die)</button>
         </div>
         <div class="bind-out" id="bindOut"></div>
       </section>
@@ -198,12 +200,26 @@
           const w = im.naturalWidth * s, h = im.naturalHeight * s; ctx.drawImage(im, (76 - w) / 2, (76 - h) / 2, w, h); } };
       cv.__c = c; cyclers.push(c); io.observe(cv); return cv;
     }
+    function gridanimCycler(e) {                        // .tpa: walk the whole grid (frame → col,row)
+      const cv = document.createElement('canvas'); cv.width = cv.height = 76; cv.className = 'prev';
+      const ctx = cv.getContext('2d');
+      const c = { el: cv, count: e.count, frame: 0, ready: false, visible: false, img: null,
+        load() { if (this.img) return; const im = new Image(); im.onload = () => { this.img = im; this.ready = true; this.draw(); }; im.src = encodeURI(e.url); },
+        draw() { if (!this.img) return; const cw = this.img.width / e.cols, ch = this.img.height / e.rows;
+          const col = this.frame % e.cols, row = (this.frame / e.cols) | 0;
+          ctx.clearRect(0, 0, 76, 76); ctx.drawImage(this.img, col * cw, row * ch, cw, ch, 0, 0, 76, 76); } };
+      cv.__c = c; cyclers.push(c); io.observe(cv); return cv;
+    }
 
     function makeCard(e) {
       const card = document.createElement('div'); card.className = 'card';
       const prev = e.preview
         ? Object.assign(document.createElement('img'), { className: 'prev', loading: 'lazy', src: encodeURI(e.preview) })
-        : (e.mode === 'sheet' ? sheetCycler(e) : framesCycler(e));
+        : e.mode === 'still'
+          ? Object.assign(document.createElement('img'), { className: 'prev', loading: 'lazy', src: encodeURI(e.url) })
+          : e.mode === 'gridanim' ? gridanimCycler(e)
+          : e.mode === 'sheet' ? sheetCycler(e)
+          : framesCycler(e);
       const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = e.name;
       card.append(prev, nm);
       card.onmouseenter = () => SpriteFX.preload(e.id);
@@ -348,6 +364,8 @@
     $('#rollAdv').onclick = () => rollAdvDis('advantage');
     $('#rollDis').onclick = () => rollAdvDis('disadvantage');
     $('#mageScene').onclick = () => roll(1);  // fumble → triggers the mageRabbit scene on the die
+    $('#voidDome').onclick = () => Director.play('voidDome');  // dark sphere + purple rim, bloom/hold/collapse
+    $('#haloAura').onclick = () => Director.play('haloAura');  // glowing halo ring around the last die
   </script>
 </body>
 </html>

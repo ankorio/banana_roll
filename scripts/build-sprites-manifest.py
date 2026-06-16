@@ -103,6 +103,41 @@ portal = {'id': 'portal', 'name': 'Portal', 'effects': [frames_effect(
     web('VFX_animated_portal', 'GIF.gif'))]}
 packs.append(portal)
 
+# ── Auras & Halos: harvested from the TimelineFX AurasAndHalos.eff library ───
+# .tpa sheets are grid animations (frame walks the whole grid); the rest are stills.
+# Everything is a white/colour glow → additive blend, tintable.
+AURA_ANIM = {  # base → (cols, rows, count, fps)
+    'HaloAnim1': (8, 4, 32, 24), 'smokeball': (8, 4, 32, 24),
+    'SmokeString': (10, 7, 64, 30), 'ElectricGroup1': (2, 2, 4, 12),
+}
+AURA_NAMES = {'HaloAnim1': 'Halo Ring (anim)', 'smokeball': 'Smoke Ball (anim)',
+              'SmokeString': 'Smoke String (anim)', 'ElectricGroup1': 'Electric (anim)',
+              'Halo1': 'Halo · specks', 'Halo2': 'Halo · cloud', 'Halo3': 'Halo · glow disc',
+              'SmokeyHalo1': 'Smokey Halo', 'SmokeyHalo2': 'Smokey Halo 2',
+              'Flare1': 'Flare', 'Flare2': 'Flare 2', 'Flare10': 'Flare 10',
+              'plume': 'Plume', 'Smoke1': 'Smoke'}
+auras = {'id': 'auras', 'name': 'Auras & Halos', 'note': 'TimelineFX glows — additive, tintable', 'effects': []}
+adir = os.path.join(ROOT, 'auras_halos')
+for f in sorted(os.listdir(adir), key=natkey):
+    if not f.endswith('.png'):
+        continue
+    base = f[:-4]
+    name = AURA_NAMES.get(base, base)
+    if base in AURA_ANIM:
+        cols, rows, count, fps = AURA_ANIM[base]
+        auras['effects'].append({'id': f'aura_{base.lower()}', 'name': name, 'mode': 'gridanim',
+            'url': web('auras_halos', f), 'cols': cols, 'rows': rows, 'count': count,
+            'fps': fps, 'blend': 'add'})
+    else:
+        auras['effects'].append({'id': f'aura_{base.lower()}', 'name': name, 'mode': 'still',
+            'url': web('auras_halos', f), 'blend': 'add'})
+packs.append(auras)
+
+# Ship ONLY the TimelineFX packs in the gallery (the other packs are still built
+# above, so flip this filter to re-enable them).
+TIMELINEFX_PACKS = {'auras'}
+packs = [p for p in packs if p['id'] in TIMELINEFX_PACKS]
+
 out = {'packs': packs}
 dest = os.path.join(ROOT, 'sprites-manifest.json')
 with open(dest, 'w') as f:

@@ -6,7 +6,8 @@
    ========================================================================== */
 
 export const TRIGGERS = [
-  { when: (r) => !!r && r.mode && r.mode !== 'normal', play: 'voidHole' },   // adv/dis → loser falls into the void
+  { when: (r) => !!r && r.mode === 'advantage',    play: 'voidHole' },   // advantage → loser spirals into the drain
+  { when: (r) => !!r && r.mode === 'disadvantage', play: 'voidDome' },   // disadvantage → void dome blooms over the loser & eats it
   { when: (r) => !!r && r.isCrit,   play: 'critGlow'   },   // nat 20 → the die shines & glows
   { when: (r) => !!r && r.isFumble, play: 'mageRabbit' },   // nat 1 → mage turns the die into a rabbit that flees
 ];

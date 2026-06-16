@@ -18,6 +18,8 @@ import BRFX from '../fx-layer.js';
 import './effects/void-hole.js';
 import './effects/crit-glow.js';
 import './effects/mage-rabbit.js';
+import './effects/void-dome.js';
+import './effects/halo-aura.js';
 
 let Box = null;
 let conductor = null;

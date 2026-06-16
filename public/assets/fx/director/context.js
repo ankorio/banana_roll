@@ -67,6 +67,9 @@ export function createContext(Box, BRFX, roll) {
         const i = Box.diceList.indexOf(die);
         if (i !== -1) Box.diceList.splice(i, 1);
       }
+      // The engine keeps shadowMap.autoUpdate OFF (only re-bakes on a roll), so a die
+      // removed outside that path leaves a stale baked shadow. Force one refresh.
+      try { if (Box.renderer && Box.renderer.shadowMap) Box.renderer.shadowMap.needsUpdate = true; } catch {}
     },
 
     worldOf(die) { return die ? die.position : null; },
