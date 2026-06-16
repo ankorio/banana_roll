@@ -107,10 +107,13 @@ function mapping() {
   return { Wpx, Hpx, f: visH / Hpx };
 }
 
-// Keep the dice engine's continuous loop running while FX are live (it idles when
-// dice settle, but looping auras + fading puffs need frames). Stop it when empty.
+// The dice engine's persistent loop is the SOLE owner of stepping + rendering and
+// is meant to run for the box's whole lifetime (see DiceBox.start / initialize). The
+// FX layer must never stop it: doing so on FX end froze any dice still settling (and
+// stalled idle auras / shadow updates). ensureLoop() stays as a defensive, idempotent
+// restart; maybeIdle() is intentionally a no-op — the engine manages its own loop.
 function ensureLoop() { try { Box.start(); } catch {} }
-function maybeIdle() { if (!live.length && !quarksLive.length) { try { Box.stop(); } catch {} } }
+function maybeIdle() { /* no-op: never stop the engine loop (it owns its own lifecycle) */ }
 
 // Load (cached) + play a three.quarks JSON preset at a dice-world position.
 async function playQuarks(def, world, intensity) {

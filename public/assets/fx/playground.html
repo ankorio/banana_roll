@@ -16,7 +16,7 @@
     :root { --bg:#0b0b12; --panel:#14141e; --line:#2a2a3a; --gold:#ffd24a; --ink:#f1f1f7; --muted:#9a9ab2; --blue:#7db8ff;
       --sans:'Manrope',system-ui,sans-serif; --serif:'Cinzel',Georgia,serif; }
     * { box-sizing:border-box; }
-    body { margin:0; height:100vh; display:grid; grid-template-columns:1fr 320px; background:var(--bg); color:var(--ink); font-family:var(--sans); overflow:hidden; }
+    body { margin:0; height:100vh; display:grid; grid-template-columns:1fr 340px; background:var(--bg); color:var(--ink); font-family:var(--sans); overflow:hidden; }
     /* stage */
     .stage-wrap { position:relative; display:grid; place-items:center; overflow:hidden;
       background: radial-gradient(900px 600px at 50% 30%, rgba(255,210,74,.05), transparent 60%), #07070c; }
@@ -27,9 +27,10 @@
     #fx { position:absolute; inset:0; z-index:2; pointer-events:none; }   /* the FX canvas, on top */
     .hint { position:absolute; left:14px; bottom:12px; font-size:12px; color:var(--muted); font-family:ui-monospace,monospace; }
     /* panel */
-    .panel { border-left:1px solid var(--line); background:var(--panel); padding:18px 16px; overflow-y:auto; }
+    .panel { border-left:1px solid var(--line); background:var(--panel); display:flex; flex-direction:column; overflow:hidden; }
+    .phead { padding:16px 16px 0; }
     h1 { font-family:var(--serif); font-size:18px; margin:0 0 2px; }
-    .sub { color:var(--muted); font-size:12px; margin:0 0 16px; }
+    .sub { color:var(--muted); font-size:12px; margin:0 0 12px; }
     h2 { font-family:ui-monospace,monospace; font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin:18px 0 8px; }
     .grid { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
     .fxbtn, .simbtn { border:1px solid var(--line); background:#1a1a26; color:var(--ink); border-radius:9px; padding:9px 8px; font-weight:700; font-size:12.5px; cursor:pointer; transition:border-color .12s, transform .1s; }
@@ -44,6 +45,30 @@
     .bind-out { margin-top:10px; font-family:ui-monospace,monospace; font-size:10.5px; color:var(--muted); white-space:pre-wrap; word-break:break-word; background:#0a0a12; border:1px solid var(--line); border-radius:8px; padding:8px; }
     .err { color:#ff7a7a; font-size:12px; margin-top:8px; }
     label.chk { display:flex; align-items:center; gap:7px; font-size:13px; }
+    /* tabs */
+    .tabs { display:flex; gap:6px; margin:4px 0 0; }
+    .tab { flex:1; border:1px solid var(--line); background:#1a1a26; color:var(--muted); border-radius:9px 9px 0 0; border-bottom:none;
+      padding:9px 6px; font-weight:800; font-size:12px; cursor:pointer; letter-spacing:.3px; }
+    .tab.active { color:var(--gold); border-color:var(--gold); background:var(--panel); }
+    .panes { flex:1; overflow-y:auto; padding:14px 16px 24px; border-top:1px solid var(--line); margin-top:-1px; }
+    .pane { display:none; }
+    .pane.active { display:block; }
+    /* sprite gallery */
+    .spritebar { position:sticky; top:-14px; z-index:3; background:var(--panel); padding:8px 0; margin-bottom:4px; }
+    .pack { margin:10px 0 18px; }
+    .pack-h { display:flex; align-items:baseline; gap:8px; margin:6px 0; }
+    .pack-h h3 { font-family:var(--serif); font-size:15px; margin:0; }
+    .pack-h .cnt { font-family:ui-monospace,monospace; font-size:10px; color:var(--muted); }
+    .pack-note { color:var(--muted); font-size:11px; margin:0 0 8px; }
+    .swatches { display:flex; gap:5px; flex-wrap:wrap; margin:6px 0 10px; }
+    .sw { width:20px; height:20px; border-radius:5px; border:2px solid #0006; cursor:pointer; box-shadow:0 0 0 1px #0008 inset; }
+    .sw.active { border-color:#fff; }
+    .cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(94px,1fr)); gap:8px; }
+    .card { border:1px solid var(--line); border-radius:10px; padding:6px; cursor:pointer; background:#1a1a26; transition:border-color .12s, transform .1s; }
+    .card:hover { border-color:var(--gold); transform:translateY(-1px); }
+    .prev { width:100%; height:76px; object-fit:contain; image-rendering:pixelated; border-radius:7px; display:block;
+      background: radial-gradient(circle at 50% 45%, #2a2233, #0a0a12 70%); }
+    .nm { font-size:10px; color:var(--muted); margin-top:5px; font-family:ui-monospace,monospace; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   </style>
 </head>
 <body>
@@ -51,43 +76,68 @@
     <div id="plaque"></div>
     <div id="dice"></div>
     <div id="fx"></div>
-    <div class="hint">click the stage to aim burst effects · roll dice below</div>
+    <div class="hint">click the stage to aim · roll dice in the Rolls tab</div>
   </div>
 
   <aside class="panel">
-    <h1>FX Playground</h1>
-    <p class="sub">Test fantasy effects, then bind them to roll outcomes. The binding map is what the overlay would consume.</p>
-
-    <h2>Controls</h2>
-    <div class="ctl"><span>Intensity</span><input type="range" id="intensity" min="0.3" max="2" step="0.1" value="1"><output id="intOut">1.0</output></div>
-    <label class="chk"><input type="checkbox" id="tintOn"> Tint colour <input type="color" id="tint" value="#ffd24a" style="margin-left:auto"></label>
-
-    <h2>Effects</h2>
-    <div class="grid" id="fxGrid"></div>
-
-    <h2>Bind to roll outcomes</h2>
-    <p class="sub" style="margin:-4px 0 8px">Pick the effect that fires on each result, then roll real dice below. (Critical = nat 20 · Fumble = nat 1)</p>
-    <div id="binds"></div>
-    <button class="simbtn" id="simRoll" style="width:100%;margin-top:8px">▶ Fire a random outcome (no dice)</button>
-
-    <h2>Dice rolls</h2>
-    <div class="grid">
-      <button class="simbtn" id="rollCrit">⭐ Roll Critical (20)</button>
-      <button class="simbtn" id="rollFumble">💀 Roll Fumble (1)</button>
-      <button class="simbtn" id="rollNormal">🎲 Roll Normal</button>
-      <button class="simbtn" id="rollRandom">🎲 Roll Random</button>
+    <div class="phead">
+      <h1>FX Playground</h1>
+      <p class="sub">Browse sprite effects, fire them on the stage, and bind them to roll outcomes.</p>
+      <div class="tabs">
+        <button class="tab active" data-tab="sprites">Sprites</button>
+        <button class="tab" data-tab="effects">Particle FX</button>
+        <button class="tab" data-tab="rolls">Rolls</button>
+      </div>
     </div>
-    <div class="bind-out" id="bindOut"></div>
 
-    <div class="err" id="err"></div>
+    <div class="panes">
+      <!-- ── SPRITES TAB ── -->
+      <section class="pane active" data-pane="sprites">
+        <div class="spritebar">
+          <label class="chk"><input type="checkbox" id="spriteAtDie" checked> Fire at the last die <span class="sub" style="margin:0">(else where you click the stage)</span></label>
+        </div>
+        <div id="gallery"><p class="sub">Loading sprite packs…</p></div>
+      </section>
+
+      <!-- ── PARTICLE FX TAB ── -->
+      <section class="pane" data-pane="effects">
+        <h2>Controls</h2>
+        <div class="ctl"><span>Intensity</span><input type="range" id="intensity" min="0.3" max="2" step="0.1" value="1"><output id="intOut">1.0</output></div>
+        <label class="chk"><input type="checkbox" id="tintOn"> Tint colour <input type="color" id="tint" value="#ffd24a" style="margin-left:auto"></label>
+        <h2>Effects (three.quarks particles)</h2>
+        <div class="grid" id="fxGrid"></div>
+      </section>
+
+      <!-- ── ROLLS TAB ── -->
+      <section class="pane" data-pane="rolls">
+        <h2>Bind to roll outcomes</h2>
+        <p class="sub" style="margin:-4px 0 8px">Pick the effect that fires on each result, then roll real dice below. (Critical = nat 20 · Fumble = nat 1)</p>
+        <div id="binds"></div>
+        <button class="simbtn" id="simRoll" style="width:100%;margin-top:8px">▶ Fire a random outcome (no dice)</button>
+
+        <h2>Dice rolls</h2>
+        <div class="grid">
+          <button class="simbtn" id="rollCrit">⭐ Roll Critical (20)</button>
+          <button class="simbtn" id="rollFumble">💀 Roll Fumble (1)</button>
+          <button class="simbtn" id="rollNormal">🎲 Roll Normal</button>
+          <button class="simbtn" id="rollRandom">🎲 Roll Random</button>
+          <button class="simbtn" id="rollAdv">⚔️ Advantage → void loser</button>
+          <button class="simbtn" id="rollDis">🛡️ Disadvantage → void higher</button>
+          <button class="simbtn" id="mageScene" style="grid-column:1/-1">🪄 Fumble (1) → Mage turns die into a rabbit</button>
+        </div>
+        <div class="bind-out" id="bindOut"></div>
+      </section>
+    </div>
+    <div class="err" id="err" style="padding:0 16px 10px"></div>
   </aside>
 
   <script type="module">
     import BRFX from '/assets/fx/fx-layer.js';
+    import Director from '/assets/fx/director/index.js';
+    import MotionFX from '/assets/fx/motion-fx.js';
+    import SpriteFX from '/assets/fx/sprite-fx.js';
     const $ = (s) => document.querySelector(s);
     let origin = { x: 0.5, y: 0.45 };
-    // FX now renders inside the dice canvas — BRFX.attach(Box) happens once the
-    // dice engine is initialized (below). The #fx div is just the click target.
 
     const intensity = () => parseFloat($('#intensity').value);
     const color = () => $('#tintOn').checked ? $('#tint').value : null;
@@ -95,21 +145,107 @@
 
     $('#intensity').addEventListener('input', () => $('#intOut').textContent = intensity().toFixed(1));
 
+    // tabs
+    document.querySelectorAll('.tab').forEach((t) => t.onclick = () => {
+      document.querySelectorAll('.tab').forEach((x) => x.classList.toggle('active', x === t));
+      document.querySelectorAll('.pane').forEach((p) => p.classList.toggle('active', p.dataset.pane === t.dataset.tab));
+    });
+
     // aim burst effects by clicking the stage
     $('#stageWrap').addEventListener('click', (e) => {
       const r = $('#fx').getBoundingClientRect();
       origin = { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height };
     });
 
-    // effect buttons
+    // ── Particle FX (BRFX) buttons ──
     const names = BRFX.names();
     const grid = $('#fxGrid');
     names.forEach((n) => { const b = document.createElement('button'); b.className = 'fxbtn'; b.textContent = BRFX.label(n);
       b.onclick = () => fire(n); grid.appendChild(b); });
 
-    // trigger binding
+    // ─────────────────────────────────────────────────────────────────────────
+    //  SPRITE GALLERY — manifest-driven, grouped by pack, with live previews.
+    //  • gif previews → <img> (cheap, animated by the browser);
+    //  • otherwise a <canvas> frame-cycler, animated only while on screen.
+    //  Multicolour packs (RPG) get colour swatches that retint every preview.
+    // ─────────────────────────────────────────────────────────────────────────
+    const RPG_SWATCHES = ['#ff8a3c','#d24bff','#46c8ff','#46d06a','#e0a23c','#dcdce4','#a07690','#ff4b4b','#7a3cff'];
+    let rpgRow = 0;                                   // selected colour row for RPG sheets
+    const cyclers = [];                               // canvas previews ticked while visible
+    const io = new IntersectionObserver((ents) => {
+      for (const en of ents) { const c = en.target.__c; if (!c) continue;
+        c.visible = en.isIntersecting; if (en.isIntersecting) c.load(); }
+    }, { root: $('.panes'), rootMargin: '160px' });
+    setInterval(() => { for (const c of cyclers) if (c.visible && c.ready) { c.frame = (c.frame + 1) % c.count; c.draw(); } }, 80);
+
+    function sheetCycler(e) {                          // RPG: draw one cell of the grid
+      const cv = document.createElement('canvas'); cv.width = cv.height = 76; cv.className = 'prev';
+      const ctx = cv.getContext('2d'); ctx.imageSmoothingEnabled = false;
+      const c = { el: cv, count: e.cols, frame: 0, ready: false, visible: false, img: null,
+        load() { if (this.img) return; const im = new Image(); im.onload = () => { this.img = im; this.ready = true; this.draw(); }; im.src = encodeURI(e.url); },
+        draw() { if (!this.img) return; const s = e.cell; ctx.clearRect(0, 0, 76, 76);
+          ctx.drawImage(this.img, this.frame * s, rpgRow * s, s, s, 0, 0, 76, 76); } };
+      cv.__c = c; cyclers.push(c); io.observe(cv); return cv;
+    }
+    function framesCycler(e) {                         // explosions: cycle frame images
+      const cv = document.createElement('canvas'); cv.width = cv.height = 76; cv.className = 'prev';
+      const ctx = cv.getContext('2d');
+      const c = { el: cv, count: e.frames.length, frame: 0, ready: false, visible: false, imgs: null,
+        load() { if (this.imgs) return; this.imgs = e.frames.map((u) => { const i = new Image(); i.src = encodeURI(u); return i; });
+          this.imgs[0].onload = () => { this.ready = true; this.draw(); }; },
+        draw() { const im = this.imgs && this.imgs[this.frame]; if (!im || !im.complete || !im.naturalWidth) return;
+          ctx.clearRect(0, 0, 76, 76); const s = Math.min(76 / im.naturalWidth, 76 / im.naturalHeight);
+          const w = im.naturalWidth * s, h = im.naturalHeight * s; ctx.drawImage(im, (76 - w) / 2, (76 - h) / 2, w, h); } };
+      cv.__c = c; cyclers.push(c); io.observe(cv); return cv;
+    }
+
+    function makeCard(e) {
+      const card = document.createElement('div'); card.className = 'card';
+      const prev = e.preview
+        ? Object.assign(document.createElement('img'), { className: 'prev', loading: 'lazy', src: encodeURI(e.preview) })
+        : (e.mode === 'sheet' ? sheetCycler(e) : framesCycler(e));
+      const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = e.name;
+      card.append(prev, nm);
+      card.onmouseenter = () => SpriteFX.preload(e.id);
+      card.onclick = () => {
+        const opts = {};
+        if (e.multicolor) opts.row = rpgRow;
+        const die = Box && Box.diceList && Box.diceList[0];
+        if ($('#spriteAtDie').checked && die && die.position) opts.worldPos = die.position; else opts.origin = origin;
+        SpriteFX.play(e.id, opts);
+      };
+      return card;
+    }
+
+    async function buildGallery() {
+      await SpriteFX.load();
+      const root = $('#gallery'); root.innerHTML = '';
+      for (const pack of SpriteFX.packs()) {
+        const sec = document.createElement('div'); sec.className = 'pack';
+        const h = document.createElement('div'); h.className = 'pack-h';
+        h.innerHTML = `<h3>${pack.name}</h3><span class="cnt">${pack.effects.length} effect${pack.effects.length > 1 ? 's' : ''}</span>`;
+        sec.appendChild(h);
+        if (pack.note) { const n = document.createElement('p'); n.className = 'pack-note'; n.textContent = pack.note; sec.appendChild(n); }
+        if (pack.colors) {                             // colour swatches retint every preview + the next play
+          const sw = document.createElement('div'); sw.className = 'swatches';
+          pack.colors.forEach((name, i) => { const b = document.createElement('div'); b.className = 'sw' + (i === rpgRow ? ' active' : '');
+            b.style.background = RPG_SWATCHES[i] || '#888'; b.title = `${i} · ${name}`;
+            b.onclick = () => { rpgRow = i; sw.querySelectorAll('.sw').forEach((x, j) => x.classList.toggle('active', j === i));
+              for (const c of cyclers) if (c.img) c.draw(); };
+            sw.appendChild(b); });
+          sec.appendChild(sw);
+        }
+        const cards = document.createElement('div'); cards.className = 'cards';
+        pack.effects.forEach((e) => cards.appendChild(makeCard(e)));
+        sec.appendChild(cards);
+        root.appendChild(sec);
+      }
+    }
+    buildGallery().catch((e) => { $('#gallery').innerHTML = '<p class="err">Failed to load sprites: ' + e.message + '</p>'; });
+
+    // ── trigger binding (Rolls tab) ──
     const outcomes = [['normal', 'Normal'], ['advantage', 'Advantage'], ['disadvantage', 'Disadvant.'], ['crit', 'Critical'], ['fumble', 'Fumble']];
-    const defaults = { normal: '', advantage: 'sparkles', disadvantage: 'smoke', crit: 'fireworks', fumble: 'lightning' };
+    const defaults = { normal: '', advantage: 'sparkles', disadvantage: 'smoke', crit: '', fumble: '' };
     const binds = {};
     const optsHtml = '<option value="">(none)</option>' + names.map((n) => `<option value="${n}">${BRFX.label(n)}</option>`).join('');
     const wrap = $('#binds');
@@ -143,20 +279,35 @@
           sounds: false, shadows: true, baseScale: 75, strength: 1.5, gravity_multiplier: 400,
           theme_material: 'glass', theme_texture: 'marble', theme_colorset: 'white' });
         await Box.initialize();
-        BRFX.attach(Box); // VFX render into the dice canvas via Box.onBeforeRender
+        BRFX.attach(Box);      // particle VFX render into the dice canvas
+        Director.attach(Box);  // outcome-driven VFX: Conductor + timeline recipes
+        MotionFX.attach(Box);  // ambient physics VFX: rolling trails + collision sparks
+        SpriteFX.attach(Box);  // frame-animated sprite effects (the gallery)
+        window.Director = Director; // expose for live console tuning
       } catch (e) { $('#err').textContent = 'Dice engine failed: ' + e.message; }
     })();
 
-    // roll a d20 landing on `value`; on settle, fire the bound effect AT the settled
-    // die's world position (no projection — FX live in the dice scene now).
+    // roll a d20 landing on `value`; once it has TRULY settled, hand the outcome
+    // to the Director (crit → critGlow, etc.) AND fire any manually-bound effect.
     async function roll(value) {
       if (!Box || rolling) return; rolling = true;
       try {
         Box.clearDice();
-        await Promise.race([Box.roll(`1d20@${value}`), new Promise((r) => setTimeout(r, 2600))]);
+        let settled = false;
+        await Promise.race([
+          Box.roll(`1d20@${value}`).then(() => { settled = true; }),
+          new Promise((r) => setTimeout(r, 8000)),
+        ]);
         const outcome = value === 20 ? 'crit' : value === 1 ? 'fumble' : 'normal';
         const fx = binds[outcome];
-        $('#bindOut').textContent = `→ rolled ${value} (${outcome})` + (fx ? `  · fx: ${fx}` : '  · (no fx bound)') + '\n\neffectByOutcome = ' + JSON.stringify(binds, null, 2);
+        $('#bindOut').textContent = `→ rolled ${value} (${outcome})` + (fx ? `  · fx: ${fx}` : '  · (no fx bound)') + (settled ? '' : '  · (timed out)');
+        // outcome-driven VFX via the Director (the trigger system)
+        if (settled) {
+          const r = { mode: 'normal', total: value, dice: [{ sides: '20', value }],
+            isCrit: value === 20, isFumble: value === 1 };
+          Director.onRoll(r);
+        }
+        // manual bind (kept for experimenting with the dropdowns)
         if (fx) {
           const die = Box.diceList && Box.diceList[0];
           const opts = { color: color(), intensity: intensity() };
@@ -170,6 +321,33 @@
     $('#rollFumble').onclick = () => roll(1);
     $('#rollNormal').onclick = () => roll(rint(2, 19));
     $('#rollRandom').onclick = () => roll(rint(1, 20));
+
+    // adv/dis: roll two real d20s, then hand the outcome to the Director — the
+    // 'voidHole' trigger fires and the LOSING die spins/shrinks into the void.
+    // (Disadvantage keeps the LOWER die, so the loser is the HIGHER one.)
+    async function rollAdvDis(mode) {
+      if (!Box || rolling) return; rolling = true;
+      try {
+        Box.clearDice();
+        const a = rint(1, 20), b = rint(1, 20);
+        let settled = false;
+        await Promise.race([
+          Box.roll(`2d20@${a},${b}`).then(() => { settled = true; }),
+          new Promise((r) => setTimeout(r, 8000)),
+        ]);
+        if (!settled) { $('#err').textContent = 'dice did not settle in time — skipped void fx'; return; }
+        const keptIndex = mode === 'advantage' ? (a >= b ? 0 : 1) : (a <= b ? 0 : 1);
+        const kept = mode === 'advantage' ? Math.max(a, b) : Math.min(a, b);
+        const roll = { mode, total: kept, d20: { values: [a, b], keptIndex },
+          dice: [{ sides: '20', value: kept }], isCrit: kept === 20, isFumble: kept === 1 };
+        $('#bindOut').textContent = `→ ${mode}: rolled [${a}, ${b}] · kept ${kept} (idx ${keptIndex}) · loser → void`;
+        Director.onRoll(roll); // fire-and-forget; the Conductor animates independently
+      } catch (e) { $('#err').textContent = 'roll failed: ' + e.message; }
+      finally { rolling = false; }
+    }
+    $('#rollAdv').onclick = () => rollAdvDis('advantage');
+    $('#rollDis').onclick = () => rollAdvDis('disadvantage');
+    $('#mageScene').onclick = () => roll(1);  // fumble → triggers the mageRabbit scene on the die
   </script>
 </body>
 </html>
