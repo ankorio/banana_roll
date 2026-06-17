@@ -9,9 +9,16 @@
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
-  const ROOM = (location.pathname.match(/\/room\/([^/]+)\//) || [])[1] || 'demo';
-  const PLAYER = new URLSearchParams(location.search).get('player') || 'default';
-  BR.room = ROOM; BR.player = PLAYER;
+  // Two run modes:
+  //  • room mode  — /room/<id>/customize?player=<pid> : edits this room's per-player store.
+  //  • token mode — /u/<token>/customize               : a clean, room-free permalink that
+  //    edits ONE player's cross-room PROFILE (keyed by their stable account id). The token is
+  //    an unguessable capability scoped to that single player — a shared link can never touch
+  //    anyone else's config and carries no room data.
+  const TOKEN = (location.pathname.match(/^\/u\/([^/]+)\/customize/) || [])[1] || null;
+  const ROOM = TOKEN ? null : ((location.pathname.match(/\/room\/([^/]+)\//) || [])[1] || 'demo');
+  const PLAYER = TOKEN ? 'me' : (new URLSearchParams(location.search).get('player') || 'default');
+  BR.room = ROOM; BR.player = PLAYER; BR.token = TOKEN;
 
   let lang = (() => { const s = localStorage.getItem('ovr_lang'); if (s === 'en' || s === 'es') return s; return (navigator.language || 'en').toLowerCase().startsWith('es') ? 'es' : 'en'; })();
   const D = () => BR.I18N[lang] || BR.I18N.en;
@@ -635,14 +642,17 @@
   $('#saveBtn').addEventListener('click', async () => {
     const pill = $('#savedPill'); const btn = $('#saveBtn');
     btn.disabled = true; const old = btn.querySelector('span').textContent; btn.querySelector('span').textContent = D().saving;
-    // Dice → /styles, plaque → /plaque (two independent stores server-side).
+    // Dice → style store, plaque → plaque store (two independent writes). Token mode
+    // targets the player's cross-room profile; room mode targets this room's per-player store.
+    const styleUrl = TOKEN ? `/u/${TOKEN}/style` : `/room/${ROOM}/styles?player=${encodeURIComponent(PLAYER)}`;
+    const plaqueUrl = TOKEN ? `/u/${TOKEN}/plaque` : `/room/${ROOM}/plaque?player=${encodeURIComponent(PLAYER)}`;
     let ok = true;
     try {
-      const r = await fetch(`/room/${ROOM}/styles?player=${encodeURIComponent(PLAYER)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ style: dicePayload() }) });
+      const r = await fetch(styleUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ style: dicePayload() }) });
       ok = r.ok;
     } catch (e) { ok = false; }
     try {
-      const r2 = await fetch(`/room/${ROOM}/plaque?player=${encodeURIComponent(PLAYER)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ templateId: st.templateId, colors: st.colors, zones: st.zones, background: st.customBg }) });
+      const r2 = await fetch(plaqueUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ templateId: st.templateId, colors: st.colors, zones: st.zones, background: st.customBg }) });
       ok = ok && r2.ok;
     } catch (e) { ok = false; }
     btn.disabled = false; btn.querySelector('span').textContent = old;
@@ -673,6 +683,15 @@
   // profile (what they saved in any previous room) when this room has nothing yet.
   async function loadExisting() {
     let ds = null, pl = null;
+    if (TOKEN) {
+      // Token mode: the player's profile IS the style + plaque (no room store).
+      try {
+        const r = await fetch(`/u/${TOKEN}/profile`);
+        if (r.ok) { const d = await r.json(); ds = d.style; pl = d.plaque; }
+      } catch (e) {}
+      applyDiceStyle(ds); applyPlaqueCfg(pl);
+      return;
+    }
     try {
       const r = await fetch(`/room/${ROOM}/styles`);
       if (r.ok) { const d = await r.json(); ds = PLAYER === 'default' ? d.defaultStyle : (d.styles || {})[PLAYER]; }
@@ -693,6 +712,20 @@
 
   // ============================================================ WHO + i18n
   async function fetchWho() {
+    if (TOKEN) {
+      // Token mode: identity (name/portrait/colour) comes from the profile endpoint, best-effort.
+      $('#whoName').textContent = (lang === 'es' ? 'Tus dados y placa' : 'Your dice & plaque');
+      try {
+        const r = await fetch(`/u/${TOKEN}/profile`); if (!r.ok) return;
+        const d = await r.json(); const w = d.identity || {};
+        const nm = w.charName || w.name;
+        if (nm) { $('#whoName').textContent = nm; st.charName = nm; }
+        if (w.color) $('#whoDot').style.background = w.color;
+        if (w.avatar) st.portraitImg = w.avatar;
+        paintZoneContent();
+      } catch (e) {}
+      return;
+    }
     if (PLAYER === 'default') { $('#whoName').textContent = D().allPlayers; return; }
     $('#whoName').textContent = PLAYER;
     try {
@@ -719,7 +752,9 @@
 
   $('#modeSeg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setMode(b.dataset.mode); });
   $('#playBtn') && $('#playBtn').addEventListener('click', playTestRoll);
-  $('#backBtn').href = `/room/${ROOM}/setup`;
+  // Token-mode links carry no room, so there's no setup page to return to — hide the back link.
+  if (TOKEN) { const b = $('#backBtn'); if (b) b.style.display = 'none'; }
+  else $('#backBtn').href = `/room/${ROOM}/setup`;
 
   // Load the real dice engine manifest (textures/materials/colorsets) + seeded
   // templates from the server, then rebuild the affected panels. Both fall back to
@@ -732,7 +767,7 @@
   }
   async function loadTemplates() {
     try {
-      const r = await fetch(`/room/${ROOM}/templates`);
+      const r = await fetch(TOKEN ? `/u/${TOKEN}/templates` : `/room/${ROOM}/templates`);
       if (!r.ok) return;
       const d = await r.json();
       if (Array.isArray(d.templates) && d.templates.length) { BR.TEMPLATES = d.templates; buildTemplatesPanel(); }

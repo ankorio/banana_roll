@@ -39,6 +39,9 @@ const CREATE_RATE_MAX = intEnv('CREATE_RATE_MAX', 10);             // creates pe
 const ROLL_RATE_WINDOW = intEnv('ROLL_RATE_WINDOW', 1000);     // per-room roll window
 const ROLL_RATE_MAX = intEnv('ROLL_RATE_MAX', 20);             // rolls per window per room
 
+const PROFILE_RATE_WINDOW = intEnv('PROFILE_RATE_WINDOW', 1000); // per-token profile-write window
+const PROFILE_RATE_MAX = intEnv('PROFILE_RATE_MAX', 10);         // profile writes per window per token
+
 function intEnv(name, dflt) {
   const v = parseInt(process.env[name], 10);
   return Number.isFinite(v) ? v : dflt;
@@ -46,7 +49,9 @@ function intEnv(name, dflt) {
 
 // --- state ------------------------------------------------------------------
 const rooms = new Map();        // id -> room record
-const profiles = new Map();     // playerid -> { style, plaque, updatedAt } (cross-room)
+const profiles = new Map();     // userid -> { style, plaque, token, updatedAt } (cross-room)
+const profileTokens = new Map();// customize-permalink token -> userid (unguessable capability)
+const profileHits = new Map();  // token -> [timestamps] (sliding window for profile writes)
 const createHits = new Map();   // ip -> [timestamps] (sliding window)
 const INSTANCE_ID = crypto.randomBytes(8).toString('hex'); // tags pub/sub msgs so we skip our own echo
 let remoteRollHandler = null;   // set by server.js: (room, roll) => broadcast to this instance's clients
@@ -144,6 +149,33 @@ async function saveProfile(id, partial) {
     profiles.set(id, next);
   }
   try { await backend.persistProfile(id, next); } catch {}
+}
+
+// --- customize permalink tokens ---------------------------------------------
+// A token is an unguessable, room-free capability that unlocks exactly ONE player's
+// cross-room profile. The streamer hands each player their own link; a shared link can
+// never touch anyone else's config and carries no room data. The token is stored INSIDE
+// the profile (so it persists with the file/redis backend) and mirrored into the
+// in-memory `profileTokens` reverse map for O(1) lookup. One stable token per account.
+async function mintProfileToken(userid) {
+  if (!userid || userid === 'default') return null;
+  const prof = (await getProfile(userid)) || {};
+  if (prof.token) { profileTokens.set(prof.token, userid); return prof.token; }
+  const tok = token();
+  await saveProfile(userid, { token: tok });
+  profileTokens.set(tok, userid);
+  return tok;
+}
+function useridForToken(tok) { return (tok && profileTokens.get(tok)) || null; }
+// Rebuild the reverse map from profiles loaded off disk (file backend) at startup.
+function indexProfileTokens() {
+  for (const [id, p] of profiles) if (p && p.token) profileTokens.set(p.token, id);
+}
+// Per-token sliding-window limiter for profile writes (no room to rate-limit against).
+function allowProfileWrite(tok) {
+  let arr = profileHits.get(tok);
+  if (!arr) { arr = []; profileHits.set(tok, arr); }
+  return slidingAllow(arr, PROFILE_RATE_WINDOW, PROFILE_RATE_MAX);
 }
 
 // --- dedup ------------------------------------------------------------------
@@ -288,6 +320,7 @@ function fileBackend(STATE_FILE) {
         const data = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
         for (const r of (data.rooms || [])) rooms.set(r.id, hydrate(r));
         for (const [id, p] of Object.entries(data.profiles || {})) profiles.set(id, p);
+        indexProfileTokens(); // rebuild token → userid reverse map so permalinks survive a restart
         console.log(`[state] loaded ${rooms.size} room(s), ${profiles.size} profile(s) from ${STATE_FILE}`);
       } catch (e) {
         console.error('[state] load failed:', e.message);
@@ -433,6 +466,7 @@ module.exports = {
   startSweeper, stopSweeper,
   persist, persistRoll, onRemoteRoll,
   getProfile, saveProfile,
+  mintProfileToken, useridForToken, allowProfileWrite,
   init, flush, close,
   _rooms: rooms, // exposed for tests
   limits: { SEEN_MAX, CLIENTS_MAX, MAX_ROOMS, ROOM_TTL },

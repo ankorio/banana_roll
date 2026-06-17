@@ -1,0 +1,176 @@
+{
+"packs": [
+{
+"id": "auras",
+"name": "Auras & Halos",
+"note": "TimelineFX glows \u2014 additive, tintable",
+"effects": [
+{
+"id": "aura_electricgroup1",
+"name": "Electric (anim)",
+"mode": "gridanim",
+"url": "/assets/fx/textures/auras_halos/ElectricGroup1.png",
+"cols": 2,
+"rows": 2,
+"count": 4,
+"fps": 12,
+"blend": "add"
+},
+{
+"id": "aura_flare1",
+"name": "Flare",
+"mode": "still",
+"url": "/assets/fx/textures/auras_halos/Flare1.png",
+"blend": "add"
+},
+{
+"id": "aura_flare2",
+"name": "Flare 2",
+"mode": "still",
+"url": "/assets/fx/textures/auras_halos/Flare2.png",
+"blend": "add"
+},
+{
+"id": "aura_flare10",
+"name": "Flare 10",
+"mode": "still",
+"url": "/assets/fx/textures/auras_halos/Flare10.png",
+"blend": "add"
+},
+{
+"id": "aura_halo1",
+"name": "Halo \u00b7 specks",
+"mode": "still",
+"url": "/assets/fx/textures/auras_halos/Halo1.png",
+"blend": "add"
+},
+{
+"id": "aura_halo2",
+"name": "Halo \u00b7 cloud",
+"mode": "still",
+"url": "/assets/fx/textures/auras_halos/Halo2.png",
+"blend": "add"
+},
+{
+"id": "aura_halo3",
+"name": "Halo \u00b7 glow disc",
+"mode": "still",
+"url": "/assets/fx/textures/auras_halos/Halo3.png",
+"blend": "add"
+},
+{
+"id": "aura_haloanim1",
+"name": "Halo Ring (anim)",
+"mode": "gridanim",
+"url": "/assets/fx/textures/auras_halos/HaloAnim1.png",
+"cols": 8,
+"rows": 4,
+"count": 32,
+"fps": 24,
+"blend": "add"
+},
+{
+"id": "aura_plume",
+"name": "Plume",
+"mode": "still",
+"url": "/assets/fx/textures/auras_halos/plume.png",
+"blend": "add"
+},
+{
+"id": "aura_smoke1",
+"name": "Smoke",
+"mode": "still",
+"url": "/assets/fx/textures/auras_halos/Smoke1.png",
+"blend": "add"
+},
+{
+"id": "aura_smokeball",
+"name": "Smoke Ball (anim)",
+"mode": "gridanim",
+"url": "/assets/fx/textures/auras_halos/smokeball.png",
+"cols": 8,
+"rows": 4,
+"count": 32,
+"fps": 24,
+"blend": "add"
+},
+{
+"id": "aura_smokestring",
+"name": "Smoke String (anim)",
+"mode": "gridanim",
+"url": "/assets/fx/textures/auras_halos/SmokeString.png",
+"cols": 10,
+"rows": 7,
+"count": 64,
+"fps": 30,
+"blend": "add"
+},
+{
+"id": "aura_smokeyhalo1",
+"name": "Smokey Halo",
+"mode": "still",
+"url": "/assets/fx/textures/auras_halos/SmokeyHalo1.png",
+"blend": "add"
+},
+{
+"id": "aura_smokeyhalo2",
+"name": "Smokey Halo 2",
+"mode": "still",
+"url": "/assets/fx/textures/auras_halos/SmokeyHalo2.png",
+"blend": "add"
+}
+]
+},
+{
+"id": "cgheven",
+"name": "cgHeven VFX",
+"note": "8\u00d78 atlases \u2014 2K, alpha-blended",
+"effects": [
+{
+"id": "cgh_portal_front",
+"name": "Magic Portal \u00b7 front",
+"mode": "gridanim",
+"url": "/assets/fx/textures/VFX_cgheven/Magic_Portal_02_Front_2K_8x8_purple.webp",
+"cols": 8,
+"rows": 8,
+"count": 64,
+"fps": 30,
+"blend": "normal"
+},
+{
+"id": "cgh_shield_block",
+"name": "Magic Shield \u00b7 block",
+"mode": "gridanim",
+"url": "/assets/fx/textures/VFX_cgheven/Magical_Sheild_Block_01_Fpv_2K_8x8.webp",
+"cols": 8,
+"rows": 8,
+"count": 64,
+"fps": 30,
+"blend": "normal"
+},
+{
+"id": "cgh_portal_side",
+"name": "Portal \u00b7 side",
+"mode": "gridanim",
+"url": "/assets/fx/textures/VFX_cgheven/Portal_04_Side_2K_8x8.webp",
+"cols": 8,
+"rows": 8,
+"count": 64,
+"fps": 30,
+"blend": "normal"
+},
+{
+"id": "cgh_tendrils",
+"name": "Violet Tendrils",
+"mode": "gridanim",
+"url": "/assets/fx/textures/VFX_cgheven/Violet_Portal_Tendrils_2K_8x8.webp",
+"cols": 8,
+"rows": 8,
+"count": 64,
+"fps": 24,
+"blend": "add"
+}
+]
+}
+]
+}

@@ -21,15 +21,10 @@ import { EFFECTS, makeTextures } from './effects.js';
 // LightningStrike was removed from current three; load the last version that has it from
 // the CDN, with ?external=three so it uses OUR three (the import-map one) — no version clash.
 import { LightningStrike } from 'https://esm.sh/three@0.150.0/examples/jsm/geometries/LightningStrike.js?external=three';
-// three.quarks (CDN, ?external=three → uses our import-map three): loads/plays authored
-// JSON presets (QuarksLoader) via a batched renderer. Used for `quarks:` effects only.
-import { BatchedRenderer, QuarksLoader, QuarksUtil, RenderMode } from 'https://esm.sh/three.quarks@0.17.1?external=three';
 
-let Box = null, scene = null, camera = null, renderer = null, batch = null, TEX = null;
+let Box = null, scene = null, camera = null, renderer = null, TEX = null;
 let unhook = null;      // Box.onBeforeRender unsubscribe
 const live = [];        // active sprite particles + lightning bolts
-const quarksLive = [];  // active three.quarks prefab instances { obj, t, endAt, max, ended }
-const quarksJson = {};  // url -> parsed JSON cache
 
 // px→world conversion + effect depth, set per play() from the current camera.
 let FX_F = 1;           // dice-world units per CSS pixel (at the z=0 plane)
@@ -42,9 +37,8 @@ const BRFX = {
     if (Box) BRFX.detach();
     Box = box;
     scene = box.scene; camera = box.camera; renderer = box.renderer;
-    try { batch = new BatchedRenderer(); scene.add(batch); } catch (e) { console.warn('[fx] three.quarks batch unavailable', e); batch = null; }
     TEX = makeTextures(THREE);
-    // one per-frame hook: advance quarks + sprite/bolt lifecycles. Box draws the frame.
+    // one per-frame hook: advance sprite/bolt lifecycles. Box draws the frame.
     unhook = box.onBeforeRender((dt) => step(Math.min(0.05, dt || 0)));
     return BRFX;
   },
@@ -53,16 +47,12 @@ const BRFX = {
     try { unhook && unhook(); } catch {}
     unhook = null;
     for (let i = live.length - 1; i >= 0; i--) removeLive(i);
-    for (let i = quarksLive.length - 1; i >= 0; i--) { try { scene.remove(quarksLive[i].obj); } catch {} quarksLive.splice(i, 1); }
-    try { batch && scene && scene.remove(batch); } catch {}
-    Box = scene = camera = renderer = batch = TEX = null;
+    Box = scene = camera = renderer = TEX = null;
     return BRFX;
   },
 
   names() { return Object.keys(EFFECTS); },
   label(name) { return (EFFECTS[name] && EFFECTS[name].label) || name; },
-  // the most recently spawned three.quarks prefab (for live tuning of tilt/scale)
-  lastQuarks() { return quarksLive.length ? quarksLive[quarksLive.length - 1].obj : null; },
 
   play(name, opts = {}) {
     if (!Box) { console.warn('[fx] not attached to a dice Box'); return; }
@@ -81,12 +71,6 @@ const BRFX = {
     const origin = { x: wx / m.f, y: wy / m.f }; // px-centered (round-trips to wx,wy via ×f)
     const intensity = Math.max(0.2, opts.intensity || 1);
 
-    if (def.quarks) {
-      const d = (opts.tiltX != null || opts.scaleK != null)
-        ? Object.assign({}, def, opts.tiltX != null ? { tiltX: opts.tiltX } : null, opts.scaleK != null ? { scaleK: opts.scaleK } : null)
-        : def;
-      playQuarks(d, { x: wx, y: wy, z: FX_Z }, intensity); ensureLoop(); return;
-    }
     try {
       def.spawn({ THREE, tex: TEX, W: m.Wpx, H: m.Hpx, origin,
         color: opts.color != null ? new THREE.Color(opts.color).getHex() : null,
@@ -107,49 +91,13 @@ function mapping() {
   return { Wpx, Hpx, f: visH / Hpx };
 }
 
-// Keep the dice engine's continuous loop running while FX are live (it idles when
-// dice settle, but looping auras + fading puffs need frames). Stop it when empty.
+// The dice engine's persistent loop is the SOLE owner of stepping + rendering and
+// is meant to run for the box's whole lifetime (see DiceBox.start / initialize). The
+// FX layer must never stop it: doing so on FX end froze any dice still settling (and
+// stalled idle auras / shadow updates). ensureLoop() stays as a defensive, idempotent
+// restart; maybeIdle() is intentionally a no-op — the engine manages its own loop.
 function ensureLoop() { try { Box.start(); } catch {} }
-function maybeIdle() { if (!live.length && !quarksLive.length) { try { Box.stop(); } catch {} } }
-
-// Load (cached) + play a three.quarks JSON preset at a dice-world position.
-async function playQuarks(def, world, intensity) {
-  if (!batch) return;
-  const f = FX_F, m = mapping();
-  try {
-    let json = quarksJson[def.quarks];
-    if (!json) { json = await (await fetch(def.quarks)).json(); quarksJson[def.quarks] = json; }
-    const loader = new QuarksLoader();
-    const obj = await loader.parseAsync(json);
-    // parseAsync (unlike the sync parse()) skips QuarksLoader.linkReference, so any
-    // EmitSubParticleSystem behaviour keeps a raw UUID instead of the real sub-emitter and
-    // crashes on the first update (reading subParticleSystem.system.duration). The gas-explosion
-    // smoke trail uses one — bind references ourselves, exactly as the engine's sync path does.
-    try { loader.linkReference?.(obj); } catch (e) { console.warn('[fx] linkReference failed', e); }
-    // The aura is authored top-down (action in the XZ ground plane); tiltX lays that onto our
-    // XY view (the dice camera, like the old FX cam, looks down −Z). Some emitters use Mesh /
-    // Horizontal·VerticalBillBoard modes that ignore the tilt and render edge-on — re-tag them as
-    // plain billboards so flat art (the magic-circle ring + rays) faces the camera. Opt out via
-    // def.keepMeshModes. (Fireball is camera-facing billboards already — no tilt needed.)
-    if (!def.keepMeshModes) obj.traverse((n) => {
-      const s = n.type === 'ParticleEmitter' && n.system;
-      if (s && (s.renderMode === RenderMode.Mesh || s.renderMode === RenderMode.HorizontalBillBoard || s.renderMode === RenderMode.VerticalBillBoard))
-        s.renderMode = RenderMode.BillBoard;
-    });
-    const k = Math.min(m.Wpx, m.Hpx) * (def.scaleK || 0.35) * intensity * f; // px tuning → world
-    obj.scale.setScalar(k);
-    obj.rotation.x = def.tiltX || 0;
-    obj.position.set(world.x, world.y, world.z || 0);
-    QuarksUtil.addToBatchRenderer(obj, batch);
-    fixQuarksBatches(); // additive→canvas-safe blending + sRGB textures (see helper)
-    if (!def.loop) try { QuarksUtil.setAutoDestroy(obj, true); } catch {}
-    scene.add(obj);
-    try { QuarksUtil.play(obj); } catch {}
-    const life = def.life || 2.5;
-    quarksLive.push({ obj, t: 0, ended: false, endAt: def.loop ? life : Infinity, max: life + (def.loop ? 2.2 : 1.4) });
-    ensureLoop();
-  } catch (e) { console.warn('[fx] quarks preset failed', def.quarks, e); }
-}
+function maybeIdle() { /* no-op: never stop the engine loop (it owns its own lifecycle) */ }
 
 // Make an additive material safe on the (alpha:true) dice canvas for OBS. Plain
 // THREE.AdditiveBlending writes SrcAlpha into the canvas ALPHA channel, which stamps
@@ -162,18 +110,6 @@ function additiveCanvasSafe(mat) {
   mat.blendSrc = THREE.SrcAlphaFactor;     mat.blendDst = THREE.OneFactor;      // RGB: additive glow
   mat.blendSrcAlpha = THREE.ZeroFactor;    mat.blendDstAlpha = THREE.OneFactor; // ALPHA: preserve transparency
   mat.needsUpdate = true;
-}
-
-// Same fix applied to three.quarks' shared batch materials, plus sRGB-tag their base64
-// textures (presets ship them with empty colorSpace → washed-out gold). Idempotent:
-// once converted the blending no longer matches AdditiveBlending so re-runs skip it.
-function fixQuarksBatches() {
-  for (const b of (batch.batches || [])) {
-    const mt = b.material;
-    if (mt && mt.blending === THREE.AdditiveBlending) additiveCanvasSafe(mt);
-    const tex = mt && mt.uniforms && mt.uniforms.map && mt.uniforms.map.value;
-    if (tex && tex.colorSpace !== THREE.SRGBColorSpace) { tex.colorSpace = THREE.SRGBColorSpace; tex.needsUpdate = true; }
-  }
 }
 
 // Sprite particle. c.* is authored in px (effects.js); convert to dice-world via FX_F.
@@ -220,15 +156,8 @@ function removeLive(i) {
   live.splice(i, 1);
 }
 
-// per-frame: advance three.quarks + sprite/bolt lifecycles (Box renders the frame)
+// per-frame: advance sprite/bolt lifecycles (Box renders the frame)
 function step(dt) {
-  if (batch) { try { batch.update(dt); } catch {} }
-  // age three.quarks prefab instances: stop a looping one at endAt, force-remove at max
-  for (let i = quarksLive.length - 1; i >= 0; i--) {
-    const q = quarksLive[i]; q.t += dt;
-    if (!q.ended && q.t >= q.endAt) { q.ended = true; try { QuarksUtil.endEmit(q.obj); } catch {} try { QuarksUtil.setAutoDestroy(q.obj, true); } catch {} }
-    if (q.t >= q.max) { try { QuarksUtil.stop(q.obj); } catch {} try { scene.remove(q.obj); } catch {} quarksLive.splice(i, 1); }
-  }
   for (let i = live.length - 1; i >= 0; i--) {
     const p = live[i];
     if (p.kind === 'ls') {

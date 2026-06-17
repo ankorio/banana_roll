@@ -170,6 +170,7 @@
   // ── optional libraries (3D dice + particles), loaded with graceful fallback ──
   let Box = null;       // dice-box-threejs instance, or null → plaque-only
   let confetti = null;  // canvas-confetti, or null → no particles
+  let Director = null;  // result-VFX director (crit/fumble/disadvantage), or null → no FX
 
   // Import a module local-first, falling back to the CDN URL if the local copy fails.
   // Returns { mod, usedCdn } so callers can adjust paths (e.g. assetPath) accordingly.
@@ -430,6 +431,16 @@
       settings = (JSON.parse(txt).settings) || null; } catch {}
   }
   const displayMs = () => (settings && Number.isFinite(settings.displaySeconds)) ? settings.displaySeconds * 1000 : CONFIG.displayMs;
+  // Per-result VFX toggles (room settings). Absent = on; only an explicit `false` disables.
+  function disabledVfx() {
+    const d = new Set();
+    if (settings) {
+      if (settings.vfxCrit === false) d.add('crit');
+      if (settings.vfxFumble === false) d.add('fumble');
+      if (settings.vfxDisadvantage === false) d.add('disadvantage');
+    }
+    return d;
+  }
 
   function showCard(roll, plan) {
     const cfg = plaqueConfigFor(roll);
@@ -628,6 +639,12 @@
     reflowAround(() => { card = showCard(tr.roll, tr.plan); });
     tr.card = card;
     fireParticles(tr.roll);
+    // Outcome VFX (crit→gold glow, fumble→red glow, disadvantage→mage/void). Scoped to
+    // this roll's own dice via groupId; `overlay: true` excludes playground-only triggers.
+    if (Box && Director) {
+      try { Director.onRoll(tr.roll, { groupId: id, overlay: true, disabled: disabledVfx() }); }
+      catch (e) { console.warn('[overlay] result fx failed', e); }
+    }
     tr.timer = setTimeout(() => endTrack(id), displayMs());
   }
 
@@ -636,7 +653,9 @@
     if (!tr) return;
     tracks.delete(id);
     if (tr.timer) clearTimeout(tr.timer);
-    if (Box) { try { Box.removeGroup(id); } catch {} } // pull the dice as the plaque leaves
+    // pull the dice as the plaque leaves. removeGroup is async; catch its rejection too
+    // (a result effect may have seized/removed a die, so the engine can throw mid-cleanup).
+    if (Box) { try { const p = Box.removeGroup(id); if (p && p.catch) p.catch(() => {}); } catch {} }
     if (tr.card) dismissCard(tr.card);                 // leaving plaque animates out; row slides in
     pumpQueue();
   }
@@ -739,6 +758,23 @@
 
   // ── boot ────────────────────────────────────────────────────────────────────
   await Promise.allSettled([initDice(), initConfetti()]);
+
+  // Result-VFX layer (only with 3D dice). Local-first dynamic import mirrors the dice
+  // engine: a module failure degrades to plaque + dice + confetti, never breaks the overlay.
+  // The trailing-trail + collision effects (MotionFX/SpriteFX) stay playground-only.
+  if (Box) {
+    try {
+      Director = (await import('/assets/fx/director/index.js')).default;
+      Director.attach(Box);   // wires BRFX (warms its procedural/Kenney textures) + the Conductor
+      // Warm heavy assets (Wizard.glb, atlases, the void-dome Fresnel shader) on idle so the
+      // first real trigger never stalls mid-roll.
+      (window.requestIdleCallback || ((f) => setTimeout(f, 1500)))(() => Director.warmup(Box));
+      console.log('[overlay] result FX ready');
+    } catch (e) {
+      console.warn('[overlay] FX layer unavailable', e);
+      Director = null;
+    }
+  }
 
   // Plaque configs + templates + room settings (cached; polled so edits land without a reload).
   if (room) {
