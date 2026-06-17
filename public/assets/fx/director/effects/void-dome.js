@@ -195,4 +195,24 @@ defineEffect('voidDome', async (ctx) => {
       portal.geometry.dispose(); portalTex.dispose(); portal.material.dispose();
     })
     .build();
+},
+// warmup: fetch the three textures AND precompile the custom Fresnel program so the
+// first cast doesn't hitch on a mid-frame shader compile. We build the ShaderMaterial
+// on a throwaway sphere, add+compile+remove it before any frame draws it (no flash).
+async (box) => {
+  await Promise.all([loadGlow(), loadSmoke(), loadPortal()]);
+  if (!box || !box.renderer || !box.scene || !box.camera) return;
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { coreColor: { value: CORE }, rimColor: { value: RIM }, power: { value: 3.0 }, strength: { value: 1 },
+      smokeTex: { value: null }, smokeFrame: { value: 0 }, smokeColor: { value: SMOKE }, smokeAmt: { value: 0.9 } },
+    vertexShader: VERT, fragmentShader: FRAG,
+    transparent: true, depthWrite: false, depthTest: false, side: THREE.FrontSide, blending: THREE.NormalBlending,
+  });
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 8, 6), mat);
+  // Compile in an ISOLATED scene (only this mesh) so we build just the Fresnel program
+  // without re-introspecting the live dice materials — lighter, and never drawn (no flash).
+  const tmp = new THREE.Scene(); tmp.add(mesh);
+  try { box.renderer.compile(tmp, box.camera); }   // builds the GL program without drawing
+  catch (e) { console.warn('[fx] void-dome shader precompile failed', e); }
+  mesh.geometry.dispose(); mat.dispose();
 });

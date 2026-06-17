@@ -431,21 +431,25 @@ async function seedProfiles(room, players) {
 
 // Room-id-only read for the setup page. Returns the roster (no token); these are the
 // same names/ids already encoded in the per-player overlay URLs (bearer capabilities).
-function handlePlayersGet(req, res, id) {
+async function handlePlayersGet(req, res, id) {
   const room = rooms.getRoom(id);
   if (!room) return sendJson(res, 404, { error: 'unknown room' });
   // Enrich the roster with the character name/portrait. The portrait prefers the
   // roster avatar the userscript resolved from Campaign at load (shows before anyone
   // rolls); the name and a fallback portrait come from each player's last roll
-  // (room.charInfo, absent until they've rolled).
+  // (room.charInfo, absent until they've rolled). We also mint each player's
+  // customize-permalink token (when we know their stable account id) so the setup page
+  // can show a clean, per-player, room-free share link.
   const ci = room.charInfo || {};
-  const players = (room.players || []).map((p) => {
+  const players = await Promise.all((room.players || []).map(async (p) => {
     const c = ci[p.id];
     const avatar = p.avatar || (c && c.avatar) || undefined;
     const charName = (c && c.who) || undefined;
-    if (!avatar && !charName) return p;
-    return { ...p, charName, avatar };
-  });
+    let customizeToken;
+    if (p.userid) { try { customizeToken = await rooms.mintProfileToken(p.userid); } catch {} }
+    if (!avatar && !charName && !customizeToken) return p;
+    return { ...p, charName, avatar, customizeToken };
+  }));
   sendJson(res, 200, { players });
 }
 
@@ -564,13 +568,94 @@ async function handleProfileGet(req, res, id, query) {
   sendJson(res, 200, { style: (prof && prof.style) || null, plaque: (prof && prof.plaque) || null });
 }
 
+// ── customize permalinks (room-free, per-player) ────────────────────────────
+// A clean /u/<token>/ link edits exactly ONE player's cross-room PROFILE (keyed by their
+// stable account id) — nothing room-scoped. The token is an unguessable capability for that
+// single player, so the streamer can hand it out without exposing the room id or letting
+// anyone touch another player's config. Writes also propagate to any LIVE room rostering
+// that player, so the new look lands on the overlay's next roll.
+
+// Best-effort display identity (name/portrait/color) for the editor preview — the first
+// roster entry across live rooms carrying this account id. Cosmetic only; null if unknown.
+function identityForUserid(userid) {
+  if (!userid) return null;
+  for (const room of rooms._rooms.values()) {
+    const p = (room.players || []).find((x) => x.userid === userid);
+    if (!p) continue;
+    const c = (room.charInfo || {})[p.id];
+    return { name: p.name || null, charName: (c && c.who) || null,
+      avatar: p.avatar || (c && c.avatar) || null, color: p.color || null };
+  }
+  return null;
+}
+
+// Push a profile change onto every live room rostering this account, overwriting that
+// player's per-campaign style/plaque so the overlay's next roll uses the new look.
+function propagateProfile(userid, partial) {
+  if (!userid) return;
+  for (const room of rooms._rooms.values()) {
+    const p = (room.players || []).find((x) => x.userid === userid);
+    if (!p) continue;
+    let changed = false;
+    if (partial.style) { (room.styles || (room.styles = {}))[p.id] = partial.style; changed = true; }
+    if (partial.plaque) { (room.plaques || (room.plaques = {}))[p.id] = partial.plaque; changed = true; }
+    if (changed) rooms.persist(room);
+  }
+}
+
+async function handleTokenProfileGet(req, res, token) {
+  const userid = rooms.useridForToken(token);
+  if (!userid) return sendJson(res, 404, { error: 'unknown link' });
+  const prof = await rooms.getProfile(userid);
+  sendJson(res, 200, {
+    style: (prof && prof.style) || null,
+    plaque: (prof && prof.plaque) || null,
+    identity: identityForUserid(userid),
+  });
+}
+
+function handleTokenStylePost(req, res, token) {
+  const userid = rooms.useridForToken(token);
+  if (!userid) return sendJson(res, 404, { error: 'unknown link' });
+  if (!rooms.allowProfileWrite(token)) return sendJson(res, 429, { error: 'rate limited' });
+  readBody(req, MAX_BODY, (err, buf) => {
+    if (err) return sendJson(res, 400, { error: 'bad body' });
+    let parsed;
+    try { parsed = JSON.parse(buf.toString('utf8')); }
+    catch { return sendJson(res, 400, { error: 'invalid json' }); }
+    const style = validateStyle(parsed && parsed.style != null ? parsed.style : parsed);
+    if (!style) return sendJson(res, 400, { error: 'invalid style' });
+    rooms.saveProfile(userid, { style });
+    propagateProfile(userid, { style });
+    sendJson(res, 200, { ok: true, style });
+  });
+}
+
+function handleTokenPlaquePost(req, res, token) {
+  const userid = rooms.useridForToken(token);
+  if (!userid) return sendJson(res, 404, { error: 'unknown link' });
+  if (!rooms.allowProfileWrite(token)) return sendJson(res, 429, { error: 'rate limited' });
+  readBody(req, PLAQUE_MAX_BODY, (err, buf) => {
+    if (err) return sendJson(res, 400, { error: 'bad body' });
+    let parsed;
+    try { parsed = JSON.parse(buf.toString('utf8')); }
+    catch { return sendJson(res, 400, { error: 'invalid json' }); }
+    const plaque = templates.validatePlaque(parsed && parsed.plaque != null ? parsed.plaque : parsed);
+    if (!plaque) return sendJson(res, 400, { error: 'invalid plaque' });
+    rooms.saveProfile(userid, { plaque });
+    propagateProfile(userid, { plaque });
+    sendJson(res, 200, { ok: true, plaque });
+  });
+}
+
 // --- room settings ----------------------------------------------------------
 function validateSettings(obj) {
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return null;
   const out = {};
   if (Number.isFinite(obj.displaySeconds)) out.displaySeconds = Math.max(1, Math.min(30, obj.displaySeconds));
   if (typeof obj.system === 'string' && /^[\w-]{1,40}$/.test(obj.system)) out.system = obj.system;
-  for (const k of ['confetti', 'sound', 'hideGm']) {
+  // confetti/sound/hideGm + per-result VFX toggles (absent = on; only `false` disables)
+  for (const k of ['confetti', 'sound', 'hideGm', 'vfxCrit', 'vfxFumble', 'vfxDisadvantage']) {
     if (typeof obj[k] === 'boolean') out[k] = obj[k];
   }
   return out;
@@ -668,6 +753,20 @@ const server = http.createServer((req, res) => {
   }
   if (pathname === '/roll20-capture.meta.js' && method === 'GET') {
     return serveUserscriptMeta(req, res);
+  }
+
+  // /u/:token/<action> — room-free customize permalink (edits the player's cross-room
+  // profile; no room data in the URL, scoped to one player by an unguessable token).
+  const u = pathname.match(/^\/u\/([^/]+)\/(customize|profile|style|plaque|templates)$/);
+  if (u) {
+    const token = decodeURIComponent(u[1]);
+    const action = u[2];
+    if (action === 'customize' && method === 'GET') return serveFile(res, path.join(PUBLIC_DIR, 'customize.html'), {}, req);
+    if (action === 'profile' && method === 'GET') return handleTokenProfileGet(req, res, token);
+    if (action === 'style' && method === 'POST') return handleTokenStylePost(req, res, token);
+    if (action === 'plaque' && method === 'POST') return handleTokenPlaquePost(req, res, token);
+    if (action === 'templates' && method === 'GET') return handleTemplatesGet(req, res, token);
+    return sendJson(res, 405, { error: 'method not allowed' });
   }
 
   // /room/:id/<action>

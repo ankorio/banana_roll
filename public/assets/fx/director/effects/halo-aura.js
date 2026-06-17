@@ -73,4 +73,6 @@ defineEffect('haloAura', async (ctx) => {
       [ring, glow].forEach((m) => { m.geometry.dispose(); m.material.map.dispose(); m.material.dispose(); });
     })
     .build();
-});
+},
+// warmup: fetch + decode the ring + glow textures
+() => Promise.all([tex(RING), tex(GLOW)]));

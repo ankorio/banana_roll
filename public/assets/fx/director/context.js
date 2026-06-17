@@ -14,8 +14,12 @@
    }
    ========================================================================== */
 
-export function createContext(Box, BRFX, roll) {
-  const all = Box.diceList ? Box.diceList.slice() : [];
+export function createContext(Box, BRFX, roll, groupId) {
+  // Scope to this roll's own dice when a groupId is given (the overlay shows up to
+  // MAX_VISIBLE concurrent rolls, each die tagged with its rollGroup id). The
+  // playground passes no groupId → operate on every die, as before.
+  const list = Box.diceList || [];
+  const all = groupId != null ? list.filter((d) => d && d.groupId === groupId) : list.slice();
 
   // Resolve winner/loser. adv/dis carries d20.keptIndex; the dice come out in
   // notation order, so the kept index maps straight onto diceList.
@@ -67,6 +71,18 @@ export function createContext(Box, BRFX, roll) {
         const i = Box.diceList.indexOf(die);
         if (i !== -1) Box.diceList.splice(i, 1);
       }
+      // Detach from the engine's GROUP too, not just diceList. The engine's async
+      // removeGroup() (overlay endTrack) iterates the group's meshes and calls
+      // getFaceValue() on each — which reads die.body.quaternion. seize() nulled this
+      // die's body, so leaving it in the group makes removeGroup throw (an uncaught
+      // promise rejection) AND abort mid-loop, leaking the sibling die. Drop it here.
+      try {
+        const g = die._group || (Box.groups && die.groupId != null ? Box.groups.get(die.groupId) : null);
+        if (g && Array.isArray(g.meshes)) {
+          const j = g.meshes.indexOf(die);
+          if (j !== -1) g.meshes.splice(j, 1);
+        }
+      } catch {}
       // The engine keeps shadowMap.autoUpdate OFF (only re-bakes on a roll), so a die
       // removed outside that path leaves a stale baked shadow. Force one refresh.
       try { if (Box.renderer && Box.renderer.shadowMap) Box.renderer.shadowMap.needsUpdate = true; } catch {}

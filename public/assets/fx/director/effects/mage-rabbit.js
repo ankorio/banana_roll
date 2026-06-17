@@ -82,7 +82,10 @@ const APP_SIZE = 560;                // apparition billboard size (engulfs the m
 
 defineEffect('mageRabbit', async (ctx) => {
   const scene = ctx.scene;
-  const die = ctx.dice.winner || ctx.dice.all[0];
+  // Perform on the DOOMED die: the discarded one when adv/dis was rolled (disadvantage
+  // keeps the lower d20, so its loser is the HIGHER die — that's the one the mage turns
+  // into a rabbit), else the single rolled die (e.g. a fumble). Mirrors voidDome's target.
+  const die = ctx.dice.loser || ctx.dice.winner || ctx.dice.all[0];
   if (!die) return null;                       // need the rolled die to perform on
   const dieP = { x: die.position.x, y: die.position.y, z: die.position.z };
   ctx.seize(die);                              // freeze the doomed die's physics
@@ -193,4 +196,6 @@ defineEffect('mageRabbit', async (ctx) => {
       try { appar.geometry.dispose(); apparTex.dispose(); appar.material.dispose(); } catch {}
     })
     .build();
-});
+},
+// warmup: fetch + decode the two GLBs (1.2 MB wizard + rabbit) and the apparition atlas
+() => Promise.all([loadGLB(WIZ), loadGLB(RAB), loadAppar()]));
