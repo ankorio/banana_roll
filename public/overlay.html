@@ -526,6 +526,12 @@
   const MAX_VISIBLE = 5;
   const tracks = new Map();   // roll.id -> { roll, card, timer }
   const pending = [];         // overflow rolls waiting for a free slot
+  // Ids already shown — survives track teardown so a retained-roll replay (the server
+  // resends `lastRoll` on every SSE (re)connect, and proxies/LBs recycle idle SSE after
+  // a while) doesn't re-render as a phantom reroll. `tracks` alone can't de-dup it: the
+  // track is gone by then. Bounded; ids are unique Firebase push-ids so never re-arrive.
+  const seen = new Set();
+  const SEEN_MAX = 256;
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   // Stable entry edge per player (seeded by playerid → same edge across reloads).
@@ -673,7 +679,9 @@
 
   function enqueue(roll) {
     const id = rollId(roll);
-    if (tracks.has(id)) return;                       // de-dup (e.g. SSE replay of retained roll)
+    if (tracks.has(id) || seen.has(id)) return;       // de-dup: live track OR already-shown (SSE retained replay)
+    seen.add(id);
+    if (seen.size > SEEN_MAX) seen.delete(seen.values().next().value); // drop oldest
     if (tracks.size >= MAX_VISIBLE) { pending.push(roll); return; }
     startRoll(roll);
   }
