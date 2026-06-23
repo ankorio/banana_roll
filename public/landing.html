@@ -959,8 +959,15 @@
           dice: [d20(v)], isCrit: v === 20, isFumble: v === 1, ts: Date.now() };
       }
 
-      let ready = false, visible = false, paused = false, idleTimer = null, nextTimer = null;
-      const autoplaying = () => ready && visible && !paused;
+      let ready = false, onScreen = false, paused = false, idleTimer = null, nextTimer = null;
+      // "Visible" = section scrolled into view AND the tab is foreground. Backgrounded tabs
+      // freeze requestAnimationFrame but keep firing (throttled) setTimeouts: if we kept
+      // auto-rolling while hidden, the overlay's rAF-driven card/dice/confetti animations
+      // would queue up frozen and all flush in one frame on refocus. Gating on
+      // document.visibilityState stops sending rolls while hidden — every fire path below
+      // is guarded by autoplaying(), so the chain simply pauses and resumes on focus.
+      const visible = () => onScreen && document.visibilityState === 'visible';
+      const autoplaying = () => ready && visible() && !paused;
       function fire(kind) {
         if (!ready) return;
         frame.contentWindow.postMessage({ type: 'demo-roll', roll: makeRoll(kind) }, location.origin);
@@ -978,7 +985,7 @@
 
       window.addEventListener('message', (e) => {
         if (e.origin !== location.origin || !e.data) return;
-        if (e.data.type === 'demo-ready') { ready = true; if (visible) kick(); }
+        if (e.data.type === 'demo-ready') { ready = true; if (visible()) kick(); }
         else if (e.data.type === 'demo-idle' && autoplaying()) {
           clearTimeout(nextTimer); nextTimer = setTimeout(() => { if (autoplaying()) fire(pick(KINDS)); }, 900);
         }
@@ -987,9 +994,12 @@
       // Only auto-play while the section is on screen (don't roll off-screen).
       if (section) {
         new IntersectionObserver((entries) => {
-          entries.forEach((en) => { const was = visible; visible = en.isIntersecting; if (visible && !was) kick(); });
+          entries.forEach((en) => { const was = visible(); onScreen = en.isIntersecting; if (visible() && !was) kick(); });
         }, { threshold: 0.3 }).observe(section);
       }
+      // Resume when the tab returns to the foreground; the autoplay chain (demo-idle →
+      // nextTimer) died while hidden because autoplaying() was false, so re-kick it.
+      document.addEventListener('visibilitychange', () => { if (visible()) kick(); });
     })();
 
     /* ════════════════ i18n (EN / ES) ════════════════ */
